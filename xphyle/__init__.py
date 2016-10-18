@@ -30,14 +30,15 @@ def safe_file_read(path : 'str', **kwargs) -> 'str':
         kwargs: Additional arguments to pass to open_
     
     Returns:
-        The contents of the file, or None if the file does not exist.
+        The contents of the file as a string, or empty string if the file does
+        not exist.
     """
     try:
         path = check_readable_file(path)
         with open_(path, 'r', **kwargs) as f:
             return f.read()
     except:
-        return None
+        return ""
     
 def safe_file_iter(path : 'str', convert : 'callable' = None,
                    strip_linesep : 'bool' = True, **kwargs) -> 'generator':
@@ -86,36 +87,40 @@ def read_chunked(path : 'str', chunksize : 'int,>0' = 1024,
             else:
                 break
 
-def write_file(path : 'str', strings, delim : 'str' = '\n'):
+def write_file(path : 'str', strings, linesep : 'str' = '\n'):
     """Write delimiter-separated strings to a file.
     
     Args:
         path: Path to the file
         strings: Single string, or an iterable of strings
-        delim: The delimiter to use to separate the strings
+        linesep: The delimiter to use to separate the strings, or
+            ``os.linesep`` if None (defaults to '\n')
     """
-    with xopen(path, 'w') as f:
+    with open_(path, 'w') as f:
         if isinstance(strings, str):
             f.write(strings)
         else:
             itr = iter(strings)
             f.write(next(itr))
             for s in itr:
-                f.write(delim)
+                f.write(delim or os.linesep)
                 f.write(s)
 
-def write_dict(path : 'str', d : 'dict', delim : 'str' = '\n'):
+def write_dict(d : 'dict', path : 'str', sep : 'str' : '=',
+               linesep : 'str' = '\n'):
     """Write a dict to a file as name=value lines.
     
     Args:
-        path: Path to the file
         d: The dict
-        delim: The delimiter between values
+        path: Path to the file
+        sep: The delimiter between key and value (defaults to '=')
+        linesep: The delimiter between values, or ``os.linesep`` if None
+            (defaults to '\n')
     """
     write_file(
         path,
-        ("{0}={1}".format(k,v) for k,v in d.iteritems()),
-        delim=delim)
+        ("{}{}{}".format(k, sep, v) for k, v in d.iteritems()),
+        linesep=linesep)
 
 ## Compressed/encoded data
 
@@ -126,15 +131,18 @@ def read_pickled(binfile : 'str', compression : 'bool' = False):
     Args:
         binfile: Path to the pickled file.
         compression: A valid argument to ``compression.get_decompressor``
+    
+    Returns:
+        The pickled object, or None if the file does not exist or is empty.
     """
     if compression is False:
         try:
-            with open(binfile, 'rb') as pfile:
+            with open_(binfile, 'rb') as pfile:
                 return pickle.load(pfile)
         except:
             return None
     else:
-        data = safe_read_file(binfile)
+        data = safe_file_read(binfile, mode='rb')
         if not data:
             return None
         decompressor = get_decompressor(binfile, compression) # TODO
