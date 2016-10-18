@@ -4,6 +4,19 @@ xphyle is a small python (3.3+) library that makes it easy to open compressed
 files for the highest-possible performance available on your system. It also
 provides some convenience methods for working with file paths.
 
+# Dependencies
+
+* nose2 (for testing)
+
+# Installation
+
+```
+pip install git+git://github.com/jdidion/xphyle.git
+```
+
+We are actively working towards 100% test coverage, at which point we will
+declare version 1.0 and add the project to pypi.
+
 # Example usages:
 
 ```python
