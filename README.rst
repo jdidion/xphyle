@@ -1,12 +1,12 @@
 xphyle: easier access to compressed files
-===
+=========================================
 
 xphyle is a small python (3.3+) library that makes it easy to open compressed
 files for the highest-possible performance available on your system. It also
 provides some convenience methods for working with file paths.
 
 Example usages:
-===
+===============
 
 .. code-block:: python
     from xphyle import *
