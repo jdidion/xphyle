@@ -1,9 +1,0 @@
-README.rst
-setup.py
-xphyle/__init__.py
-xphyle/compression.py
-xphyle/paths.py
-xphyle.egg-info/PKG-INFO
-xphyle.egg-info/SOURCES.txt
-xphyle.egg-info/dependency_links.txt
-xphyle.egg-info/top_level.txt
