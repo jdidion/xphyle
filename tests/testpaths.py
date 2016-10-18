@@ -1,31 +1,23 @@
-from contextlib import contextmanager
-import stat
-import tempfile
+from unittest import TestCase
+
 from xphyle.paths import *
+from . import *
 
-@contextmanager
-def make_file(mode, contents=None):
-    fh, path = tempfile.mkstemp()
-    if contents:
-        fh.write(contents)
-    fh.close()
-    mode_flag = 0
-    if 'r' in mode:
-        mode_flag |= stat.S_IREAD
-    if 'w' in mode:
-        mode_flag |= stat.S_IWRITE
-    if 'x' in mode:
-        mode_flag |= stat.S_IEXEC
-    os.chmod(path, mode_flag)
-    try:
-        yield path
-    finally:
-        os.remove(path)
+class PathTests(TestCase):
+    def test_check_access_std(self):
+        check_access(STDOUT, 'r')
+        check_access(STDOUT, 'w')
+        check_access(STDERR, 'w')
+        check_access(STDOUT, 'a')
+        check_access(STDERR, 'a')
+        
+    def test_check_access_file(self):
+        with make_file('rwx') as path:
+            check_access(path, 'r')
+            check_access(path, 'w')
+            check_access(path, 'x')
 
-def test_check_access_std():
-    check_access(STDOUT, 'r')
-    check_access(STDOUT, 'w')
-    check_access(STDERR, 'w')
-    check_access(STDOUT, 'a')
-    check_access(STDERR, 'a')
-    
+    def test_no_access(self):
+        with self.assertRaises(IOError):
+            with make_file('r') as path:
+                check_access(path, 'w')
