@@ -1,0 +1,16 @@
+Metadata-Version: 1.1
+Name: xphyle
+Version: 0.1
+Summary: Utilities for working with files.
+Home-page: https://github.com/jdidion/xphyle
+Author: John Didion
+Author-email: john.didion@nih.gov
+License: Public Domain
+Description: UNKNOWN
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: License :: OSI Approved :: Public Domain
+Classifier: Programming Language :: Python :: 3.3
+Classifier: Programming Language :: Python :: 3.4
+Classifier: Programming Language :: Python :: 3.5
+Classifier: Programming Language :: Python :: 3.6
