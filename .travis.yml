@@ -10,7 +10,8 @@ python:
 
 install:
   - pip install --upgrade pip wheel
+  - pip install nose2
   - pip install .
 
 script:
-  - nosetests -P tests
+  - nose2 -P tests

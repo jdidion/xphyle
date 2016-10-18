@@ -6,7 +6,6 @@ otherwise managing files.
 from contextlib import contextmanager
 import pickle
 import csv
-import fileinput
 import importlib
 import io
 import os
@@ -23,29 +22,32 @@ from xphyle.paths import *
 
 ## Raw data
 
-def safe_file_read(path : 'str') -> 'str':
+def safe_file_read(path : 'str', **kwargs) -> 'str':
     """Read the contents of a file if it exists.
     
     Args:
-        path: Path to the file.
+        path: Path to the file, or a file-like object
+        kwargs: Additional arguments to pass to open_
     
     Returns:
         The contents of the file, or None if the file does not exist.
     """
     try:
         path = check_readable_file(path)
-        with xopen(path, 'r') as f:
+        with open_(path, 'r', **kwargs) as f:
             return f.read()
     except:
         return None
     
-def safe_file_iter(path : 'str', convert : 'callable' = None) -> 'generator':
+def safe_file_iter(path : 'str', convert : 'callable' = None,
+                   strip_linesep : 'bool' = True, **kwargs) -> 'generator':
     """Iterate over a file if it exists.
     
     Args:
         path: Path to the file.
-        convert: function to call on each line in the file.
-        
+        convert: Function to call on each line in the file.
+        kwargs: Additional arguments to pass to open_
+    
     Returns:
         Iterator over the lines of a file, with line endings stripped, or
         None if the file doesn't exist or is not readable.
@@ -53,11 +55,15 @@ def safe_file_iter(path : 'str', convert : 'callable' = None) -> 'generator':
     try:
         path = check_readable_file(path)
     except:
-        return None
-    itr = (s.rstrip() for s in fileinput.input(path))
-    if convert:
-        itr = (convert(s) for s in itr)
-    return itr
+        return
+    with open_(path, **kwargs) as f:
+        itr = f
+        if strip_linesep:
+            itr = (line.rstrip() for line in itr)
+        if convert:
+            itr = (convert(line) for line in itr)
+        for line in itr:
+            yield line
 
 def read_chunked(path : 'str', chunksize : 'int,>0' = 1024,
                  **kwargs) -> 'generator':
@@ -134,11 +140,13 @@ def read_pickled(binfile : 'str', compression : 'bool' = False):
         decompressor = get_decompressor(binfile, compression) # TODO
         return pickle.loads(decompressor(data))
 
-def compress_file(path : 'str', compressed_path : 'str' = None, compression=None):
-    """Compress a file, either in-place or to a separate file.
+def compress_contents(path : 'str', compressed_path : 'str' = None, compression=None):
+    """Compress the contents of a file, either in-place or to a separate file.
     
     Args:
-        path (str): The file to compress.
+        path (str): The path of the file to copy, or a file-like object.
+          This can itself be a compressed file (e.g. if you want to change
+          the file from one compression format to another).
         compressed_path (str): The compressed file. If None, the file is
           compressed in place.
         compression: None or True, to guess compression format from the file
@@ -150,12 +158,10 @@ def compress_file(path : 'str', compressed_path : 'str' = None, compression=None
             raise ValueException(
                 "Either compressed_path must be specified or compression must "
                 "be a valid compression type.")
-        tmp, compressed_path = tempfile.mkstemp()
-        tmp.close()
+        compressed_path = tempfile.mkstemp()[1]
     
     # Perform sequential compression as the source file might be quite large
-    opener = get_file_opener(compressed_path, compression) # TODO
-    with opener(compressed_path, 'wb') as cfile:
+    with open_(compressed_path, mode='wb', compression=compression) as cfile:
         for bytes in read_chunked(path):
             cfile.write(bytes)
     
@@ -168,7 +174,7 @@ def write_archive(path : 'str', contents, **kwargs):
     
     Args:
         path (str): Path of the archive file to write.
-        contents (iterable): A dict or an iterable of (name,content) tuples.
+        contents (iterable): A dict or an iterable of (name, content) tuples.
           A content item can be a path to a readable file to be added
           to the archive.
         kwargs: Additional args to `open_archive_writer`.
@@ -189,7 +195,7 @@ def delimited_file_iter(path : 'str', delim : 'str' = '\t',
     """Iterate over rows in a delimited file.
     
     Args:
-        path: Path to the file
+        path: Path to the file, or a file-like object
         delim: field delimiter
         converters: function, or iterable of functions, to call on each field
         kwargs: additional arguments to pass to ``csv.reader``
@@ -204,7 +210,7 @@ def delimited_file_iter(path : 'str', delim : 'str' = '\t',
         else:
             raise ValueError("'converters' must be iterable or callable")
     
-    with xopen(path, 'r') as f:
+    with open_(path, 'r') as f:
         g = (row for row in csv.reader(f, delimiter=delim, **kwargs))
         if converters:
             g = (fn(x) if fn else x
@@ -219,7 +225,7 @@ def delimited_file_to_dict(path : 'str', delim : 'str' = '\t',
     """Parse rows in a delimited file and add each row to a dict.
     
     Args:
-        path: Path to the file
+        path: Path to the file, or a file-like object
         delim: Field delimiter
         key: The column to use as a dict key, or a function to extract the key
           from the row. All values must be unique, or an exception is raised.
