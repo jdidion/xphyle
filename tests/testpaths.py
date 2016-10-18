@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import stat
 import tempfile
 from xphyle.paths import *
@@ -27,5 +28,4 @@ def test_check_access_std():
     check_access(STDERR, 'w')
     check_access(STDOUT, 'a')
     check_access(STDERR, 'a')
-    
     

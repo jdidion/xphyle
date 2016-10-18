@@ -4,6 +4,7 @@ to use system-level processes, which is faster than using the python
 implementations.
 """
 
+from contextlib import contextmanager
 from importlib import import_module
 import io
 import os
@@ -38,7 +39,7 @@ class SystemReader:
           the basename of ``executable_path``
     """
     def __init__(self, filename : 'str', command : 'str',
-                 executable_path : 'str', executable_name=None : 'str'):
+                 executable_path : 'str', executable_name : 'str' = None):
         self.name = filename
         self.command = command.format(
             exe=executable_path, filename=filename).split(' ')
@@ -103,8 +104,9 @@ class SystemWriter:
         executable_name: The display name of the executable, or ``None`` to use
           the basename of ``executable_path``
     """
-    def __init__(self, filename : 'str', mode='w' : 'str', command : 'str',
-                 executable_path : 'str', executable_name=None : 'str'):
+    def __init__(self, executable_path : 'str', filename : 'str',
+                 mode : 'str' = 'w', command : 'str' = "{exe} {filename}",
+                 executable_name : 'str' = None):
         self.name = filename
         self.command = command.format(
             exe=executable_path, filename=filename).split(' ')
@@ -162,7 +164,7 @@ def register_compression_format(format_class : 'class'):
         ``format_class`` -- a subclass of CompressionFormat
     """
     fmt = format_class()
-    aliases = set(fmt.exts) + set((fmt.lib_name, fmt.system_command))
+    aliases = set(fmt.exts) & set((fmt.lib_name, fmt.system_command))
     for alias in aliases:
         # TODO: warn about overriding existing format?
         compression_formats[alias] = fmt
@@ -209,10 +211,10 @@ class CompressionFormat(FileFormat):
     def compress_iterable(self, strings) -> 'bytes':
         """Compress an iterable of strings using the python-level interface.
         """
-        self.lib.compress(b''.join(s.encode() for s in strings)))
+        self.lib.compress(b''.join(s.encode() for s in strings))
     
     def open_file(self, filename : 'str', mode : 'str',
-                  use_system=True : 'bool', **kwargs):
+                  use_system : 'bool' = True, **kwargs):
         """Opens a compressed file for reading or writing.
         
         If ``use_system`` is True and the system provides an accessible
@@ -233,16 +235,16 @@ class CompressionFormat(FileFormat):
             try:
                 if 'r' in mode:
                     z = SystemReader(
+                        self.executable_path,
                         filename,
                         self.system_reader_command,
-                        self.executable_path,
                         self.system_command)
                 else:
                     z = SystemWriter(
+                        self.executable_path,
                         filename,
                         mode,
                         self.system_writer_command,
-                        self.executable_path,
                         self.system_command)
                 if 't' in mode:
                     z = io.TextIOWrapper(z)
@@ -323,10 +325,10 @@ def register_archive_format(format_class : 'class'):
     Args:
         ``format_class`` -- a subclass of ArchiveFormat
     """
-    aliases = set(fmt.exts) + set((fmt.lib_name,))
+    aliases = set(format_class.exts) & set((format_class.lib_name,))
     for alias in aliases:
         # TODO: warn about overriding existing format?
-        archive_formats[alias] = fmt
+        archive_formats[alias] = format_class
 
 def get_archive_format(name : 'str') -> 'ArchiveWriter':
     """Get the ArchiveWriter class for the given name.
@@ -363,7 +365,7 @@ class ArchiveWriter(FileFormat):
             the name of compression format to use.
         kwargs: Additional arguments to pass to the open method
     """
-    def __init__(self, path : 'str', compression=False : 'bool', **kwargs):
+    def __init__(self, path : 'str', compression : 'bool' = False, **kwargs):
         self.path = path
         self.compression = compression
         self.open_args = kwargs
@@ -374,7 +376,7 @@ class ArchiveWriter(FileFormat):
             raise Exception("Archive is already open")
         self.archive = self._open()
     
-    def write_file(self, path : 'str', archive_name=None : 'str'):
+    def write_file(self, path : 'str', archive_name : 'str' = None):
         """Copy a file into the archive.
         
         Args:

@@ -16,7 +16,7 @@ import tempfile
 import tarfile
 import zipfile
 
-from xplyle.compression import *
+from xphyle.compression import *
 from xphyle.paths import *
 
 # Reading data from/writing data to files
@@ -280,9 +280,9 @@ def parse_properties(source, delim : 'str' = '=', fn : 'callable' = None,
     def parse_line(line):
         line = line.strip()
         if len(line) == 0 or line[0] == "#":
-            continue
+            return None
         return line.split(delim)
-    g = (parse_line(line) for line in source)
+    g = filter(None, (parse_line(line) for line in source))
     if fn:
         g = ((k, fn(v)) for k,v in g)
     return OrderedDict(g) if ordered else PropDict(g)

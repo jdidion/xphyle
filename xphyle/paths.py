@@ -64,7 +64,7 @@ def abspath(path : 'str') -> 'str':
         return path
     return os.path.abspath(os.path.expanduser(path))
 
-def splitext(path : 'str', keep_seps=True : 'bool') -> 'tuple':
+def splitext(path : 'str', keep_seps : 'bool' = True) -> 'tuple':
     """Splits the basename of ``path`` into a filename and zero or more
     file extensions.
     
@@ -93,7 +93,7 @@ def filename(path : 'str') -> 'str':
     """
     return splitext(path)[0]
 
-def resolve_path(path : 'str', parent=None : 'str') -> 'str':
+def resolve_path(path : 'str', parent : 'str' = None) -> 'str':
     """Resolves the absolute path of the specified file and ensures that the
     file/directory exists.
     
@@ -116,7 +116,7 @@ def resolve_path(path : 'str', parent=None : 'str') -> 'str':
         raise IOError(errno.ENOENT, "{} does not exist".format(apath), apath)
     return apath
 
-def check_path(path : 'str', ptype=None : 'str', access=None) -> 'str':
+def check_path(path : 'str', ptype : 'str' = None, access=None) -> 'str':
     """Resolves the path (using ``resolve_path``) and checks that the path is
     of the specified type and allows the specified access.
     
@@ -167,8 +167,8 @@ def check_writeable_file(path : 'str') -> 'str':
             os.makedirs(dirpath)
         return path
 
-def find(root : 'str', pattern : 'RegexObject', types='f' : 'str',
-         recursive=True : 'bool') -> 'list':
+def find(root : 'str', pattern : 'RegexObject', types : 'str' = 'f',
+         recursive : 'bool' = True) -> 'list':
     """Find all paths under ``root`` that match ``pattern``.
     
     Args:
