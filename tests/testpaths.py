@@ -1,5 +1,5 @@
 from unittest import TestCase
-
+import os
 from xphyle.paths import *
 from . import *
 
@@ -21,3 +21,31 @@ class PathTests(TestCase):
         with self.assertRaises(IOError):
             with make_file('r') as path:
                 check_access(path, 'w')
+    
+    def test_abspath_home(self):
+        home = os.path.expanduser("~")
+        self.assertEqual(abspath('~/foo'), os.path.join(home, 'foo'))
+    
+    def test_abspath_rel(self):
+        cwd = os.getcwd()
+        self.assertEqual(abspath('foo'), os.path.join(cwd, 'foo'))
+    
+    def test_splitext(self):
+        self.assertTupleEqual(
+            splitext('/path/to/foo', keep_seps=False),
+            ('foo',))
+        self.assertTupleEqual(
+            splitext('foo.tar.gz', keep_seps=False),
+            ('foo', 'tar', 'gz'))
+        self.assertTupleEqual(
+            splitext('foo.tar.gz', keep_seps=True),
+            ('foo', '.tar', '.gz'))
+    
+    def test_filename(self):
+        self.assertEqual(filename('/path/to/foo.tar.gz'), 'foo')
+    
+    def test_resolve_std(self):
+        self.assertEqual(STDOUT, resolve_path(STDOUT))
+        self.assertEqual(STDERR, resolve_path(STDERR))
+    
+    def test_resolve

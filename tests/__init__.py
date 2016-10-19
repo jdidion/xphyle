@@ -4,8 +4,8 @@ import stat
 import tempfile
 
 @contextmanager
-def make_file(mode, contents=None):
-    path = tempfile.mkstemp()[1]
+def make_file(mode, directory=".", contents=None):
+    path = tempfile.mkstemp(dir=directory)[1]
     if contents:
         fh.write(contents)
     mode_flag = 0

@@ -81,7 +81,7 @@ def splitext(path : 'str', keep_seps : 'bool' = True) -> 'tuple':
         splitext('myfile.foo.txt', False) # -> ('myfile', 'foo', 'txt')
         splitext('/usr/local/foobar.gz', True) # -> ('foobar', '.gz')
     """
-    file_parts = os.path.basename(path).split(os.extsep)
+    file_parts = tuple(os.path.basename(path).split(os.extsep))
     if keep_seps and len(file_parts) > 1:
         file_parts = (file_parts[0],) + tuple(
             '{}{}'.format(os.extsep, ext) for ext in file_parts[1:])
@@ -107,14 +107,14 @@ def resolve_path(path : 'str', parent : 'str' = None) -> 'str':
     Raises:
         IOError: if the path does not exist
     """
-    apath = abspath(path)
-    if apath in (STDOUT, STDERR):
+    if path in (STDOUT, STDERR):
         return path
-    if not os.path.exists(apath) and parent is not None:
-        apath = abspath(os.path.join(parent, path))
-    if not os.path.exists(apath):
-        raise IOError(errno.ENOENT, "{} does not exist".format(apath), apath)
-    return apath
+    if parent:
+        path = os.path.join(parent, path)
+    path = abspath(path)
+    if not os.path.exists(path):
+        raise IOError(errno.ENOENT, "{} does not exist".format(path), path)
+    return path
 
 def check_path(path : 'str', ptype : 'str' = None, access=None) -> 'str':
     """Resolves the path (using ``resolve_path``) and checks that the path is

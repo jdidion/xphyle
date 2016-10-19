@@ -106,7 +106,7 @@ def write_file(path : 'str', strings, linesep : 'str' = '\n'):
                 f.write(delim or os.linesep)
                 f.write(s)
 
-def write_dict(d : 'dict', path : 'str', sep : 'str' : '=',
+def write_dict(d : 'dict', path : 'str', sep : 'str' = '=',
                linesep : 'str' = '\n'):
     """Write a dict to a file as name=value lines.
     
