@@ -4,6 +4,7 @@
 
 import errno
 import os
+import re
 import shutil
 import sys
 
@@ -105,13 +106,14 @@ def resolve_path(path : 'str', parent : 'str' = None) -> 'str':
         The absolute path
     
     Raises:
-        IOError: if the path does not exist
+        IOError: if the path does not exist or is invalid
     """
     if path in (STDOUT, STDERR):
         return path
     if parent:
-        path = os.path.join(parent, path)
-    path = abspath(path)
+        path = os.path.join(abspath(parent), path)
+    else:
+        path = abspath(path)
     if not os.path.exists(path):
         raise IOError(errno.ENOENT, "{} does not exist".format(path), path)
     return path
@@ -121,11 +123,12 @@ def check_path(path : 'str', ptype : 'str' = None, access=None) -> 'str':
     of the specified type and allows the specified access.
     
     Args:
+        path: The path to check
         ptype: 'f' for file or 'd' for directory.
-        access (int): One of the access values from :module:`os`
+        access: One of the access values from :module:`os`
     
     Returns:
-        Fully resolved path
+        The fully resolved path
     
     Raises:
         IOError if the path does not exist, is not of the specified type,
@@ -133,10 +136,12 @@ def check_path(path : 'str', ptype : 'str' = None, access=None) -> 'str':
     """
     path = resolve_path(path)
     if ptype is not None:
-        if ptype == 'f' and not (path in (STDOUT, STDERR) or os.path.isfile(path)):
+        if ptype == 'f' and not (
+                path in (STDOUT, STDERR) or os.path.isfile(path)):
             raise IOError(errno.EISDIR, "{} not a file".format(path), path)
         elif ptype == 'd' and not os.path.isdir(path):
-            raise IOError(errno.ENOTDIR, "{} not a directory".format(path), path)
+            raise IOError(errno.ENOTDIR, "{} not a directory".format(path),
+                          path)
     if access is not None:
         check_access(path, access)
     return path
@@ -144,21 +149,28 @@ def check_path(path : 'str', ptype : 'str' = None, access=None) -> 'str':
 def check_readable_file(path : 'str') -> 'str':
     """Check that ``path`` exists and is readable.
     
+    Args:
+        path: The path to check
+    
     Returns:
         The fully resolved path of ``path``
     """
     return check_path(path, 'f', 'r')
 
-def check_writeable_file(path : 'str') -> 'str':
+def check_writeable_file(path : 'str', mkdirs : 'bool' = True) -> 'str':
     """If ``path`` exists, check that it is writeable, otherwise check that
     its parent directory exists and is writeable.
+    
+    Args:
+        path: The path to check
+        mkdirs: Whether to create any missing directories (True)
     
     Returns:
         The fully resolved path
     """
-    try:
+    if os.path.exists(path):
         return check_path(path, 'f', 'w')
-    except IOError:
+    else:
         path = abspath(path)
         dirpath = os.path.dirname(path)
         if os.path.exists(dirpath):
@@ -167,19 +179,21 @@ def check_writeable_file(path : 'str') -> 'str':
             os.makedirs(dirpath)
         return path
 
-def find(root : 'str', pattern : 'RegexObject', types : 'str' = 'f',
+def find(root : 'str', pattern, types : 'str' = 'f',
          recursive : 'bool' = True) -> 'list':
     """Find all paths under ``root`` that match ``pattern``.
     
     Args:
         root: Directory at which to start search
-        pattern: File name pattern to match
+        pattern: File name pattern to match (string or re object)
         types: Types to return -- files ("f"), directories ("d") or both ("fd")
         recursive: Whether to search directories recursively
     
     Returns:
         List of matching paths
     """
+    if isinstance(pattern, str):
+        pattern = re.compile(pattern)
     found = []
     for root, dirs, files in os.walk(root):
         if types != "f":
@@ -202,8 +216,9 @@ def get_executable_path(executable : 'str') -> 'str':
     Returns:
         The full path of ``executable``, or None if the path cannot be found.
     """
-    if executable in executable_cache:
-        return executable_cache[executable]
+    exe_name = os.path.basename(executable)
+    if exe_name in executable_cache:
+        return executable_cache[exe_name]
     
     def check_executable(fpath):
         try:
@@ -211,13 +226,12 @@ def get_executable_path(executable : 'str') -> 'str':
         except:
             return None
     
-    if check_executable(executable):
-        exe_file = executable
-    else:
+    exe_file = check_executable(executable)
+    if not exe_file:
         for path in os.get_exec_path():
             exe_file = check_executable(os.path.join(path.strip('"'), executable))
             if exe_file:
                 break
     
-    executable_cache[executable] = exe_file
+    executable_cache[exe_name] = exe_file
     return exe_file
