@@ -12,17 +12,31 @@ import sys
 from subprocess import Popen, PIPE
 from xphyle.paths import get_executable_path
 
+class CompressionError(Exception):
+    pass
+
 class FileFormat(object):
     """Base class for classes that wrap built-in python file format libraries.
+    The subclass must provide the ``lib_name`` member.
     """
     _lib = None
     
     @property
     def lib(self):
         """Caches and returns the python module assocated with this file format.
+        
+        Returns:
+            The module
+        
+        Raises:
+            CompressionError if the module cannot be imported.
         """
         if not self._lib:
-            self._lib = import_module(self.lib_name)
+            try:
+                self._lib = import_module(self.lib_name)
+            except Exception as e:
+                raise CompressionError(
+                    "Library does not exist: {}".format(self.lib_name)) from e
         return self._lib
 
 # Wrappers around system-level compression executables
@@ -292,8 +306,8 @@ class BZip2(CompressionFormat):
     exts = ('bz2','bzip','bzip2')
     lib_name = 'bz2'
     system_command = 'bzip2'
-    system_reader_command = "{exe} {filename}" # TODO
-    system_writer_command = "{exe} {filename}"
+    system_reader_command = "{exe} -cd {filename}"
+    system_writer_command = "{exe} -z {filename}"
     
     def open_file(filename, mode, use_system=False, **kwargs):
         if 't' in mode:
@@ -307,11 +321,11 @@ register_compression_format(BZip2)
 class Lzma(CompressionFormat):
     """Implementation of CompressionFormat for lzma (.xz) files.
     """
-    exts = ('xz', 'lzma')
+    exts = ('xz', 'lzma', '7z', '7zip')
     lib_name = 'lzma'
     system_command = 'lzma'
-    system_reader_command = "{exe} {filename}" # TODO
-    system_writer_command = "{exe} {filename}"
+    system_reader_command = "{exe} -cd {filename}"
+    system_writer_command = "{exe} -z {filename}"
 register_compression_format(Lzma)
 
 # Archive formats
