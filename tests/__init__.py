@@ -65,5 +65,5 @@ def chmod(path, mode):
         mode_flag |= stat.S_IEXEC
     os.chmod(path, mode_flag)
 
-def random_text(n):
+def random_text(n=1024):
     return ''.join(chr(random.randint(32, 126)) for i in range(n))

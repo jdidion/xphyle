@@ -1,6 +1,6 @@
 from unittest import TestCase, skipIf
 import os
-from xphyle.compression import *
+from xphyle.formats import *
 from xphyle.paths import get_executable_path
 from . import *
 
@@ -18,28 +18,35 @@ class CompressionTests(TestCase):
 def get_format(ext):
     return get_compression_format(guess_compression_format(ext))
 
-def write_file(fmt, path, ext, use_system, text):
-    with fmt.open_file(path, mode='wt', ext=ext, use_system=use_system) as f:
-        f.write(text)
+def write_file(fmt, path, ext, use_system, content, mode='wt'):
+    with fmt.open_file(path, mode=mode, ext=ext, use_system=use_system) as f:
+        f.write(content)
 
-def read_file(fmt, path, ext, use_system):
-    with fmt.open_file(path, mode='rt', ext=ext, use_system=use_system) as f:
+def read_file(fmt, path, ext, use_system, mode='rt'):
+    with fmt.open_file(path, mode=mode, ext=ext, use_system=use_system) as f:
         return f.read()
 
 class FileTests(TestCase):
-    def write_read_file(self, ext, use_system, text=None):
-        if text is None:
-            text = random_text(1024) # generate 1 kb of random text
+    def write_read_file(self, ext, use_system, mode='t', content=None):
+        if content is None:
+            content = random_text() # generate 1 kb of random text
+            if mode == 'b':
+                content = b''.join(c.encode() for c in content)
         with make_file(suffix=ext) as path:
             fmt = get_format(ext)
-            write_file(fmt, path, ext, use_system, text)
-            in_text = read_file(fmt, path, ext, use_system)
-            self.assertEqual(text, in_text)
-
-    def test_write_read_python(self):
+            write_file(fmt, path, ext, use_system, content, 'w' + mode)
+            in_text = read_file(fmt, path, ext, use_system, 'r' + mode)
+            self.assertEqual(content, in_text)
+    
+    def test_write_read_bytes_python(self):
         for fmt in ('.gz','.bz2','.xz'):
             with self.subTest(fmt=fmt):
-                self.write_read_file(fmt, False)
+                self.write_read_file(fmt, False, 'b')
+    
+    def test_write_read_text_python(self):
+        for fmt in ('.gz','.bz2','.xz'):
+            with self.subTest(fmt=fmt):
+                self.write_read_file(fmt, False, 't')
     
     # These tests will be skipped if the required system-level executables
     # are not available
@@ -77,14 +84,14 @@ class StringTests(TestCase):
     
     def test_compress(self):
         fmt = get_format('.gz')
-        bytes = random_text(1024).encode()
+        bytes = random_text().encode()
         compressed = fmt.compress(bytes)
         decompressed = fmt.decompress(compressed)
         self.assertEqual(bytes, decompressed)
     
     def test_compress_string(self):
         fmt = get_format('.gz')
-        text = random_text(1024)
+        text = random_text()
         compressed = fmt.compress_string(text)
         decompressed = fmt.decompress_string(compressed)
         self.assertEqual(text, decompressed)

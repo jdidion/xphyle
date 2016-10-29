@@ -2,7 +2,6 @@
 """A collection of convenience methods for opening, reading, writing, and
 otherwise managing files.
 """
-
 from contextlib import contextmanager
 import pickle
 import csv
@@ -12,11 +11,119 @@ import os
 import shutil
 import sys
 import tempfile
-import tarfile
-import zipfile
 
-from xphyle.compression import *
+from xphyle.formats import *
 from xphyle.paths import *
+
+# Opening files
+
+@contextmanager
+def open_(f, **kwargs):
+    """Context manager that frees you from checking if an argument is a path
+    or a file object. Calls ``xopen`` to open files.
+    
+    Examples:
+      with open_('myfile') as infile:
+          print(next(infile))
+      
+      fh = open('myfile')
+      with open_(fh) as infile:
+          print(next(infile))
+    """
+    if isinstance(f, str):
+        with xopen(f, **kwargs) as fp:
+            yield fp
+    else:
+        yield f
+
+def xopen(path : 'str', mode : 'str' ='r', compression : 'str' = None,
+          use_system : 'bool' = True, context_wrapper : 'bool' = False,
+          resolve : 'int,>=0,<=2' = 2, **kwargs):
+    """
+    Replacement for the `open` function that automatically handles
+    compressed files. If `use_system==True` and the file is compressed,
+    the file is opened with a pipe to the system-level compression program
+    (e.g. ``gzip`` for '.gz' files), or with the corresponding python library
+    if the system program is not available on the path.
+    
+    Returns ``sys.stdout`` or ``sys.stdin`` if ``path`` is '-' (for
+    modes 'w' and 'r' respectively), and ``sys.stderr`` if ``path``
+    is '_'.
+    
+    Args:
+        path: a relative or absolute path. Must be a string. If
+          you have a situation you want to automatically handle either
+          a path or a file object, use the ``open_`` wrapper instead.
+        mode: some combination of the open mode ('r', 'w', 'a', or 'x')
+          and the format ('b' or 't'). If the later is not given, 't'
+          is used by default.
+        compression: if None or True, compression type (if any) will be
+          determined automatically. If False, no attempt will be made to
+          determine compression type. Otherwise this must specify the
+          compression type (e.g. 'gz'). See `xphyle.compression` for
+          details. Note that compression will *not* be guessed for
+          '-' (stdin).
+        use_system: whether to attempt to use system-level compression
+          programs.
+        context_wrapper: If True and ``path`` == '-' or '_', returns
+          a ContextManager (i.e. usable with ``with``) that wraps the
+          system stream and is no-op on close.
+        resolve: By default, filename is fully resolved and checked for
+          accessibility (2). Set to 1 to resolve but not check, and 0 to
+          perform no resolution at all.
+        kwargs: Additional keyword arguments to pass to ``open``.
+    
+    Returns:
+        An opened file-like object.
+    """
+    if not isinstance(path, str):
+        raise ValueError("'path' must be a string")
+    if not any(m in mode for m in ('r','w','a','x')):
+        raise ValueError("'mode' must contain one of (r,w,a,x)")
+    if 'U' in mode:
+        mode = mode.replace('U','')
+        kwargs['newline'] = None
+    if len(mode) == 1:
+        mode += 't'
+    elif not any(f in mode for f in ('b', 't')):
+        raise ValueError("'mode' must contain one of (b,t)")
+    
+    # standard input and standard output handling
+    if path in (STDOUT, STDERR):
+        if path == STDERR:
+            assert 'r' not in mode
+            fh = sys.stdout
+        else:
+            fh = sys.stdin if 'r' in mode else sys.stdout
+        if 'b' in mode:
+            fh = fh.buffer
+        if compression is not False:
+            if compression in (None, True):
+                raise ValueError("Compression can not be determined "
+                                 "automatically from stdin")
+            fh = wrap_compressed_stream(fh, compression) # TODO
+        if context_wrapper:
+            class StdWrapper(object):
+                def __init__(self, fh):
+                    self.fh = fh
+                def __enter__(self):
+                    return self.fh
+                def __exit__(exception_type, exception_value, traceback):
+                    pass
+            fh = StdWrapper(fh)
+        return fh
+    
+    if resolve == 2:
+        path = check_file(path, mode)
+    elif resolve == 1:
+        path = resolve_path(abspath(path))
+    
+    if compression is not False:
+        file_opener = get_file_opener(path, compression)
+        if file_opener:
+            return file_opener(path, mode, use_system, **kwargs)
+    
+    return open(path, mode, **kwargs)
 
 # Reading data from/writing data to files
 
@@ -87,7 +194,7 @@ def read_chunked(path : 'str', chunksize : 'int,>0' = 1024,
             else:
                 break
 
-def write_file(path : 'str', strings, linesep : 'str' = '\n'):
+def write_strings(path : 'str', strings, linesep : 'str' = '\n'):
     """Write delimiter-separated strings to a file.
     
     Args:
@@ -148,7 +255,8 @@ def read_pickled(binfile : 'str', compression : 'bool' = False):
         decompressor = get_decompressor(binfile, compression) # TODO
         return pickle.loads(decompressor(data))
 
-def compress_contents(path : 'str', compressed_path : 'str' = None, compression=None):
+def compress_contents(path : 'str', compressed_path : 'str' = None,
+                      compression=None):
     """Compress the contents of a file, either in-place or to a separate file.
     
     Args:
@@ -177,24 +285,24 @@ def compress_contents(path : 'str', compressed_path : 'str' = None, compression=
     if inplace:
         shutil.move(compressed_path, path)
 
-def write_archive(path : 'str', contents, **kwargs):
-    """Write entries to a compressed archive file.
-    
-    Args:
-        path (str): Path of the archive file to write.
-        contents (iterable): A dict or an iterable of (name, content) tuples.
-          A content item can be a path to a readable file to be added
-          to the archive.
-        kwargs: Additional args to `open_archive_writer`.
-    """
-    if isinstance(contents, dict):
-        contents = dict.items()
-    with open_archive_writer(path, **kwargs) as c:
-        for name, content in contents:
-            if os.path.isfile(content):
-                c.writefile(content, name)
-            else:
-                c.writestr(content, name)
+# def write_archive(path : 'str', contents, **kwargs):
+#     """Write entries to a compressed archive file.
+#
+#     Args:
+#         path (str): Path of the archive file to write.
+#         contents (iterable): A dict or an iterable of (name, content) tuples.
+#           A content item can be a path to a readable file to be added
+#           to the archive.
+#         kwargs: Additional args to `open_archive_writer`.
+#     """
+#     if isinstance(contents, dict):
+#         contents = dict.items()
+#     with open_archive_writer(path, **kwargs) as c:
+#         for name, content in contents:
+#             if os.path.isfile(content):
+#                 c.writefile(content, name)
+#             else:
+#                 c.writestr(content, name)
 
 ## Delimited files
 
@@ -306,187 +414,8 @@ def parse_properties(source, delim : 'str' = '=', fn : 'callable' = None,
 def load_module_from_file(path : 'str'):
     """Load a python module from a file.
     """
-    return importlib.machinery.SourceFileLoader(filename(path), path).load_module()
-
-# Guessing file formats from magic numbers
-
-MAGIC = {
-    0x1f : ('gz' , (0x8b,)),
-    0x42 : ('bz2', (0x5A, 0x68)),
-    0x4C : ('lz' , (0x5A, 0x49, 0x50)),
-    0xFD : ('xz' , (0x37, 0x7A, 0x58, 0x5A, 0x00)),
-    0x37 : ('7z' , (0x7A, 0xBC, 0xAF, 0x27, 0x1C)),
-    0x50 : ('zip', (0x4B, 0x03, 0x04)),
-    0x75 : ('tar', (0x73, 0x74, 0x61, 0x72))
-}
-"""A collection of magic numbers.
-From: https://en.wikipedia.org/wiki/List_of_file_signatures
-"""
-
-MAX_MAGIC_BYTES = max(len(v[1]) for v in MAGIC.values()) + 1
-
-def guess_format(path : 'str') -> 'str':
-    """Guess file format from 'magic numbers' at the beginning of the file.
-    
-    Note that ``path`` must be an ``open``able file. If it is a named pipe or
-    other pseudo-file type, the magic bytes will be destructively consumed and
-    thus will open correctly.
-    
-    Args:
-        path: Path to the file
-    
-    Returns:
-        The name of the format, or ``None`` if it could not be guessed.
-    """
-    with open(filename, 'rb') as fh:
-        magic = tuple(ord(b) for b in fh.read(MAX_MAGIC_BYTES))
-    
-    l = len(magic)
-    if l > 0:
-        if magic[0] in MAGIC:
-            fmt, tail = MAGIC[magic[0]]
-            if l > len(tail) and magic[1:len(tail)+1] == tail:
-                return fmt
-    
-    return None
-
-# Opening files
-
-def open_archive_writer(path : 'str', atype : 'str' = None,
-                        ctype : 'str' = None, **kwargs) -> 'ArchiveWriter':
-    """Open a writer for an archive file.
-    
-    Args:
-        path: The path to the archive file
-        atype: The archive type, or None if should be guessed from the file name
-        ctype: The compression type, or None if it should be guessed from the
-            file name
-        kwargs: Addtional keyword arguments to pass to the ArchiveWriter
-            constructor
-    
-    Returns:
-        An open ArchiveWriter
-    """
-    if atype is None:
-        guess = guess_archive_format(path)
-        if guess:
-            atype = guess[0]
-            if ctype is None:
-                ctype = guess[1]
-    
-    if atype is None:
-        raise Exception("Invalid archive type {}".format(atype))
-    
-    archive_format = get_archive_format(atype)
-    return archive_format(path, ctype, **kwargs)
-
-def xopen(path : 'str', mode : 'str' ='r', compression : 'str' = None,
-          use_system : 'bool' = True, context_wrapper : 'bool' = False,
-          resolve : 'int,>=0,<=2' = 2, **kwargs):
-    """
-    Replacement for the `open` function that automatically handles
-    compressed files. If `use_system==True` and the file is compressed,
-    the file is opened with a pipe to the system-level compression program
-    (e.g. ``gzip`` for '.gz' files), or with the corresponding python library
-    if the system program is not available on the path.
-    
-    Returns ``sys.stdout`` or ``sys.stdin`` if ``path`` is '-' (for
-    modes 'w' and 'r' respectively), and ``sys.stderr`` if ``path``
-    is '_'.
-    
-    Args:
-        path: a relative or absolute path. Must be a string. If
-          you have a situation you want to automatically handle either
-          a path or a file object, use the ``open_`` wrapper instead.
-        mode: some combination of the open mode ('r', 'w', 'a', or 'x')
-          and the format ('b' or 't'). If the later is not given, 't'
-          is used by default.
-        compression: if None or True, compression type (if any) will be
-          determined automatically. If False, no attempt will be made to
-          determine compression type. Otherwise this must specify the
-          compression type (e.g. 'gz'). See `xphyle.compression` for
-          details. Note that compression will *not* be guessed for
-          '-' (stdin).
-        use_system: whether to attempt to use system-level compression
-          programs.
-        context_wrapper: If True and ``path`` == '-' or '_', returns
-          a ContextManager (i.e. usable with ``with``) that wraps the
-          system stream and is no-op on close.
-        resolve: By default, filename is fully resolved and checked for
-          accessibility (2). Set to 1 to resolve but not check, and 0 to
-          perform no resolution at all.
-        kwargs: Additional keyword arguments to pass to ``open``.
-    
-    Returns:
-        An opened file-like object.
-    """
-    if not isinstance(path, str):
-        raise ValueError("'path' must be a string")
-    if not any(m in mode for m in ('r','w','a','x')):
-        raise ValueError("'mode' must contain one of (r,w,a,x)")
-    if 'U' in mode:
-        mode = mode.replace('U','')
-        kwargs['newline'] = None
-    if len(mode) == 1:
-        mode += 't'
-    elif not any(f in mode for f in ('b', 't')):
-        raise ValueError("'mode' must contain one of (b,t)")
-    
-    # standard input and standard output handling
-    if path in (STDOUT, STDERR):
-        if path == STDERR:
-            assert 'r' not in mode
-            fh = sys.stdout
-        else:
-            fh = sys.stdin if 'r' in mode else sys.stdout
-        if 'b' in mode:
-            fh = fh.buffer
-        if compression is not False:
-            if compression in (None, True):
-                raise ValueError("Compression can not be determined "
-                                 "automatically from stdin")
-            fh = wrap_compressed_stream(fh, compression) # TODO
-        if context_wrapper:
-            class StdWrapper(object):
-                def __init__(self, fh):
-                    self.fh = fh
-                def __enter__(self):
-                    return self.fh
-                def __exit__(exception_type, exception_value, traceback):
-                    pass
-            fh = StdWrapper(fh)
-        return fh
-    
-    if resolve == 2:
-        path = check_file(path, mode)
-    elif resolve == 1:
-        path = resolve_path(abspath(path))
-    
-    if compression is not False:
-        file_opener = get_file_opener(path, compression)
-        if file_opener:
-            return file_opener(path, mode, use_system, **kwargs)
-    
-    return open(path, mode, **kwargs)
-
-@contextmanager
-def open_(f, **kwargs):
-    """Context manager that frees you from checking if an argument is a path
-    or a file object. Calls ``xopen`` to open files.
-    
-    Examples:
-      with open_('myfile') as infile:
-          print(next(infile))
-      
-      fh = open('myfile')
-      with open_(fh) as infile:
-          print(next(infile))
-    """
-    if isinstance(f, str):
-        with xopen(f, **kwargs) as fp:
-            yield fp
-    else:
-        yield f
+    loader = importlib.machinery.SourceFileLoader(filename(path), path)
+    return loader.load_module()
 
 # File wrappers that perform an action when the file is closed.
 

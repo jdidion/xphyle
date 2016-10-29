@@ -1,19 +1,58 @@
 # -*- coding: utf-8 -*-
-"""Interfaces to file compression formats. Most importantly, these attempt
-to use system-level processes, which is faster than using the python
-implementations.
 """
-
-from contextlib import contextmanager
+"""
 from importlib import import_module
 import io
+import logging
 import os
+import re
 import sys
 from subprocess import Popen, PIPE
 from xphyle.paths import get_executable_path, splitext
 
-class CompressionError(Exception):
-    pass
+# Guessing file formats from magic numbers
+
+MAGIC = {
+    0x1f : ('gz' , (0x8b,)),
+    0x42 : ('bz2', (0x5A, 0x68)),
+    0x4C : ('lz' , (0x5A, 0x49, 0x50)),
+    0xFD : ('xz' , (0x37, 0x7A, 0x58, 0x5A, 0x00)),
+    0x37 : ('7z' , (0x7A, 0xBC, 0xAF, 0x27, 0x1C)),
+    0x50 : ('zip', (0x4B, 0x03, 0x04)),
+    0x75 : ('tar', (0x73, 0x74, 0x61, 0x72))
+}
+"""A collection of magic numbers.
+From: https://en.wikipedia.org/wiki/List_of_file_signatures
+"""
+
+MAX_MAGIC_BYTES = max(len(v[1]) for v in MAGIC.values()) + 1
+
+def guess_format(path : 'str') -> 'str':
+    """Guess file format from 'magic numbers' at the beginning of the file.
+    
+    Note that ``path`` must be an ``open``able file. If it is a named pipe or
+    other pseudo-file type, the magic bytes will be destructively consumed and
+    thus will open correctly.
+    
+    Args:
+        path: Path to the file
+    
+    Returns:
+        The name of the format, or ``None`` if it could not be guessed.
+    """
+    with open(filename, 'rb') as fh:
+        magic = tuple(ord(b) for b in fh.read(MAX_MAGIC_BYTES))
+    
+    l = len(magic)
+    if l > 0:
+        if magic[0] in MAGIC:
+            fmt, tail = MAGIC[magic[0]]
+            if l > len(tail) and magic[1:len(tail)+1] == tail:
+                return fmt
+    
+    return None
+
+# File formats
 
 class FileFormat(object):
     """Base class for classes that wrap built-in python file format libraries.
@@ -32,12 +71,12 @@ class FileFormat(object):
             CompressionError if the module cannot be imported.
         """
         if not self._lib:
-            try:
-                self._lib = import_module(self.lib_name)
-            except Exception as e:
-                raise CompressionError(
-                    "Library does not exist: {}".format(self.lib_name)) from e
+            self._lib = import_module(self.lib_name)
         return self._lib
+
+# Interfaces to file compression formats. Most importantly, these attempt
+# to use system-level processes, which is faster than using the python
+# implementations.
 
 # Wrappers around system-level compression executables
 
@@ -327,37 +366,32 @@ class CompressionFormat(FileFormat):
             A file-like object
         """
         if use_system and self.can_use_system_compression():
-            try:
-                parts = splitext(filename)
-                ext = parts[-1] if len(parts) > 1 else self.exts[0]
-                if 'r' in mode:
-                    z = SystemReader(
-                        self.executable_path,
-                        filename,
-                        ext,
-                        self.system_reader_command,
-                        self.executable_name)
+            parts = splitext(filename)
+            ext = parts[-1] if len(parts) > 1 else self.exts[0]
+            if 'r' in mode:
+                z = SystemReader(
+                    self.executable_path,
+                    filename,
+                    ext,
+                    self.system_reader_command,
+                    self.executable_name)
+            else:
+                for c in mode:
+                    if c in ('w', 'a', 'x'):
+                        bin_mode = c + 'b'
+                        break
                 else:
-                    for c in mode:
-                        if c in ('w', 'a', 'x'):
-                            bin_mode = c + 'b'
-                            break
-                    else:
-                        raise ValueError("Invalid mode: {}".format(mode))
-                    z = SystemWriter(
-                        self.executable_path,
-                        filename,
-                        ext,
-                        bin_mode,
-                        self.system_writer_command,
-                        self.executable_name)
-                if 't' in mode:
-                    z = io.TextIOWrapper(z)
-                return z
-            except IOError:
-                raise Exception('could not open system reader/writer')
-                # TODO: log
-                pass
+                    raise ValueError("Invalid mode: {}".format(mode))
+                z = SystemWriter(
+                    self.executable_path,
+                    filename,
+                    ext,
+                    bin_mode,
+                    self.system_writer_command,
+                    self.executable_name)
+            if 't' in mode:
+                z = io.TextIOWrapper(z)
+            return z
         
         return self.open_file_python(filename, mode, **kwargs)
     
@@ -420,150 +454,3 @@ class Lzma(CompressionFormat):
     system_reader_command = "{exe} -cd -S {ext} {filename}"
     system_writer_command = "{exe} -z -S {ext}"
 register_compression_format(Lzma)
-
-# Archive formats
-
-archive_formats = {}
-"""Dict of registered archive formats"""
-
-def register_archive_format(format_class : 'class'):
-    """Register a new compression format.
-    
-    Args:
-        ``format_class`` -- a subclass of ArchiveFormat
-    """
-    aliases = set(format_class.exts) & set((format_class.lib_name,))
-    for alias in aliases:
-        # TODO: warn about overriding existing format?
-        archive_formats[alias] = format_class
-
-def get_archive_format(name : 'str') -> 'ArchiveWriter':
-    """Get the ArchiveWriter class for the given name.
-    """
-    if name in archive_formats:
-        return archive_formats[name]
-    raise ValueError("Unsupported archive format: {}".format(name))
-
-def guess_archive_format(name : 'str') -> '(str,str)':
-    """Guess the archive format from the file extension.
-    
-    Returns:
-        (archive_format, compression_format), or ``None`` if the format
-        can't be determined.
-    """
-    file_parts = splitext(filename, False)
-    if len(file_parts) < 2:
-        return None
-    if len(file_parts) == 2 and file_parts[2] in archive_formats:
-        return (file_parts[2], None)
-    # it might be a compressed archive
-    if guess_compression_format(file_parts[-1]) and file_parts[-2] in archive_formats:
-        return (file_parts[-2], file_parts[-1])
-    return None
-
-class ArchiveWriter(FileFormat):
-    """Base class for writers that store arbitrary data and files within
-    archives (e.g. tar, zip).
-    
-    Args:
-        path: Path to the archive file
-        compression: If None or False, do not compress the archive. If True,
-            compress the archive using the default format. Otherwise specifies
-            the name of compression format to use.
-        kwargs: Additional arguments to pass to the open method
-    """
-    def __init__(self, path : 'str', compression : 'bool' = False, **kwargs):
-        self.path = path
-        self.compression = compression
-        self.open_args = kwargs
-        self.archive = None
-    
-    def open(self):
-        if self.archive is not None:
-            raise Exception("Archive is already open")
-        self.archive = self._open()
-    
-    def write_file(self, path : 'str', archive_name : 'str' = None):
-        """Copy a file into the archive.
-        
-        Args:
-            path: Path to the file
-            archive_name: Name to give the file within the archive. Defaults
-                to ``path`` if None.
-        """
-        if archive_name is None:
-            archive_name = path
-        path = check_readable_file(path)
-        self._write_file(path, archive_name)
-    
-    def write(self, string : 'str', archive_name : 'str'):
-        """Write the contents of a string into the archive.
-        
-        Args:
-            string: The string to write
-            archive_name: The name to assign the string in the archive
-        """
-        raise NotImplemented()
-    
-    def close(self):
-        if self.archive is None:
-            raise Exception("Archive is not open")
-        self.archive.close()
-    
-    def __enter__(self):
-        self.open()
-        return self
-    
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
-
-class CompressableArchiveWriter(object):
-    """Base class for an ArchiveWriter that is compressable by an external
-    executable (e.g. tar.gz) rather than having its own internal compression
-    scheme (e.g. zip).
-    """
-    def close(self):
-        super(CompressedArchiveWriter, self).close()
-        if self.compression:
-            ctype = self.compression
-            if ctype is True:
-                ctype = self.default_compression
-            compress_file(self.archive.name, ctype=ctype)
-
-class ZipWriter(ArchiveWriter):
-    """Simple, write-only interface to a zip file.
-    """
-    exts = ('zip',)
-    lib_name = 'zipfile'
-    
-    def _open(self):
-        return self.lib.Zipfile(
-            self.path, 'w',
-            self.lib.ZIP_DEFLATED if self.compression else self.lib.ZIP_STORED,
-            **self.open_args)
-    
-    def _write_file(self, path, archive_name):
-        self.archive.write(path, archive_name)
-    
-    def write(self, string, archive_name):
-        self.archive.writestr(archive_name, string)
-register_archive_format(ZipWriter)
-
-class TarWriter(CompressableArchiveWriter):
-    """Simple, write-only interface to a tar file.
-    """
-    exts = ('tar',)
-    lib_name = 'tarfile'
-    default_compression = 'gzip'
-    
-    def _open(self):
-        return self.lib.TarFile(self.path, 'w', **self.open_args)
-    
-    def _write_file(self, path, archive_name):
-        self.archive.add(path, archive_name)
-    
-    def write(self, string, archive_name):
-        ti = tarfile.TarInfo(arcname)
-        ti.frombuf(string)
-        self.archive.addfile(ti)
-register_archive_format(TarWriter)
