@@ -14,4 +14,4 @@ install:
   - pip install .
 
 script:
-  - nose2 -P tests
+  - nose2 -C tests

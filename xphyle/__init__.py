@@ -22,6 +22,13 @@ def open_(f, **kwargs):
     """Context manager that frees you from checking if an argument is a path
     or a file object. Calls ``xopen`` to open files.
     
+    Args:
+        f: A path or file-like object
+        kwargs: Additional args to pass through to xopen (if ``f`` is a path)
+    
+    Yields:
+        A file-like object
+    
     Examples:
       with open_('myfile') as infile:
           print(next(infile))
@@ -31,39 +38,40 @@ def open_(f, **kwargs):
           print(next(infile))
     """
     if isinstance(f, str):
+        kwargs['context_wrapper'] = True
         with xopen(f, **kwargs) as fp:
             yield fp
     else:
         yield f
 
-def xopen(path : 'str', mode : 'str' ='r', compression : 'str' = None,
+def xopen(path : 'str', mode : 'str' ='r', compression : 'bool|str' = None,
           use_system : 'bool' = True, context_wrapper : 'bool' = False,
           resolve : 'int,>=0,<=2' = 2, **kwargs):
     """
     Replacement for the `open` function that automatically handles
     compressed files. If `use_system==True` and the file is compressed,
     the file is opened with a pipe to the system-level compression program
-    (e.g. ``gzip`` for '.gz' files), or with the corresponding python library
-    if the system program is not available on the path.
+    (e.g. ``gzip`` for '.gz' files) if possible, otherwise the corresponding
+    python library is used.
     
     Returns ``sys.stdout`` or ``sys.stdin`` if ``path`` is '-' (for
     modes 'w' and 'r' respectively), and ``sys.stderr`` if ``path``
     is '_'.
     
     Args:
-        path: a relative or absolute path. Must be a string. If
+        path: A relative or absolute path. Must be a string. If
           you have a situation you want to automatically handle either
           a path or a file object, use the ``open_`` wrapper instead.
-        mode: some combination of the open mode ('r', 'w', 'a', or 'x')
+        mode: Some combination of the open mode ('r', 'w', 'a', or 'x')
           and the format ('b' or 't'). If the later is not given, 't'
           is used by default.
-        compression: if None or True, compression type (if any) will be
+        compression: If None or True, compression type (if any) will be
           determined automatically. If False, no attempt will be made to
           determine compression type. Otherwise this must specify the
           compression type (e.g. 'gz'). See `xphyle.compression` for
           details. Note that compression will *not* be guessed for
           '-' (stdin).
-        use_system: whether to attempt to use system-level compression
+        use_system: Whether to attempt to use system-level compression
           programs.
         context_wrapper: If True and ``path`` == '-' or '_', returns
           a ContextManager (i.e. usable with ``with``) that wraps the
