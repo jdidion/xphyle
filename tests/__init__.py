@@ -22,7 +22,8 @@ def make_files(*file_descriptors, parent="."):
             prefix=desc.prefix,
             dir=parent)[1]
         if desc.contents:
-            fh.write(desc.contents)
+            with open(path, 'wt') as fh:
+                fh.write(desc.contents)
         chmod(path, desc.mode)
         filepaths.append(path)
     try:
