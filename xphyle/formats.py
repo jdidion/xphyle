@@ -17,9 +17,9 @@ MAGIC = {
     0x42 : ('bz2', (0x5A, 0x68)),
     0x4C : ('lz' , (0x5A, 0x49, 0x50)),
     0xFD : ('xz' , (0x37, 0x7A, 0x58, 0x5A, 0x00)),
-    0x37 : ('7z' , (0x7A, 0xBC, 0xAF, 0x27, 0x1C)),
-    0x50 : ('zip', (0x4B, 0x03, 0x04)),
-    0x75 : ('tar', (0x73, 0x74, 0x61, 0x72))
+    0x37 : ('7z' , (0x7A, 0xBC, 0xAF, 0x27, 0x1C))
+    #0x50 : ('zip', (0x4B, 0x03, 0x04)),
+    #0x75 : ('tar', (0x73, 0x74, 0x61, 0x72))
 }
 """A collection of magic numbers.
 From: https://en.wikipedia.org/wiki/List_of_file_signatures
@@ -27,7 +27,7 @@ From: https://en.wikipedia.org/wiki/List_of_file_signatures
 
 MAX_MAGIC_BYTES = max(len(v[1]) for v in MAGIC.values()) + 1
 
-def guess_format(path : 'str') -> 'str':
+def guess_format_from_header(path : 'str') -> 'str':
     """Guess file format from 'magic numbers' at the beginning of the file.
     
     Note that ``path`` must be an ``open``able file. If it is a named pipe or
@@ -40,14 +40,15 @@ def guess_format(path : 'str') -> 'str':
     Returns:
         The name of the format, or ``None`` if it could not be guessed.
     """
-    with open(filename, 'rb') as fh:
-        magic = tuple(ord(b) for b in fh.read(MAX_MAGIC_BYTES))
+    with open(path, 'rb') as fh:
+        magic = fh.read(MAX_MAGIC_BYTES)
     
     l = len(magic)
     if l > 0:
         if magic[0] in MAGIC:
             fmt, tail = MAGIC[magic[0]]
-            if l > len(tail) and magic[1:len(tail)+1] == tail:
+            if (l > len(tail) and
+                    tuple(magic[i] for i in range(1, len(tail)+1)) == tail):
                 return fmt
     
     return None
