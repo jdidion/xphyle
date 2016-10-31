@@ -10,7 +10,7 @@ import sys
 
 ACCESS = dict(r=os.R_OK, w=os.W_OK, a=os.W_OK, x=os.X_OK)
 """Dictionary mapping mode characters to access method constants"""
-STDOUT = '-'
+STDIN = STDOUT = '-'
 """Placeholder for ``sys.stdin`` or ``sys.stdout`` (depending on access mode)"""
 STDERR = '_'
 """Placeholder for ``sys.stderr``"""

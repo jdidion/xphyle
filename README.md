@@ -6,7 +6,8 @@ provides some convenience methods for working with file paths.
 
 xphyle is organized as follows:
 
-* The `xphyle` module (i.e. __init__.py) provides `open_`, a drop-in replacement for the python `open()` method that tries to automatically and transparently handle common compression and archive formats. It also provides some useful methods on top of open_ for reading and writing files.
+* The `xphyle` module (i.e. __init__.py) provides `open_`, a drop-in replacement for the python `open()` method that tries to automatically and transparently handle common compression and archive formats.
+* The `xphyle.utils` module provides some useful methods on top of open_ for reading and writing files.
 * The `xphyle.formats` module implements the details of different file formats. The goal of this module is to try to use the system-level program/library (which is generally the fastest) when possible, and fall back to a pure-python module.
 * The `xphyle.paths` module offers useful functions for locating and resolving files and directories.
 
@@ -32,10 +33,11 @@ with open_('infile.gz') as myfile:
         print(line)
 
 # Read all lines in a compressed file into a list
-lines = list(safe_file_iter('infile.gz'))
+from xphyle.utils import safe_file_iter
+lines = list(safe_iter('infile.gz'))
 
 # Sum the rows in a compressed file where each line is an integer value
-total = sum(i for i in safe_file_iter('infile.gz', convert=int))
+total = sum(i for i in safe_iter('infile.gz', convert=int))
 ```
 
 # TODO
@@ -44,7 +46,8 @@ total = sum(i for i in safe_file_iter('infile.gz', convert=int))
 
 * Enable user to define compression level
 * LZW support (via python-lzw)
-
+* Make all file I/O functions work transparently with URLs ()
+*
 ## After 1.0
 
 * Support multi-threaded gzip compression (via pigz)
