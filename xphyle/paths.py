@@ -179,6 +179,27 @@ def check_writeable_file(path : 'str', mkdirs : 'bool' = True) -> 'str':
             os.makedirs(dirpath)
         return path
 
+### "Safe" versions of the check methods, meaning they return None
+### instead of throwing exceptions
+
+def safe_check_path(path : 'str', **kwargs) -> 'str':
+    try:
+        return check_path(path, **kwargs)
+    except IOError:
+        return None
+
+def safe_check_readable_file(path : 'str') -> 'str':
+    try:
+        return check_readable_file(path)
+    except IOError:
+        return None
+
+def safe_check_writeable_file(path : 'str') -> 'str':
+    try:
+        return check_writeable_file(path)
+    except IOError:
+        return None
+
 def find(root : 'str', pattern, types : 'str' = 'f',
          recursive : 'bool' = True) -> 'list':
     """Find all paths under ``root`` that match ``pattern``.
