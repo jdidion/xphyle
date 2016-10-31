@@ -15,6 +15,25 @@ import tempfile
 from xphyle.formats import *
 from xphyle.paths import *
 
+# Guess file format
+
+def guess_file_format(path : 'str') -> 'str':
+    """Try to guess the file format, first from the extension, and then
+    from the header bytes.
+    
+    Args:
+        path: The path to the file
+    
+    Returns:
+        The compression format, or None if one could not be determined
+    """
+    if path in (STDOUT, STDERR):
+        raise ValueError("Cannot guess format from {}".format(path))
+    fmt = guess_compression_format(path)
+    if fmt is None and safe_check_readable_file(path):
+        fmt = guess_format_from_header(path)
+    return fmt
+
 # Opening files
 
 @contextmanager
@@ -83,6 +102,13 @@ def xopen(path : 'str', mode : 'str' ='r', compression : 'bool|str' = None,
     
     Returns:
         An opened file-like object.
+    
+    Raises:
+        ValueError if:
+            * ``compression==True`` and compression format cannot be
+            determined
+            * the specified compression format is invalid
+            * the path or mode are invalid
     """
     if not isinstance(path, str):
         raise ValueError("'path' must be a string")
@@ -105,11 +131,12 @@ def xopen(path : 'str', mode : 'str' ='r', compression : 'bool|str' = None,
             fh = sys.stdin if 'r' in mode else sys.stdout
         if 'b' in mode:
             fh = fh.buffer
-        if compression is not False:
-            if compression in (None, True):
+        if compression:
+            if compression == True:
                 raise ValueError("Compression can not be determined "
                                  "automatically from stdin")
-            fh = wrap_compressed_stream(fh, compression) # TODO
+            fmt = get_compression_format(compression)
+            fh = fmt.open_file_python(path, mode, **kwargs)
         if context_wrapper:
             class StdWrapper(object):
                 def __init__(self, fh):
@@ -122,14 +149,21 @@ def xopen(path : 'str', mode : 'str' ='r', compression : 'bool|str' = None,
         return fh
     
     if resolve == 2:
-        path = check_file(path, mode)
+        path = check_path(path, 'f', mode)
     elif resolve == 1:
         path = resolve_path(abspath(path))
     
     if compression is not False:
-        file_opener = get_file_opener(path, compression)
-        if file_opener:
-            return file_opener(path, mode, use_system, **kwargs)
+        if compression in (None, True):
+            fmt = guess_file_format(path)
+            if fmt:
+                compression = fmt
+            elif compression == True:
+                raise ValueError(
+                    "Could not guess compression format from {}".format(path))
+        
+        fmt = get_compression_format(compression)
+        return fmt.open_file(path, mode, use_system=use_system, **kwargs)
     
     return open(path, mode, **kwargs)
 
