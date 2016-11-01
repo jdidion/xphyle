@@ -65,34 +65,44 @@ def abspath(path : 'str') -> 'str':
         return path
     return os.path.abspath(os.path.expanduser(path))
 
-def splitext(path : 'str', keep_seps : 'bool' = True) -> 'tuple':
-    """Splits the basename of ``path`` into a filename and zero or more
-    file extensions.
+def split_path(path : 'str', keep_seps : 'bool' = True,
+               resolve : 'bool' = True) -> 'tuple':
+    """Splits a path into a (parent_dir, name, *ext) tuple.
     
     Args:
         path: The path
         keep_seps: Whether the extension separators should be kept as part
             of the file extensions
+        resolve: Whether to resolve the path before splitting
     
     Returns:
-        A tuple of length >= 1, in which the first element is the filename and
-        the remaining elements are file extensions.
+        A tuple of length >= 2, in which the first element is the parent
+        directory, the second element is the file name, and the remaining
+        elements are file extensions.
     
     Examples:
-        splitext('myfile.foo.txt', False) # -> ('myfile', 'foo', 'txt')
-        splitext('/usr/local/foobar.gz', True) # -> ('foobar', '.gz')
+        split_path('myfile.foo.txt', False)
+        -> ('/current/dir', 'myfile', 'foo', 'txt')
+        split_path('/usr/local/foobar.gz', True)
+        -> ('/usr/local', 'foobar', '.gz')
     """
+    if resolve:
+        path = abspath(path)
+    parent = os.path.dirname(path)
     file_parts = tuple(os.path.basename(path).split(os.extsep))
-    if keep_seps and len(file_parts) > 1:
-        file_parts = (file_parts[0],) + tuple(
-            '{}{}'.format(os.extsep, ext) for ext in file_parts[1:])
-    return file_parts
+    if len(file_parts) == 1:
+        seps = ()
+    else:
+        seps = file_parts[1:]
+        if keep_seps:
+            seps = tuple('{}{}'.format(os.extsep, ext) for ext in file_parts[1:])
+    return (parent, file_parts[0]) + seps
 
 def filename(path : 'str') -> 'str':
     """Returns just the filename part of ``path``. Equivalent to
-    ``splitext(path)[0]``.
+    ``split_path(path)[1]``.
     """
-    return splitext(path)[0]
+    return split_path(path)[1]
 
 def resolve_path(path : 'str', parent : 'str' = None) -> 'str':
     """Resolves the absolute path of the specified file and ensures that the

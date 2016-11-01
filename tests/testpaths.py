@@ -42,16 +42,17 @@ class PathTests(TestCase):
         cwd = os.getcwd()
         self.assertEqual(abspath('foo'), os.path.join(cwd, 'foo'))
     
-    def test_splitext(self):
-        self.assertTupleEqual(
-            splitext('/path/to/foo', keep_seps=False),
-            ('foo',))
-        self.assertTupleEqual(
-            splitext('foo.tar.gz', keep_seps=False),
-            ('foo', 'tar', 'gz'))
-        self.assertTupleEqual(
-            splitext('foo.tar.gz', keep_seps=True),
-            ('foo', '.tar', '.gz'))
+    def test_split_path(self):
+        with make_dir() as parent:
+            self.assertTupleEqual(
+                split_path(os.path.join(parent, 'foo'), keep_seps=False),
+                (parent, 'foo'))
+            self.assertTupleEqual(
+                split_path(os.path.join(parent, 'foo.tar.gz'), keep_seps=False),
+                (parent, 'foo', 'tar', 'gz'))
+            self.assertTupleEqual(
+                split_path(os.path.join(parent, 'foo.tar.gz'), keep_seps=True),
+                (parent, 'foo', '.tar', '.gz'))
     
     def test_filename(self):
         self.assertEqual(filename('/path/to/foo.tar.gz'), 'foo')

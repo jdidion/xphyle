@@ -9,7 +9,6 @@ from itertools import cycle
 import os
 import shutil
 import sys
-import tempfile
 
 from xphyle import open_
 from xphyle.formats import *
@@ -77,12 +76,8 @@ def chunked_iter(path : 'str', chunksize : 'int,>0' = 1024,
     """
     kwargs['mode'] = 'rb'
     with open_(path, **kwargs) as infile:
-        while True:
-            data = infile.read(chunksize)
-            if data:
-                yield data
-            else:
-                break
+        for chunk in iter_file_chunked(infile, chunksize):
+            yield chunk
 
 def write_iterable(iterable : 'iterable', path : 'str', linesep : 'str' = '\n',
                    convert : 'callable' = str, **kwargs):
@@ -146,117 +141,161 @@ def write_dict(d : 'dict', path : 'str', sep : 'str' = '=',
 
 ## Delimited files
 
-def delimited_file_iter(path : 'str', delim : 'str' = '\t',
-                        header : 'bool' = False,
+def delimited_file_iter(path : 'str', sep : 'str' = '\t',
+                        header : 'bool|iterable' = False,
                         converters : 'callable|iterable' = None,
+                        yield_header : 'bool' = True,
+                        row_type : 'str|callable' = 'list',
                         **kwargs) -> 'generator':
     """Iterate over rows in a delimited file.
     
     Args:
         path: Path to the file, or a file-like object
-        delim: field delimiter
-        converters: function, or iterable of functions, to call on each field
+        sep: The field delimiter
+        header: Either True or False to specifiy whether the file has a header,
+            or an iterable of column names.
+        converters: callable, or iterable of callables, to call on each value
+        yield_header: If header == True, whether the first row yielded should be
+            the header row
+        row_type: The collection type to return for each row:
+            tuple, list, or dict
         kwargs: additional arguments to pass to ``csv.reader``
     
     Yields:
         Rows of the delimited file. If ``header==True``, the first row yielded
-        is the header row. Converters are not applied to the header row.
+        is the header row, and its type is always a list. Converters are not
+        applied to the header row.
     """
+    if row_type == 'dict' and not header:
+        raise ValueError("Header must be specified for row_type=dict")
+    
     with open_(path, 'r') as f:
-        reader = csv.reader(f, delimiter=delim, **kwargs)
-        if not converters:
-            for row in reader:
-                yield reader
-        else:
+        reader = csv.reader(f, delimiter=sep, **kwargs)
+        
+        if header is True:
+            header_row = next(reader)
+            if yield_header:
+                yield header_row
+        
+        if converters:
             if not is_iterable(converters):
                 if callable(converters):
                     converters = cycle([converters])
                 else:
                     raise ValueError("'converters' must be iterable or callable")
-                
-            if header:
-                yield next(reader)
             
-            for row in reader:
-                yield [fn(x) if fn else x for fn, x in zip(converters, row)]
+            reader = (
+                [fn(x) if fn else x for fn, x in zip(converters, row)]
+                for row in reader)
+        
+        if row_type == 'tuple':
+            reader = (tuple(row) for row in reader)
+        elif row_type == 'dict':
+            reader = (dict(zip(header_row, row)) for row in reader)
+        elif callable(row_type):
+            reader = (row_type(row) for row in reader)
+        
+        for row in reader:
+            yield row
 
-def delimited_file_to_dict(path : 'str', delim : 'str' = '\t',
-                           key : 'int,>=0|callable' = 0,
-                           converters : 'callable|iterable' = None,
-                           skip_blank : 'bool' = True, **kwargs) -> 'dict':
+def delimited_file_to_dict(path : 'str', sep : 'str' = '\t',
+                           header : 'bool|iterable' = False,
+                           key : 'int,>=0|callable' = 0, **kwargs) -> 'dict':
     """Parse rows in a delimited file and add rows to a dict based on a a
     specified key index or function.
     
     Args:
         path: Path to the file, or a file-like object
-        delim: Field delimiter
+        sep: Field delimiter
         key: The column to use as a dict key, or a function to extract the key
-          from the row. All values must be unique, or an exception is raised.
-        converters: function, or iterable of functions, to call on each field
-        kwargs: Additional arguments to pass to ``csv.reader``
+          from the row. If a string value, header must be specified. All values
+          must be unique, or an exception is raised.
+        kwargs: Additional arguments to pass to ``delimited_file_iter``
     
     Returns:
-        A dict with as many element as rows in the file.
+        A dict with as many element as rows in the file
+    
+    Raises:
+        Exception if a duplicte key is generated
     """
+    itr = None
+    
+    if isinstance(key, str):
+        if not header:
+            raise ValueError("'header' must be specified if 'key' is a column name")
+        if header is True:
+            kwargs['yield_header'] = True
+            itr = delimited_file_iter(path, sep, True, **kwargs)
+            header = next(itr)
+        key = header.index(key)
+    
     if isinstance(key, int):
         keyfn = lambda row: row[key]
     elif callable(key):
         keyfn = key
     else:
-        raise ValueError("'key' must be an integer or callable")
+        raise ValueError("'key' must be an column name, index, or callable")
+    
+    if itr is None:
+        kwargs['yield_header'] = False
+        itr = delimited_file_iter(path, sep, header, **kwargs)
     
     d = {}
-    for row in delimited_file_iter(path, delim, converters):
-        if len(row) == 0 and skip_blank:
-            continue
-        d[keyfn(v)] = v
+    for row in itr:
+        k = keyfn(row)
+        if k in d:
+            raise Exception("Duplicate key {}".format(k))
+        d[k] = row
     return d
-
-def rows_to_delimited_file(rows : 'iterable', path : 'str',
-                           delim : 'str' = '\t', **kwargs):
-    """Write rows to delimited file.
-    
-    Args:
-        rows: Iterable of rows
-        path: Path to the file
-        delim: Field delimiter
-        kwargs: Additional args for ``csv.writer``
-    """
-    with open_(txt_file, 'w') as o:
-        w = csv.writer(o, delimiter=delim, **kwargs)
-        w.writerows(rows)
 
 ## Compressed files
 
-def compress_contents(path : 'str', compressed_path : 'str' = None,
-                      compression=None):
-    """Compress the contents of a file, either in-place or to a separate file.
+def compress_file(source_file, compressed_file=None,
+                  compression : 'bool|str' = None) -> 'str':
+    """Compress an existing file, either in-place or to a separate file.
     
     Args:
-        path (str): The path of the file to copy, or a file-like object.
-          This can itself be a compressed file (e.g. if you want to change
-          the file from one compression format to another).
-        compressed_path (str): The compressed file. If None, the file is
-          compressed in place.
+        source_file: Path or file-like object to compress. This can itself be a
+            compressed file (e.g. if you want to change the file from one
+            compression format to another).
+        compressed_file: The compressed path or file-like object. If None,
+            compression is performed in-place. If True, file name is determined
+            from ``source_file`` and the uncompressed file is retained.
         compression: None or True, to guess compression format from the file
           name, or the name of any supported compression format.
     """
-    inplace = compressed_path is None
-    if inplace:
-        if compression in (None, True):
-            raise ValueException(
-                "Either compressed_path must be specified or compression must "
-                "be a valid compression type.")
-        compressed_path = tempfile.mkstemp()[1]
+    if not isinstance(compression, str):
+        if compressed_file:
+            compression = guess_compression_format(compressed_file
+                if isinstance(compressed_file, str) else compressed_file.name)
+        else:
+            raise ValueError(
+                "'compressed_file' or 'compression' must be specified")
     
-    # Perform sequential compression as the source file might be quite large
-    with open_(compressed_path, mode='wb', compression=compression) as cfile:
-        for bytes in read_chunked(path):
-            cfile.write(bytes)
+    fmt = get_compression_format(compression)
+    fmt.compress_file(source_file, compressed_file)
+
+def uncompress_file(compressed_file, dest_file=None,
+                    compression : 'bool|str' = None) -> 'str':
+    """Uncompress an existing file, either in-place or to a separate file.
     
-    # Move temp file to original path
-    if inplace:
-        shutil.move(compressed_path, path)
+    Args:
+        compressed_file: Path or file-like object to uncompress
+        dest_file: Path or file-like object for the uncompressed file.
+            If None, file will be uncompressed in-place. If True, file will be
+            uncompressed to a new file (and the compressed file retained) whose
+            name is determined automatically.
+        compression: None or True, to guess compression format from the file
+            name, or the name of any supported compression format.
+    
+    Returns:
+        The path of the uncompressed file
+    """
+    if not isinstance(compression, str):
+        compression = guess_compression_format(
+            compressed_file.name if is_fileobj else compressed_file)
+    fmt = get_compression_format(compression)
+    return fmt.uncompress_file(compressed_file, uncompressed_file)
 
 # def write_archive(path : 'str', contents, **kwargs):
 #     """Write entries to a compressed archive file.
@@ -392,27 +431,27 @@ class FileCloser(object):
 
 # Misc
 
-def linecount(f, delim : 'str' = None, bufsize : 'int' = 1024 * 1024) -> 'int':
+def linecount(f, linesep : 'str' = None, bufsize : 'int' = 1024 * 1024) -> 'int':
     """Fastest pythonic way to count the lines in a file.
     
     Args:
         path: File object, or path to the file
-        delim: Line delimiter, specified as a byte string (e.g. b'\n')
+        linesep: Line delimiter, specified as a byte string (e.g. b'\n')
         bufsize: How many bytes to read at a time (1 Mb by default)
     
     Returns:
         The number of lines in the file
     """
-    if delim is None:
-        delim = os.linesep.encode()
+    if linesep is None:
+        linesep = os.linesep.encode()
     lines = 0
     with open_(f, 'rb') as fh:
         read_f = fh.read # loop optimization
         buf = read_f(buf_size)
         while buf:
-            lines += buf.count(delim)
+            lines += buf.count(linesep)
             buf = read_f(buf_size)
     return lines
 
 def is_iterable(x):
-    return isinstance(x, Iterable)
+    return isinstance(x, Iterable) and not isinstance(x, str)

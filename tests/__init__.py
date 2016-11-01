@@ -32,7 +32,9 @@ def make_files(*file_descriptors, parent="."):
         yield filepaths
     finally:
         for path in filepaths:
-            os.remove(path)
+            # path might have been deleted by the test
+            if os.path.exists(path):
+                os.remove(path)
 
 @contextmanager
 def make_empty_files(n, *args, parent='.', **kwargs):

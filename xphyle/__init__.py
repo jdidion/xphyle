@@ -6,6 +6,21 @@ import os
 import sys
 from xphyle.formats import *
 from xphyle.paths import *
+import xphyle.progress
+
+def configure(progress=True, system_progress=True):
+    """Conifgure xphyle.
+    
+    Args:
+        progress: Whether to wrap long-running operations with a progress bar.
+            If this is callable, it will be called to obtain the wrapped
+            iterable.
+        system_progress: Whether to use progress bars for system-level
+            operations. If this is a string, it will be used as the command
+            for producing the progress bar; pv is used by default.
+    """
+    xphyle.progress.wrapper = progress
+    xphyle.progress.system_wrapper = system_progress
 
 # Guess file format
 

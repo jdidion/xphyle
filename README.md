@@ -44,10 +44,9 @@ total = sum(i for i in safe_iter('infile.gz', convert=int))
 
 ## Version 1.0
 
-* Enable user to define compression level
 * LZW support (via python-lzw)
 * Make all file I/O functions work transparently with URLs ()
-*
+
 ## After 1.0
 
 * Support multi-threaded gzip compression (via pigz)
