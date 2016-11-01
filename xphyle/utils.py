@@ -2,7 +2,7 @@
 """A collection of convenience methods for reading, writing, and
 otherwise managing files.
 """
-from collections import OrderedDict
+from collections import OrderedDict, Iterable
 import csv
 import io
 from itertools import cycle
@@ -99,7 +99,7 @@ def write_iterable(iterable : 'iterable', path : 'str', linesep : 'str' = '\n',
     if linesep is None:
         linesep = os.linesep
     with open_(path, mode='w', **kwargs) as f:
-        f.write(linesep.join(convert(s) for s in strings))
+        f.write(linesep.join(convert(s) for s in iterable))
 
 def read_dict(path, sep : 'str' = '=', convert : 'callable' = None,
               ordered : 'bool' = False, **kwargs) -> 'dict':
@@ -120,8 +120,8 @@ def read_dict(path, sep : 'str' = '=', convert : 'callable' = None,
         line = line.strip()
         if len(line) == 0 or line[0] == "#":
             return None
-        return line.split(delim)
-    lines = safe_iter(path, convert=parse_line, **kwargs)
+        return line.split(sep)
+    lines = filter(None, safe_iter(path, convert=parse_line, **kwargs))
     if convert:
         lines = ((k, convert(v)) for k, v in lines)
     return OrderedDict(lines) if ordered else dict(lines)
@@ -140,14 +140,16 @@ def write_dict(d : 'dict', path : 'str', sep : 'str' = '=',
     """
     if linesep is None:
         linesep = os.linesep
-    write_strings(
+    write_iterable(
         ("{}{}{}".format(k, sep, convert(v)) for k, v in d.items()),
         path, linesep=linesep)
 
 ## Delimited files
 
 def delimited_file_iter(path : 'str', delim : 'str' = '\t',
-                        converters=None, **kwargs) -> 'generator':
+                        header : 'bool' = False,
+                        converters : 'callable|iterable' = None,
+                        **kwargs) -> 'generator':
     """Iterate over rows in a delimited file.
     
     Args:
@@ -157,27 +159,33 @@ def delimited_file_iter(path : 'str', delim : 'str' = '\t',
         kwargs: additional arguments to pass to ``csv.reader``
     
     Yields:
-        Rows of the delimited file
+        Rows of the delimited file. If ``header==True``, the first row yielded
+        is the header row. Converters are not applied to the header row.
     """
-    if not iterable(converters):
-        if callable(converters):
-            converters = cycle(converters)
-        else:
-            raise ValueError("'converters' must be iterable or callable")
-    
     with open_(path, 'r') as f:
-        g = (row for row in csv.reader(f, delimiter=delim, **kwargs))
-        if converters:
-            g = (fn(x) if fn else x
-                for row in g
-                for fn, x in zip(converters, row))
-        for row in g:
-            yield g
+        reader = csv.reader(f, delimiter=delim, **kwargs)
+        if not converters:
+            for row in reader:
+                yield reader
+        else:
+            if not is_iterable(converters):
+                if callable(converters):
+                    converters = cycle([converters])
+                else:
+                    raise ValueError("'converters' must be iterable or callable")
+                
+            if header:
+                yield next(reader)
+            
+            for row in reader:
+                yield [fn(x) if fn else x for fn, x in zip(converters, row)]
 
 def delimited_file_to_dict(path : 'str', delim : 'str' = '\t',
-                           key : 'int,>=0' = 0, converters=None,
+                           key : 'int,>=0|callable' = 0,
+                           converters : 'callable|iterable' = None,
                            skip_blank : 'bool' = True, **kwargs) -> 'dict':
-    """Parse rows in a delimited file and add each row to a dict.
+    """Parse rows in a delimited file and add rows to a dict based on a a
+    specified key index or function.
     
     Args:
         path: Path to the file, or a file-like object
@@ -405,3 +413,6 @@ def linecount(f, delim : 'str' = None, bufsize : 'int' = 1024 * 1024) -> 'int':
             lines += buf.count(delim)
             buf = read_f(buf_size)
     return lines
+
+def is_iterable(x):
+    return isinstance(x, Iterable)
