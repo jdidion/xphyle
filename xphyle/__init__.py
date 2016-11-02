@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """The main xphyle methods -- open_ and xopen.
 """
+from collections import defaultdict
 from contextlib import contextmanager
 import os
 import sys
@@ -60,12 +61,12 @@ def open_(f, mode : 'str' = 'r', **kwargs):
         A file-like object
     
     Examples:
-      with open_('myfile') as infile:
-          print(next(infile))
+        with open_('myfile') as infile:
+            print(next(infile))
       
-      fh = open('myfile')
-      with open_(fh) as infile:
-          print(next(infile))
+        fh = open('myfile')
+        with open_(fh) as infile:
+            print(next(infile))
     """
     if isinstance(f, str):
         kwargs['context_wrapper'] = True
@@ -76,7 +77,7 @@ def open_(f, mode : 'str' = 'r', **kwargs):
 
 def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
           use_system : 'bool' = True, context_wrapper : 'bool' = False,
-          **kwargs):
+          **kwargs) -> 'file':
     """
     Replacement for the `open` function that automatically handles
     compressed files. If `use_system==True` and the file is compressed,
@@ -149,15 +150,8 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
                 fh = fh.buffer
             fmt = get_compression_format(compression)
             fh = fmt.open_file_python(fh, mode, **kwargs)
-        elif context_wrapper:
-            class StdWrapper(object):
-                def __init__(self, fh):
-                    self.fh = fh
-                def __enter__(self):
-                    return self.fh
-                def __exit__(self, exception_type, exception_value, traceback):
-                    pass
-            fh = StdWrapper(fh)
+        if context_wrapper:
+            fh = StreamWrapper(fh)
         return fh
     
     if 'r' in mode:
@@ -177,6 +171,100 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
     
     if compression:
         fmt = get_compression_format(compression)
-        return fmt.open_file(path, mode, use_system=use_system, **kwargs)
+        fh = fmt.open_file(path, mode, use_system=use_system, **kwargs)
+    else:
+        fh = open(path, mode, **kwargs)
     
-    return open(path, mode, **kwargs)
+    if context_wrapper:
+        fh = FileWrapper(fh)
+    
+    return fh
+
+# File wrapper
+
+class FileWrapper(object):
+    """Wrapper around a file object that adds two features:
+    
+    1. An event system by which registered listeners can respond to file events.
+    Currently, 'close' is the only supported event.
+    2. Wraps a file iterator in a progress bar (if configured)
+    
+    Args:
+        source: Path or file object
+        mode: File open mode
+        kwargs: Additional arguments to pass to xopen
+    """
+    __slots__ = ['_file', '_path', '_listeners']
+    
+    def __init__(self, source, mode='w', **kwargs):
+        if isinstance(source, str):
+            path = source
+            source = xopen(source, mode=mode, **kwargs)
+        else:
+            path = source.name
+        object.__setattr__(self, '_file', source)
+        object.__setattr__(self, '_path', path)
+        object.__setattr__(self, '_listeners', defaultdict(lambda: []))
+    
+    def __getattr__(self, name):
+        return getattr(self._file, name)
+    
+    def __iter__(self):
+        return iter(xphyle.progress.wrap(self._file))
+    
+    def __enter__(self):
+        if self.closed:
+            raise ValueError("I/O operation on closed file.")
+        return self
+    
+    def __exit__(self, exception_type, exception_value, traceback):
+        self.close()
+    
+    def register_listener(self, event : 'str', listener):
+        """Register an event listener.
+        
+        Args:
+            event: Event name (currently, only 'close' is recognized)
+            listener: A listener object, which must be callable with a
+                single argument -- this file wrapper.
+        """
+        self._listeners[event].append(listener)
+    
+    def close(self):
+        self._file.close()
+        if 'close' in self._listeners:
+            for listener in self._listeners['close']:
+                listener(self)
+
+class FileEventListener(object):
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+    
+    def __call__(self, file_wrapper):
+        self.execute(file_wrapper._path, *self.args, **self.kwargs)
+
+class StreamWrapper(object):
+    """Wrapper around a stream (such as stdout) that implements the
+    ContextManager operations and wraps iterators in a progress bar
+    (if configured).
+    
+    Args:
+        stream: The stream to wrap
+    """
+    __slots__ = ['_stream']
+    
+    def __init__(self, stream):
+        object.__setattr__(self, '_stream', stream)
+    
+    def __getattr__(self, name):
+        return getattr(self._stream, name)
+    
+    def __iter__(self):
+        return iter(xphyle.progress.wrap(self._stream))
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exception_type, exception_value, traceback):
+        pass

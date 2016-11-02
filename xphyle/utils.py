@@ -330,72 +330,26 @@ def uncompress_file(compressed_file, dest_file=None,
 #             else:
 #                 c.writestr(content, name)
 
-# File wrappers that perform an action when the file is closed.
+# Some useful FileEventListeners
 
-class FileWrapper(object):
-    """Base class for file wrappers.
-    """
-    __slots__ = ['_file']
-    
-    def __init__(self, source, mode='w', **kwargs):
-        if isinstance(source, str):
-            path = source
-            source = xopen(source, mode=mode, **kwargs)
-        else:
-            path = source.name
-        object.__setattr__(self, '_file', source)
-        object.__setattr__(self, '_path', path)
-    
-    def __getattr__(self, name):
-        return getattr(self._file, name)
+class CompressOnClose(FileEventListener):
+    """Compress a file."""
+    def execute(self, path, *args, **kwargs):
+        self.compressed_path = compress_file(path, *args, **kwargs)
 
-def compress_on_close(source, *args, **kwargs) -> 'FileWrapper':
-    """Compress the file when it is closed.
-    
-    Args:
-        args, kwargs: arguments passed through to ``compress_file``
-    
-    Returns:
-        File-like object
-    """
-    class FileCompressor(FileWrapper):
-        def close(self):
-            self._file.close()
-            return compress_file(self._path, *args, **kwargs)
-    return FileCompressor(source)
+class MoveOnClose(FileEventListener):
+    """Move a file."""
+    def execute(self, path, dest):
+        shutil.move(path, dest)
 
-def move_on_close(source, dest : 'str') -> 'FileWrapper':
-    """Move the file to a new location when it is closed.
-    
-    Args:
-        source: Path or file object
-        dest: Destination path
-    
-    Returns:
-        File-like object
-    """
-    class FileMover(FileWrapper):
-        def close(self):
-            self._file.close()
-            shutil.move(self._path, dest)
-    return FileMover(source)
+class RemoveOnClose(FileEventListener):
+    """Remove a file."""
+    def execute(self, path):
+        os.remove(path)
 
-def remove_on_close(source) -> 'FileWrapper':
-    """Delete the file when it is closed.
-    
-    Args:
-        source: Path or file object
-    
-    Returns:
-        File-like object
-    """
-    class FileDeleter(FileWrapper):
-        def close(self):
-            self._file.close()
-            os.remove(self._path)
-    return FileDeleter(source)
+# Misc
 
-class FileCloser(object):
+class FileManager(object):
     """Dict-like container for files. Has a ``close`` method that closes
     all open files.
     """
@@ -446,6 +400,8 @@ class FileCloser(object):
         return f
     
     def items(self):
+        """Returns a list of all (key, file) pairs.
+        """
         return self.files.items()
     
     def close(self):
@@ -453,8 +409,6 @@ class FileCloser(object):
         """
         for fh in self.files.values():
             fh.close()
-
-# Misc
 
 def linecount(f, linesep : 'str' = None, buf_size : 'int' = 1024 * 1024) -> 'int':
     """Fastest pythonic way to count the lines in a file.
@@ -482,4 +436,9 @@ def linecount(f, linesep : 'str' = None, buf_size : 'int' = 1024 * 1024) -> 'int
         return lines
 
 def is_iterable(x):
+    """Returns True if ``x`` is a non-string Iterable.
+    
+    Args:
+        x: The object to test
+    """
     return isinstance(x, Iterable) and not isinstance(x, str)

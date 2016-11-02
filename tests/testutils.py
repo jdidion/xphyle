@@ -227,40 +227,6 @@ class UtilsTests(TestCase):
         with open(path, 'rt') as i:
             self.assertEqual(i.read(), 'foo')
     
-    def test_compress_on_close(self):
-        path = self.root.make_file()
-        fh = compress_on_close(path, compression='gz')
-        fh.write('foo')
-        gzfile = fh.close()
-        self.assertEqual(gzfile, path + '.gz')
-        self.assertTrue(os.path.exists(gzfile))
-        with gzip.open(gzfile, 'rt') as i:
-            self.assertEqual(i.read(), 'foo')
-    
-    def test_move_on_close(self):
-        path = self.root.make_file()
-        dest = self.root.make_file()
-        fh = move_on_close(path, dest)
-        fh.write('foo')
-        fh.close()
-        self.assertFalse(os.path.exists(path))
-        self.assertTrue(os.path.exists(dest))
-        with open(dest, 'rt') as i:
-            self.assertEqual(i.read(), 'foo')
-    
-    def test_remove_on_close(self):
-        path = self.root.make_file()
-        fh = remove_on_close(path)
-        fh.write('foo')
-        fh.close()
-        self.assertFalse(os.path.exists(path))
-        
-        path = self.root.make_file()
-        fh = remove_on_close(open(path, 'wt'))
-        fh.write('foo')
-        fh.close()
-        self.assertFalse(os.path.exists(path))
-    
     def test_linecount(self):
         path = self.root.make_file()
         with open(path, 'wt') as o:
@@ -274,8 +240,8 @@ class UtilsTests(TestCase):
         path = self.root.make_empty_files(1)[0]
         self.assertEqual(0, linecount(path))
     
-    def test_file_closer(self):
-        f = FileCloser()
+    def test_file_manager(self):
+        f = FileManager()
         paths = self.root.make_empty_files(3)
         for p in paths:
             f.add(p, mode='wt')
@@ -293,9 +259,45 @@ class UtilsTests(TestCase):
         for key, fh in f.items():
             self.assertTrue(fh.closed)
     
-    def test_file_closer_dup_files(self):
-        f = FileCloser()
+    def test_file_manager_dup_files(self):
+        f = FileManager()
         path = self.root.make_file()
         f.add(path)
         with self.assertRaises(ValueError):
             f.add(path)
+    
+    def test_compress_on_close(self):
+        path = self.root.make_file()
+        compressor = CompressOnClose(compression='gz')
+        with FileWrapper(path, 'wt') as wrapper:
+            wrapper.register_listener('close', compressor)
+            wrapper.write('foo')
+        gzfile = path + '.gz'
+        self.assertEqual(gzfile, compressor.compressed_path)
+        self.assertTrue(os.path.exists(gzfile))
+        with gzip.open(gzfile, 'rt') as i:
+            self.assertEqual(i.read(), 'foo')
+
+    def test_move_on_close(self):
+        path = self.root.make_file()
+        dest = self.root.make_file()
+        with FileWrapper(path, 'wt') as wrapper:
+            wrapper.register_listener('close', MoveOnClose(dest))
+            wrapper.write('foo')
+        self.assertFalse(os.path.exists(path))
+        self.assertTrue(os.path.exists(dest))
+        with open(dest, 'rt') as i:
+            self.assertEqual(i.read(), 'foo')
+
+    def test_remove_on_close(self):
+        path = self.root.make_file()
+        with FileWrapper(path, 'wt') as wrapper:
+            wrapper.register_listener('close', RemoveOnClose())
+            wrapper.write('foo')
+        self.assertFalse(os.path.exists(path))
+        
+        path = self.root.make_file()
+        with FileWrapper(open(path, 'wt')) as wrapper:
+            wrapper.register_listener('close', RemoveOnClose())
+            wrapper.write('foo')
+        self.assertFalse(os.path.exists(path))
