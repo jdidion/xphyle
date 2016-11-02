@@ -116,7 +116,7 @@ class SystemReader:
         retcode = self.process.poll()
         if retcode is None:
             # still running
-            self.process.terminate()
+            self.process.terminate() # pragma: no-cover
         self._raise_if_error()
 
     def __iter__(self):
@@ -130,7 +130,7 @@ class SystemReader:
         exit code is nonzero.
         """
         retcode = self.process.poll()
-        if retcode is not None and retcode != 0:
+        if retcode is not None and retcode != 0: # pragma: no-cover
             raise EOFError(
                 "{} process returned non-zero exit code {}. "
                 "Is the input file truncated or corrupt?".format(
@@ -180,7 +180,7 @@ class SystemWriter:
             self.process = Popen(
                 self.command, stdin=PIPE, stdout=self.outfile,
                 stderr=self.devnull, close_fds=True)
-        except IOError as e:
+        except IOError as e: # pragma: no-cover
             self.outfile.close()
             self.devnull.close()
             raise
@@ -201,7 +201,7 @@ class SystemWriter:
         retcode = self.process.wait()
         self.outfile.close()
         self.devnull.close()
-        if retcode != 0:
+        if retcode != 0: # pragma: no-cover
             raise IOError("Output {} process terminated with "
                           "exit code {}".format(self.executable_name, retcode))
 

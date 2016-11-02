@@ -9,7 +9,7 @@ from xphyle.paths import get_executable_path, check_path
 wrapper = False
 system_wrapper = False
 
-class TqdmWrapper(object):
+class TqdmWrapper(object): # pragma: no-cover
     def __init__(self):
         import tqdm
         self.fn = tqdm.tqdm
@@ -28,7 +28,7 @@ def wrap(itr, size=None):
         return wrapper(itr, size)
     return itr
 
-def pv_command():
+def pv_command(): # pragma: no-cover
     if pv is None:
         pv = get_executable_path('pv')
     if pv is None:
@@ -36,7 +36,7 @@ def pv_command():
     check_path(pv, 'f', 'x')
     return "{} -pre".format(pv)
 
-def wrap_subprocess(cmd, stdin, stdout, **kwargs):
+def wrap_subprocess(cmd, stdin, stdout, **kwargs): # pragma: no-cover
     global system_wrapper
     if system_wrapper is True:
         try:

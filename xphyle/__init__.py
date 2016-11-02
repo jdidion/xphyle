@@ -122,7 +122,7 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
         raise ValueError("'path' must be a string")
     if not any(m in mode for m in ('r','w','a','x')):
         raise ValueError("'mode' must contain one of (r,w,a,x)")
-    if 'U' in mode:
+    if 'U' in mode: # pragma: no-cover
         if 'newline' in kwargs and kwargs['newline'] is not None:
             raise ValueError("newline={} not compatible with universal newlines "
                              "('U') mode".format(kwargs['newline']))

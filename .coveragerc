@@ -1,4 +1,13 @@
 [run]
-omit = 
+omit =
     tests/*
     setup.py
+    xphyle/_version.py
+    versioneer.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise NotImplementedError
+    if __name__ == .__main__.:
