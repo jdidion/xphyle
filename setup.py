@@ -20,7 +20,7 @@ setup(
     packages = ['xphyle'],
     classifiers=[
         'Development Status :: 4 - Beta',
-        'License :: OSI Approved :: Public Domain',
+        'License :: Public Domain',
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
