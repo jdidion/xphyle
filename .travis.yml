@@ -10,6 +10,7 @@ python:
 install:
   - pip install --upgrade pip wheel
   - pip install nose2
+  - pip install cov-core
   - pip install coveralls
   - pip install .
 
