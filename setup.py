@@ -6,9 +6,12 @@ if sys.version_info < (3, 3):
     sys.stdout.write("At least Python 3.3 is required.\n")
     sys.exit(1)
 
+import versioneer
+
 setup(
     name='xphyle',
-    version='0.1',
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
     description='Utilities for working with files.',
     url='https://github.com/jdidion/xphyle',
     author='John Didion',
@@ -16,7 +19,7 @@ setup(
     license='Public Domain',
     packages = ['xphyle'],
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'License :: OSI Approved :: Public Domain',
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',

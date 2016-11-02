@@ -8,6 +8,10 @@ from xphyle.formats import *
 from xphyle.paths import *
 import xphyle.progress
 
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions
+
 def configure(progress=True, system_progress=True):
     """Conifgure xphyle.
     
