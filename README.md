@@ -50,26 +50,26 @@ total = sum(i for i in safe_iter('infile.gz', convert=int))
 
 # TODO
 
-## 1.0
+## 0.7
 
 * Documentation
 * Publish to pypi
 
-## 1.1
+## 0.8
 
 * Make all file I/O functions work transparently with URLs (via urllib2)
 * Plug-in interface for alternative url schemes
 * Support multi-threaded gzip compression (via pigz)
 * Support multi-threaded lzma compression
 
-## 1.2
+## 0.9
 
 * Formalize the plug-in interface for alternative compression formats
 * Consider natively supporting other popular compression formats:
     * LZW: the only decent library is python-lzw, and it doesn't provide an open method
     * Snappy (via python-snappy): this is problematic since it depends on libsnappy, with no pure python fallback
 
-## 1.3
+## 1.0
 
 * Add support for archive formats
     * tar, zip
