@@ -28,13 +28,13 @@ def wrap(itr, size=None):
         return wrapper(itr, size)
     return itr
 
-def pv_command(): # pragma: no-cover
+def pv_command(pv=None): # pragma: no-cover
     if pv is None:
         pv = get_executable_path('pv')
     if pv is None:
         raise IOError("pv is not available on the path")
     check_path(pv, 'f', 'x')
-    return "{} -pre".format(pv)
+    return (pv, "-pre")
 
 def wrap_subprocess(cmd, stdin, stdout, **kwargs): # pragma: no-cover
     global system_wrapper
