@@ -1,6 +1,6 @@
 ![https://pypi.python.org/pypi/xphyle](https://img.shields.io/pypi/v/xphyle.svg?branch=master)
 ![https://travis-ci.org/jdidion/xphyle](https://travis-ci.org/jdidion/xphyle.svg?branch=master)
-![https://coveralls.io/repos/github/jdidion/xphyle/badge.svg?branch=master](https://coveralls.io/github/jdidion/xphyle?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/jdidion/xphyle/badge.svg?branch=master)](https://coveralls.io/github/jdidion/xphyle?branch=master)
 
 # xphyle: easier access to compressed files
 
