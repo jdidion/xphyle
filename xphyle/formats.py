@@ -223,7 +223,11 @@ def register_compression_format(format_class : 'class'):
         ``format_class`` -- a subclass of CompressionFormat
     """
     fmt = format_class()
-    aliases = set(fmt.exts) | set(fmt.system_commands)
+    aliases = set(fmt.exts)
+    if isinstance(fmt.system_commands, dict):
+        aliases = aliases | set(fmt.system_commands.values())
+    else:
+        aliases = aliases | set(fmt.system_commands)
     aliases.add(fmt.lib_name)
     for alias in aliases:
         # TODO: warn about overriding existing format?
@@ -254,29 +258,8 @@ class CompressionFormat(FileFormat):
     python-level implementations of compression formats.
     """
     @property
-    def executable_path(self) -> 'str':
-        self._resolve_executable()
-        return self._executable_path
-    
-    @property
-    def executable_name(self) -> 'str':
-        self._resolve_executable()
-        return self._executable_name
-    
-    @property
     def default_ext(self) -> 'str':
         return self.exts[0]
-    
-    def _resolve_executable(self):
-        if not hasattr(self, '_executable_path'):
-            self._executable_path = None
-            self._executable_name = None
-            for cmd in self.system_commands:
-                exe = get_executable_path(cmd)
-                if exe:
-                    self._executable_name = cmd
-                    self._executable_path = exe
-                    break
     
     def _get_compresslevel(self, level=None):
         if level is None:
@@ -292,7 +275,14 @@ class CompressionFormat(FileFormat):
         """Returns True if at least one command in ``self.system_commands``
         resolves to an existing, executable file.
         """
-        return self.executable_path is not None
+        return self.compress_path is not None
+    
+    @property
+    def can_use_system_uncompression(self) -> 'bool':
+        """Returns True if at least one command in ``self.system_commands``
+        resolves to an existing, executable file.
+        """
+        return self.uncompress_path is not None
     
     def compress(self, bytes : 'bytes', **kwargs) -> 'bytes':
         """Compress bytes.
@@ -386,16 +376,15 @@ class CompressionFormat(FileFormat):
         Returns:
             A file-like object
         """
-        if use_system and self.can_use_system_compression:
-            parts = split_path(filename)
-            ext = parts[-1] if len(parts) > 2 else self.exts[0]
-            if 'r' in mode:
+        if use_system:
+            z = None
+            if 'r' in mode and self.can_use_system_compression:
                 z = SystemReader(
-                    self.executable_path,
+                    self.compress_path,
                     filename,
                     self.get_command('d', src=filename),
-                    self.executable_name)
-            else:
+                    self.compress_name)
+            elif 'r' not in mode and self.can_use_system_uncompression:
                 for c in mode:
                     if c in ('w', 'a', 'x'):
                         bin_mode = c + 'b'
@@ -403,14 +392,15 @@ class CompressionFormat(FileFormat):
                 else:
                     raise ValueError("Invalid mode: {}".format(mode))
                 z = SystemWriter(
-                    self.executable_path,
+                    self.uncompress_path,
                     filename,
                     bin_mode,
                     self.get_command('c'),
-                    self.executable_name)
-            if 't' in mode:
-                z = io.TextIOWrapper(z)
-            return z
+                    self.uncompress_name)
+            if z:
+                if 't' in mode:
+                    z = io.TextIOWrapper(z)
+                return z
         
         return self.open_file_python(filename, mode, **kwargs)
     
@@ -528,7 +518,7 @@ class CompressionFormat(FileFormat):
         dest_file = open(dest, 'wb') if dest_is_path else dest
         
         try:
-            if use_system and self.can_use_system_compression:
+            if use_system and self.can_use_system_uncompression:
                 src = source if source_is_path else STDIN
                 cmd = self.get_command('d', src=src)
                 psrc = None if source_is_path else source
@@ -555,7 +545,30 @@ class CompressionFormat(FileFormat):
 
         return dest
 
-class Gzip(CompressionFormat):
+class SingleExeCompressionFormat(CompressionFormat):
+    """CompressionFormat that uses the same executable for compressing and
+    uncompressing.
+    """
+    @property
+    def executable_path(self) -> 'str':
+        self._resolve_executable()
+        return self._executable_path
+    compress_path = executable_path
+    uncompress_path = executable_path
+    
+    @property
+    def executable_name(self) -> 'str':
+        self._resolve_executable()
+        return self._executable_name
+    compress_name = executable_name
+    uncompress_name = executable_name
+    
+    def _resolve_executable(self):
+        if not hasattr(self, '_executable_path'):
+            self._executable_path, self._executable_name = _resolve_exe(
+                self.system_commands)
+
+class Gzip(SingleExeCompressionFormat):
     """Implementation of CompressionFormat for gzip files.
     """
     exts = ('gz',)
@@ -588,7 +601,7 @@ class Gzip(CompressionFormat):
 
 register_compression_format(Gzip)
 
-class BZip2(CompressionFormat):
+class BZip2(SingleExeCompressionFormat):
     """Implementation of CompressionFormat for bzip2 files.
     """
     exts = ('bz2','bzip','bzip2')
@@ -621,7 +634,7 @@ class BZip2(CompressionFormat):
 
 register_compression_format(BZip2)
 
-class Lzma(CompressionFormat):
+class Lzma(SingleExeCompressionFormat):
     """Implementation of CompressionFormat for lzma (.xz) files.
     """
     exts = ('xz', 'lzma', '7z', '7zip')
@@ -652,9 +665,79 @@ class Lzma(CompressionFormat):
 
 register_compression_format(Lzma)
 
+# class DualExeCompressionFormat(CompressionFormat):
+#     """CompressionFormat that uses the same executable for compressing and
+#     uncompressing.
+#     """
+#     @property
+#     def compress_path(self) -> 'str':
+#         self._resolve_compress()
+#         return self._compress_path
+#
+#     @property
+#     def uncompress_path(self) -> 'str':
+#         self._resolve_uncompress()
+#         return self._uncompress_path
+#
+#     @property
+#     def compress_name(self) -> 'str':
+#         self._resolve_compress()
+#         return self._compress_name
+#
+#     @property
+#     def uncompress_name(self) -> 'str':
+#         self._resolve_uncompress()
+#         return self._uncompress_name
+#
+#     def _resolve_compress(self):
+#         if not hasattr(self, '_compress_path'):
+#             self._compress_path, self._compress_name = _resolve_exe(
+#                 self.system_commands['compress'])
+#
+#     def _resolve_uncompress(self):
+#         if not hasattr(self, '_uncompress_path'):
+#             self._uncompress_path, self._uncompress_name = _resolve_exe(
+#                 self.system_commands['uncompress'])
+#
+# class Lzw(DualExeCompressionFormat):
+#     exts = ('Z', 'lzw')
+#     lib_name = 'lzw'
+#     system_commands = dict(compress='compress', uncompress='uncompress')
+#     compresslevel_range = (0, 7)
+#     default_compresslevel = 7
+#
+#     def get_command(self, op, src=STDIN, stdout=True, compresslevel=7):
+#         compresslevel += 9
+#         if op == 'c':
+#             cmd = [self.compress_path]
+#             cmd.extend(('-b', compresslevel))
+#         else:
+#             cmd = [self.uncompress_path]
+#         if stdout:
+#             cmd.append('-c')
+#         if src != STDIN:
+#             cmd.append(src)
+#         return cmd
+#
+# register_compression_format(Lzw)
+
+def _resolve_exe(names):
+    path = None
+    name = None
+    for cmd in names:
+        exe = get_executable_path(cmd)
+        if exe:
+            path = cmd
+            name = exe
+            break
+    return (path, name)
+
 # Misc functions
 
 def iter_file_chunked(fh, chunksize : 'int,>0' = 1024):
+    """Returns a progress bar-wrapped iterator over a file that reads
+    fixed-size chunks.
+    """
     def _itr():
         while True:
             data = fh.read(chunksize)

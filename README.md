@@ -17,8 +17,6 @@ xphyle is organized as follows:
 pip install git+git://github.com/jdidion/xphyle.git
 ```
 
-We are actively working towards 100% test coverage and completion of additional features (see 'TODO' below), at which point we will declare version 1.0 and add the project to pypi.
-
 # Example usages:
 
 ```python
@@ -42,20 +40,27 @@ total = sum(i for i in safe_iter('infile.gz', convert=int))
 
 # TODO
 
-## Version 1.0
+## 1.0
 
-* LZW support (via python-lzw)
-* Make all file I/O functions work transparently with URLs ()
+* Documentation
 
-## After 1.0
+## 1.1
 
+* Make all file I/O functions work transparently with URLs (via urllib2)
 * Support multi-threaded gzip compression (via pigz)
 * Support multi-threaded lzma compression
-* Many other archive formats that might be supported - which are most important?
-    * arc, cab (windows-specific), dmg (mac-specific), iso9660, lzh, rar, xar, zz
+
+## 1.2
+
+* Support for other compression formats
+    * LZW: the only decent library is python-lzw, and it doesn't provide an open method
     * Snappy (via python-snappy): this is problematic since it depends on libsnappy, with no pure python fallback
     * Data type-specific formats (e.g. scalce for nucleotide sequences)
+
+## 1.3
+
 * Add support for archive formats
     * Recognize .tgz, .tbz2, and .tlz extensions
     * Support 7zip archives: this is problematic as it depends on 7zip being installed, with no pure python fallback
     * Optionally use libarchive (if installed) via one of the several available python packages. Will have to do performance testing to determine whether this should be the first option or the second to try.
+    * Many other archive formats that might be supported - which are most important? arc, cab (windows-specific), dmg (mac-specific), iso9660, lzh, rar, xar, zz
