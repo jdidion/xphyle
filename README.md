@@ -11,8 +11,8 @@ provides some convenience methods for working with file paths.
 
 xphyle is organized as follows:
 
-* The `xphyle` module (i.e. __init__.py) provides `open_`, a drop-in replacement for the python `open()` method that tries to automatically and transparently handle common compression and archive formats.
-* The `xphyle.utils` module provides some useful methods on top of open_ for reading and writing files.
+* The `xphyle` module (i.e. \_\_init\_\_.py) provides `xopen()`, a drop-in replacement for the python `open()` method that tries to automatically and transparently handle common compression and archive formats. In addition, `open_()` transparently makes both paths and open file objects work with `wait`.
+* The `xphyle.utils` module provides some useful methods on top of `xopen()/open_()` for reading and writing files.
 * The `xphyle.formats` module implements the details of different file formats. The goal of this module is to try to use the system-level program/library (which is generally the fastest) when possible, and fall back to a pure-python module.
 * The `xphyle.paths` module offers useful functions for locating and resolving files and directories.
 
@@ -35,6 +35,12 @@ with open_('infile.gz') as myfile:
     for line in myfile:
         print(line)
 
+# Transparently handle paths and file objects
+def dostuff(path_or_file):
+    with open_(path_or_file) as myfile:
+        for line in myfile:
+            print(line)
+
 # Read all lines in a compressed file into a list
 from xphyle.utils import safe_file_iter
 lines = list(safe_iter('infile.gz'))
@@ -53,20 +59,22 @@ total = sum(i for i in safe_iter('infile.gz', convert=int))
 ## 1.1
 
 * Make all file I/O functions work transparently with URLs (via urllib2)
+* Plug-in interface for alternative url schemes
 * Support multi-threaded gzip compression (via pigz)
 * Support multi-threaded lzma compression
 
 ## 1.2
 
-* Support for other compression formats
+* Formalize the plug-in interface for alternative compression formats
+* Consider natively supporting other popular compression formats:
     * LZW: the only decent library is python-lzw, and it doesn't provide an open method
     * Snappy (via python-snappy): this is problematic since it depends on libsnappy, with no pure python fallback
-    * Data type-specific formats (e.g. scalce for nucleotide sequences)
 
 ## 1.3
 
 * Add support for archive formats
+    * tar, zip
     * Recognize .tgz, .tbz2, and .tlz extensions
     * Support 7zip archives: this is problematic as it depends on 7zip being installed, with no pure python fallback
-    * Optionally use libarchive (if installed) via one of the several available python packages. Will have to do performance testing to determine whether this should be the first option or the second to try.
+    * Consider using libarchive (if installed) via one of the several available python packages. Will have to do performance testing to determine whether this should be the first option or the second to try.
     * Many other archive formats that might be supported - which are most important? arc, cab (windows-specific), dmg (mac-specific), iso9660, lzh, rar, xar, zz
