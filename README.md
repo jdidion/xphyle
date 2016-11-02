@@ -43,6 +43,7 @@ total = sum(i for i in safe_iter('infile.gz', convert=int))
 ## 1.0
 
 * Documentation
+* Publish to pypi
 
 ## 1.1
 

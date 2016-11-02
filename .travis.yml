@@ -11,7 +11,11 @@ python:
 install:
   - pip install --upgrade pip wheel
   - pip install nose2
+  - pip install coveralls
   - pip install .
 
 script:
-  - nose2 -C tests
+  nose2 -C tests
+
+after_success:
+  coveralls
