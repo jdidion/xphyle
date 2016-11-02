@@ -16,7 +16,6 @@ install:
 
 script:
   - nose2 -C tests --coverage-config .coveragerc
-  - coverage run --source=xphyle setup.py test
 
 after_success:
   - coveralls
