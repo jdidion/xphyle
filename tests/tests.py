@@ -6,27 +6,33 @@ from xphyle import *
 from xphyle.paths import STDIN, STDOUT, STDERR
 
 class XphyleTests(TestCase):
+    def setUp(self):
+        self.root = TestTempDir()
+    
+    def tearDown(self):
+        self.root.close()
+    
     def test_guess_format(self):
         with self.assertRaises(ValueError):
             guess_file_format(STDOUT)
         with self.assertRaises(ValueError):
             guess_file_format(STDERR)
-        with make_file(suffix='.gz') as path:
-            with gzip.open(path, 'wt') as o:
-                o.write('foo')
-            self.assertEqual(guess_file_format(path), 'gz')
-        with make_file() as path:
-            with gzip.open(path, 'wt') as o:
-                o.write('foo')
-            self.assertEqual(guess_file_format(path), 'gz')
+        path = self.root.make_file(suffix='.gz')
+        with gzip.open(path, 'wt') as o:
+            o.write('foo')
+        self.assertEqual(guess_file_format(path), 'gz')
+        path = self.root.make_file()
+        with gzip.open(path, 'wt') as o:
+            o.write('foo')
+        self.assertEqual(guess_file_format(path), 'gz')
         
     def test_open_(self):
-        with make_file(contents='foo') as path:
-            with open_(path, compression=False) as fh:
-                self.assertEqual(fh.read(), 'foo')
-            with open(path) as fh:
-                with open_(fh, compression=False) as fh2:
-                    self.assertEqual(fh2.read(), 'foo')
+        path = self.root.make_file(contents='foo')
+        with open_(path, compression=False) as fh:
+            self.assertEqual(fh.read(), 'foo')
+        with open(path) as fh:
+            with open_(fh, compression=False) as fh2:
+                self.assertEqual(fh2.read(), 'foo')
 
     def test_xopen_invalid(self):
         # invalid path
@@ -80,8 +86,8 @@ class XphyleTests(TestCase):
     def test_xopen_file(self):
         with self.assertRaises(IOError):
             xopen('foobar', 'r')
-        with make_file(suffix='.gz') as path:
-            with xopen(path, 'w', compression=True) as o:
-                o.write('foo')
-            with gzip.open(path, 'rt') as i:
-                self.assertEqual(i.read(), 'foo')
+        path = self.root.make_file(suffix='.gz')
+        with xopen(path, 'w', compression=True) as o:
+            o.write('foo')
+        with gzip.open(path, 'rt') as i:
+            self.assertEqual(i.read(), 'foo')

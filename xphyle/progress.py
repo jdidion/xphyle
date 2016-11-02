@@ -42,7 +42,7 @@ def wrap_subprocess(cmd, stdin, stdout, **kwargs):
         try:
             system_wrapper = pv_command()
         except:
-            wrapper = False
+            system_wrapper = False
     
     if not system_wrapper or (stdin is None and stdout is None):
         return Popen(cmd, stdin=stdin, stdout=stdout, **kwargs)

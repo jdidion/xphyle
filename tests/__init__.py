@@ -6,6 +6,7 @@ import stat
 import sys
 import tempfile
 import shutil
+from xphyle.paths import TempDir, set_access
 
 class FileDescriptor(object):
     def __init__(self, mode='rwx', suffix='', prefix='', contents=None):
@@ -14,61 +15,25 @@ class FileDescriptor(object):
         self.mode = mode
         self.contents = contents
 
-@contextmanager
-def make_files(*file_descriptors, parent="."):
-    parent = os.path.abspath(os.path.expanduser(parent))
-    filepaths = []
-    for desc in file_descriptors:
-        path = tempfile.mkstemp(
-            suffix=desc.suffix,
-            prefix=desc.prefix,
-            dir=parent)[1]
-        if desc.contents:
-            with open(path, 'wt') as fh:
-                fh.write(desc.contents)
-        chmod(path, desc.mode)
-        filepaths.append(path)
-    try:
-        yield filepaths
-    finally:
-        for path in filepaths:
-            # path might have been deleted by the test
-            if os.path.exists(path):
-                os.remove(path)
-
-@contextmanager
-def make_empty_files(n, *args, parent='.', **kwargs):
-    descriptors = [FileDescriptor(*args, **kwargs) for i in range(n)]
-    with make_files(*descriptors, parent=parent) as filepaths:
-        yield filepaths
-
-@contextmanager
-def make_file(*args, parent=".", **kwargs):
-    desc = FileDescriptor(*args, **kwargs)
-    with make_files(desc, parent=parent) as files:
-        yield files[0]
-
-@contextmanager
-def make_dir(mode='rwx', parent=".", suffix='', prefix=''):
-    parent = os.path.abspath(os.path.expanduser(parent))
-    dirpath = tempfile.mkdtemp(suffix=suffix, prefix=prefix, dir=parent)
-    chmod(dirpath, mode)
-    try:
-        yield dirpath
-    finally:
-        if 'r' not in mode:
-            chmod(dirpath, 'rwx') # ensure permission allow deletion
-        shutil.rmtree(dirpath)
-        
-def chmod(path, mode):
-    mode_flag = 0
-    if 'r' in mode:
-        mode_flag |= stat.S_IREAD
-    if 'w' in mode:
-        mode_flag |= stat.S_IWRITE
-    if 'x' in mode:
-        mode_flag |= stat.S_IEXEC
-    os.chmod(path, mode_flag)
+class TestTempDir(TempDir):
+    def make_files(self, *file_descriptors, subdir=None):
+        filepaths = []
+        for desc in file_descriptors:
+            path = self.get_temp_file(desc.prefix, desc.suffix, subdir)
+            if desc.contents:
+                with open(path, 'wt') as fh:
+                    fh.write(desc.contents)
+            set_access(path, desc.mode)
+            filepaths.append(path)
+        return filepaths
+    
+    def make_empty_files(self, n, *args, subdir=None, **kwargs):
+        descriptors = [FileDescriptor(*args, **kwargs) for i in range(n)]
+        return self.make_files(*descriptors, subdir=subdir)
+    
+    def make_file(self, *args, subdir=None, **kwargs):
+        desc = FileDescriptor(*args, **kwargs)
+        return self.make_files(desc, subdir=subdir)[0]
 
 def random_text(n=1024):
     return ''.join(chr(random.randint(32, 126)) for i in range(n))

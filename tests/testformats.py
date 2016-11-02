@@ -80,6 +80,12 @@ class CompressionTests(TestCase):
             [xz_path, '-d', '-c', 'foo.xz'])
 
 class FileTests(TestCase):
+    def setUp(self):
+        self.root = TestTempDir()
+    
+    def tearDown(self):
+        self.root.close()
+    
     def test_invalid(self):
         with self.assertRaises(ValueError):
             get_format('gz').open_file('foo', 'n')
@@ -89,11 +95,11 @@ class FileTests(TestCase):
             content = random_text() # generate 1 kb of random text
             if mode == 'b':
                 content = b''.join(c.encode() for c in content)
-        with make_file(suffix=ext) as path:
-            fmt = get_format(ext)
-            write_file(fmt, path, ext, use_system, content, 'w' + mode)
-            in_text = read_file(fmt, path, ext, use_system, 'r' + mode)
-            self.assertEqual(content, in_text)
+        path = self.root.make_file(suffix=ext)
+        fmt = get_format(ext)
+        write_file(fmt, path, ext, use_system, content, 'w' + mode)
+        in_text = read_file(fmt, path, ext, use_system, 'r' + mode)
+        self.assertEqual(content, in_text)
     
     def test_write_read_bytes_python(self):
         for fmt in ('.gz','.bz2','.xz'):
@@ -114,16 +120,16 @@ class FileTests(TestCase):
     
     @skipIf(gz_path is None, "'gzip' not available")
     def test_iter_system(self):
-        with make_file(suffix='.gz') as path:
-            text = 'line1\nline2\nline3'
-            fmt = get_format('.gz')
-            # Have to open in bytes mode, or it will get wrapped in a
-            # TextBuffer, which does not use the underlying __iter__
-            with fmt.open_file(path, mode='w', ext='.gz', use_system=True) as f:
-                f.write(text.encode())
-            with fmt.open_file(path, mode='r', ext='.gz', use_system=True) as f:
-                lines = list(line.rstrip().decode() for line in iter(f))
-            self.assertListEqual(lines, ['line1','line2','line3'])
+        path = self.root.make_file(suffix='.gz')
+        text = 'line1\nline2\nline3'
+        fmt = get_format('.gz')
+        # Have to open in bytes mode, or it will get wrapped in a
+        # TextBuffer, which does not use the underlying __iter__
+        with fmt.open_file(path, mode='w', ext='.gz', use_system=True) as f:
+            f.write(text.encode())
+        with fmt.open_file(path, mode='r', ext='.gz', use_system=True) as f:
+            lines = list(line.rstrip().decode() for line in iter(f))
+        self.assertListEqual(lines, ['line1','line2','line3'])
     
     @skipIf(bz_path is None, "'bzip2' not available")
     def test_system_gzip(self):
@@ -133,124 +139,132 @@ class FileTests(TestCase):
     def test_system_gzip(self):
         self.write_read_file('.xz', True)
     
-    @skipIf(gz_path is None, "'gzip' not available")
     def test_compress_path(self):
-        for use_system in (True, False):
+        b = (True, False) if gz_path else (False,)
+        for use_system in b:
             with self.subTest(use_system=use_system):
-                with make_file() as path:
-                    with open(path, 'wt') as o:
-                        o.write('foo')
-                    fmt = get_format('.gz')
-                    dest = fmt.compress_file(path, use_system=use_system)
-                    gzfile = path + '.gz'
-                    self.assertEqual(dest, gzfile)
-                    self.assertTrue(os.path.exists(path))
-                    self.assertTrue(os.path.exists(gzfile))
-                    with gzip.open(gzfile, 'rt') as i:
-                        self.assertEqual(i.read(), 'foo')
+                path = self.root.make_file()
+                with open(path, 'wt') as o:
+                    o.write('foo')
+                fmt = get_format('.gz')
+                dest = fmt.compress_file(path, use_system=use_system)
+                gzfile = path + '.gz'
+                self.assertEqual(dest, gzfile)
+                self.assertTrue(os.path.exists(path))
+                self.assertTrue(os.path.exists(gzfile))
+                with gzip.open(gzfile, 'rt') as i:
+                    self.assertEqual(i.read(), 'foo')
                 
-                with make_file() as path:
-                    with open(path, 'wt') as o:
-                        o.write('foo')
-                    gzfile = path + '.bar'
+                path = self.root.make_file()
+                with open(path, 'wt') as o:
+                    o.write('foo')
+                gzfile = path + '.bar'
+                fmt = get_format('.gz')
+                dest = fmt.compress_file(
+                    path, gzfile, keep=False, use_system=use_system)
+                self.assertEqual(dest, gzfile)
+                self.assertFalse(os.path.exists(path))
+                self.assertTrue(os.path.exists(gzfile))
+                with gzip.open(gzfile, 'rt') as i:
+                    self.assertEqual(i.read(), 'foo')
+    
+    def test_compress_file(self):
+        b = (True, False) if gz_path else (False,)
+        for use_system in b:
+            with self.subTest(use_system=use_system):
+                path = self.root.make_file()
+                with open(path, 'wt') as o:
+                    o.write('foo')
+                with open(path, 'rb') as i:
+                    fmt = get_format('.gz')
+                    dest = fmt.compress_file(i, use_system=use_system)
+                gzfile = path + '.gz'
+                self.assertEqual(dest, gzfile)
+                self.assertTrue(os.path.exists(gzfile))
+                with gzip.open(gzfile, 'rt') as i:
+                    self.assertEqual(i.read(), 'foo')
+                
+                path = self.root.make_file()
+                with open(path, 'wt') as o:
+                    o.write('foo')
+                gzfile = path + '.bar'
+                with open(path, 'rb') as i:
                     fmt = get_format('.gz')
                     dest = fmt.compress_file(
-                        path, gzfile, keep=False, use_system=use_system)
-                    self.assertEqual(dest, gzfile)
-                    self.assertFalse(os.path.exists(path))
-                    self.assertTrue(os.path.exists(gzfile))
-                    with gzip.open(gzfile, 'rt') as i:
-                        self.assertEqual(i.read(), 'foo')
+                        i, gzfile, keep=False, use_system=use_system)
+                self.assertEqual(dest, gzfile)
+                self.assertFalse(os.path.exists(path))
+                self.assertTrue(os.path.exists(gzfile))
+                with gzip.open(gzfile, 'rt') as i:
+                    self.assertEqual(i.read(), 'foo')
     
-    @skipIf(gz_path is None, "'gzip' not available")
-    def test_compress_file(self):
-        for use_system in (True, False):
-            with self.subTest(use_system=use_system):
-                with make_file() as path:
-                    with open(path, 'wt') as o:
-                        o.write('foo')
-                    with open(path, 'rb') as i:
-                        fmt = get_format('.gz')
-                        dest = fmt.compress_file(i, use_system=use_system)
-                    gzfile = path + '.gz'
-                    self.assertEqual(dest, gzfile)
-                    self.assertTrue(os.path.exists(gzfile))
-                    with gzip.open(gzfile, 'rt') as i:
-                        self.assertEqual(i.read(), 'foo')
-                
-                with make_file() as path:
-                    with open(path, 'wt') as o:
-                        o.write('foo')
-                    gzfile = path + '.bar'
-                    with open(path, 'rb') as i:
-                        fmt = get_format('.gz')
-                        dest = fmt.compress_file(
-                            i, gzfile, keep=False, use_system=use_system)
-                    self.assertEqual(dest, gzfile)
-                    self.assertFalse(os.path.exists(path))
-                    self.assertTrue(os.path.exists(gzfile))
-                    with gzip.open(gzfile, 'rt') as i:
-                        self.assertEqual(i.read(), 'foo')
+    def test_uncompress_path_error(self):
+        path = self.root.make_file()
+        with gzip.open(path, 'wt') as o:
+            o.write('foo')
+        with self.assertRaises(Exception):
+            fmt = get_format('.gz')
+            dest = fmt.uncompress_file(path)
     
-    @skipIf(gz_path is None, "'gzip' not available")
     def test_uncompress_path(self):
-        for use_system in (True, False):
+        b = (True, False) if gz_path else (False,)
+        for use_system in b:
             with self.subTest(use_system=use_system):
-                with make_file() as path:
-                    gzfile = path + '.gz'
-                    with gzip.open(gzfile, 'wt') as o:
-                        o.write('foo')
-                    fmt = get_format('.gz')
-                    dest = fmt.uncompress_file(gzfile, use_system=use_system)
-                    self.assertEqual(dest, path)
-                    self.assertTrue(os.path.exists(path))
-                    self.assertTrue(os.path.exists(gzfile))
-                    with open(path, 'rt') as i:
-                        self.assertEqual(i.read(), 'foo')
+                path = self.root.make_file()
+                gzfile = path + '.gz'
+                with gzip.open(gzfile, 'wt') as o:
+                    o.write('foo')
+                fmt = get_format('.gz')
+                dest = fmt.uncompress_file(gzfile, use_system=use_system)
+                self.assertEqual(dest, path)
+                self.assertTrue(os.path.exists(path))
+                self.assertTrue(os.path.exists(gzfile))
+                with open(path, 'rt') as i:
+                    self.assertEqual(i.read(), 'foo')
                 
-                with make_file() as path:
-                    gzfile = path + '.gz'
-                    with gzip.open(gzfile, 'wt') as o:
-                        o.write('foo')
+                path = self.root.make_file()
+                gzfile = path + '.gz'
+                with gzip.open(gzfile, 'wt') as o:
+                    o.write('foo')
+                fmt = get_format('.gz')
+                dest = fmt.uncompress_file(
+                    gzfile, path, keep=False, use_system=use_system)
+                self.assertEqual(dest, path)
+                self.assertTrue(os.path.exists(path))
+                self.assertFalse(os.path.exists(gzfile))
+                with open(path, 'rt') as i:
+                    self.assertEqual(i.read(), 'foo')
+    
+    def test_uncompress_file(self):
+        b = (True, False) if gz_path else (False,)
+        for use_system in b:
+            with self.subTest(use_system=use_system):
+                path = self.root.make_file()
+                gzfile = path + '.gz'
+                with gzip.open(gzfile, 'wt') as o:
+                    o.write('foo')
+                with open(gzfile, 'rb') as i:
+                    fmt = get_format('.gz')
+                    dest = fmt.uncompress_file(i, use_system=use_system)
+                self.assertEqual(dest, path)
+                self.assertTrue(os.path.exists(path))
+                self.assertTrue(os.path.exists(gzfile))
+                with open(path, 'rt') as i:
+                    self.assertEqual(i.read(), 'foo')
+                
+                path = self.root.make_file()
+                gzfile = path + '.bar'
+                with gzip.open(gzfile, 'wt') as o:
+                    o.write('foo')
+                with open(gzfile, 'rb') as i:
                     fmt = get_format('.gz')
                     dest = fmt.uncompress_file(
-                        gzfile, path, keep=False, use_system=use_system)
-                    self.assertEqual(dest, path)
-                    self.assertTrue(os.path.exists(path))
-                    self.assertFalse(os.path.exists(gzfile))
-                    with open(path, 'rt') as i:
-                        self.assertEqual(i.read(), 'foo')
-    
-    @skipIf(gz_path is None, "'gzip' not available")
-    def test_uncompress_file(self):
-        for use_system in (True, False):
-            with self.subTest(use_system=use_system):
-                with make_file() as path:
-                    gzfile = path + '.gz'
-                    with gzip.open(gzfile, 'wt') as o:
-                        o.write('foo')
-                    with open(gzfile, 'rb') as i:
-                        fmt = get_format('.gz')
-                        dest = fmt.uncompress_file(i, use_system=use_system)
-                    self.assertEqual(dest, path)
-                    self.assertTrue(os.path.exists(path))
-                    self.assertTrue(os.path.exists(gzfile))
-                    with open(path, 'rt') as i:
-                        self.assertEqual(i.read(), 'foo')
-                
-                with make_file() as path:
-                    gzfile = path + '.bar'
-                    with gzip.open(gzfile, 'wt') as o:
-                        o.write('foo')
-                    with open(gzfile, 'rb') as i:
-                        fmt = get_format('.gz')
-                        dest = fmt.uncompress_file(
-                            i, path, keep=False, use_system=use_system)
-                    self.assertEqual(dest, path)
-                    self.assertFalse(os.path.exists(gzfile))
-                    self.assertTrue(os.path.exists(path))
-                    with open(path, 'rt') as i:
-                        self.assertEqual(i.read(), 'foo')
+                        i, path, keep=False, use_system=use_system)
+                self.assertEqual(dest, path)
+                self.assertFalse(os.path.exists(gzfile))
+                self.assertTrue(os.path.exists(path))
+                with open(path, 'rt') as i:
+                    self.assertEqual(i.read(), 'foo')
 
 class StringTests(TestCase):
     def test_compress(self):

@@ -10,7 +10,7 @@ import os
 import shutil
 import sys
 
-from xphyle import open_
+from xphyle import *
 from xphyle.formats import *
 from xphyle.paths import *
 
@@ -251,7 +251,9 @@ def delimited_file_to_dict(path : 'str', sep : 'str' = '\t',
 ## Compressed files
 
 def compress_file(source_file, compressed_file=None,
-                  compression : 'bool|str' = None) -> 'str':
+                  compression : 'bool|str' = None,
+                  keep : 'bool' = True, compresslevel : 'int' = None,
+                  use_system : 'bool' = True) -> 'str':
     """Compress an existing file, either in-place or to a separate file.
     
     Args:
@@ -262,7 +264,13 @@ def compress_file(source_file, compressed_file=None,
             compression is performed in-place. If True, file name is determined
             from ``source_file`` and the uncompressed file is retained.
         compression: None or True, to guess compression format from the file
-          name, or the name of any supported compression format.
+            name, or the name of any supported compression format.
+        keep: Whether to keep the source file
+        compresslevel: Compression level
+        use_system: Whether to try to use system-level compression
+    
+    Returns:
+        The path to the compressed file
     """
     if not isinstance(compression, str):
         if compressed_file:
@@ -273,10 +281,12 @@ def compress_file(source_file, compressed_file=None,
                 "'compressed_file' or 'compression' must be specified")
     
     fmt = get_compression_format(compression)
-    fmt.compress_file(source_file, compressed_file)
+    return fmt.compress_file(
+        source_file, compressed_file, keep, compresslevel, use_system)
 
 def uncompress_file(compressed_file, dest_file=None,
-                    compression : 'bool|str' = None) -> 'str':
+                    compression : 'bool|str' = None,
+                    keep : 'bool' = True, use_system : 'bool' = True) -> 'str':
     """Uncompress an existing file, either in-place or to a separate file.
     
     Args:
@@ -287,15 +297,19 @@ def uncompress_file(compressed_file, dest_file=None,
             name is determined automatically.
         compression: None or True, to guess compression format from the file
             name, or the name of any supported compression format.
+        keep: Whether to keep the source file
+        use_system: Whether to try to use system-level compression
     
     Returns:
         The path of the uncompressed file
     """
     if not isinstance(compression, str):
-        compression = guess_compression_format(
-            compressed_file.name if is_fileobj else compressed_file)
+        source_path = compressed_file
+        if not isinstance(compressed_file, str):
+            source_path = compressed_file.name
+        compression = guess_compression_format(source_path)
     fmt = get_compression_format(compression)
-    return fmt.uncompress_file(compressed_file, uncompressed_file)
+    return fmt.uncompress_file(compressed_file, dest_file, keep, use_system)
 
 # def write_archive(path : 'str', contents, **kwargs):
 #     """Write entries to a compressed archive file.
@@ -323,22 +337,23 @@ class FileWrapper(object):
     """
     __slots__ = ['_file']
     
-    def __init__(self, f, mode='w', **kwargs):
-        object.__setattr__(self, '_file', open_(f, mode=mode, **kwargs))
+    def __init__(self, source, mode='w', **kwargs):
+        if isinstance(source, str):
+            path = source
+            source = xopen(source, mode=mode, **kwargs)
+        else:
+            path = source.name
+        object.__setattr__(self, '_file', source)
+        object.__setattr__(self, '_path', path)
     
     def __getattr__(self, name):
         return getattr(self._file, name)
-    
-    def __setattr__(self, name, value):
-        setattr(self._file, name, value)
 
-def compress_on_close(f, dest : 'str' = None, ctype=None):
+def compress_on_close(source, *args, **kwargs) -> 'FileWrapper':
     """Compress the file when it is closed.
     
     Args:
-        f: Path or file object
-        dest: compressed file, or None to compress in place
-        ctype: compression type
+        args, kwargs: arguments passed through to ``compress_file``
     
     Returns:
         File-like object
@@ -346,14 +361,14 @@ def compress_on_close(f, dest : 'str' = None, ctype=None):
     class FileCompressor(FileWrapper):
         def close(self):
             self._file.close()
-            compress_file(self._file, dest, ctype)
-    return FileCompressor(f)
+            return compress_file(self._path, *args, **kwargs)
+    return FileCompressor(source)
 
-def move_on_close(f, dest : 'str'):
+def move_on_close(source, dest : 'str') -> 'FileWrapper':
     """Move the file to a new location when it is closed.
     
     Args:
-        f: Path or file object
+        source: Path or file object
         dest: Destination path
     
     Returns:
@@ -362,14 +377,14 @@ def move_on_close(f, dest : 'str'):
     class FileMover(FileWrapper):
         def close(self):
             self._file.close()
-            shutil.move(self._file.name, dest)
-    return FileMover(f)
+            shutil.move(self._path, dest)
+    return FileMover(source)
 
-def del_on_close(f):
+def remove_on_close(source) -> 'FileWrapper':
     """Delete the file when it is closed.
     
     Args:
-        f: Path or file object
+        source: Path or file object
     
     Returns:
         File-like object
@@ -377,8 +392,8 @@ def del_on_close(f):
     class FileDeleter(FileWrapper):
         def close(self):
             self._file.close()
-            os.remove(self._file.name)
-    return FileDeleter(f)
+            os.remove(self._path)
+    return FileDeleter(source)
 
 class FileCloser(object):
     """Dict-like container for files. Has a ``close`` method that closes
@@ -386,6 +401,9 @@ class FileCloser(object):
     """
     def __init__(self):
         self.files = {}
+    
+    def __len__(self):
+        return len(self.files)
     
     def __getitem__(self, key : 'str'):
         return self.files[key]
@@ -403,26 +421,33 @@ class FileCloser(object):
     def __contains__(self, key : 'str'):
         return key in self.files
         
-    def add(self, f, key : 'str' = None, mode : 'str' = 'r'):
+    def add(self, f, key : 'str' = None, **kwargs):
         """Add a file.
         
         Args:
             f: Path or file object. If this is a path, the file will be
                 opened with the specified mode.
             key: Dict key. Defaults to the file name.
-            mode: Open mode for file, if ``f`` is a path string.
+            kwargs: Arguments to pass to xopen
         
         Returns:
             A file object
         """
-        f = open_(f, mode)
+        if isinstance(f, str):
+            path = f
+            f = xopen(f, **kwargs)
+        else:
+            path = f.name
         if key is None:
-            key = f.name
+            key = path
         if key in self.files:
             raise ValueError("Already tracking file with key {}".format(key))
         self.files[key] = f
         return f
-
+    
+    def items(self):
+        return self.files.items()
+    
     def close(self):
         """Close all files being tracked.
         """
@@ -431,7 +456,7 @@ class FileCloser(object):
 
 # Misc
 
-def linecount(f, linesep : 'str' = None, bufsize : 'int' = 1024 * 1024) -> 'int':
+def linecount(f, linesep : 'str' = None, buf_size : 'int' = 1024 * 1024) -> 'int':
     """Fastest pythonic way to count the lines in a file.
     
     Args:
@@ -440,18 +465,21 @@ def linecount(f, linesep : 'str' = None, bufsize : 'int' = 1024 * 1024) -> 'int'
         bufsize: How many bytes to read at a time (1 Mb by default)
     
     Returns:
-        The number of lines in the file
+        The number of lines in the file. Blank lines (including the last line
+        in the file) are included.
     """
     if linesep is None:
         linesep = os.linesep.encode()
-    lines = 0
     with open_(f, 'rb') as fh:
         read_f = fh.read # loop optimization
         buf = read_f(buf_size)
+        if len(buf) == 0:
+            return 0
+        lines = 1
         while buf:
             lines += buf.count(linesep)
             buf = read_f(buf_size)
-    return lines
+        return lines
 
 def is_iterable(x):
     return isinstance(x, Iterable) and not isinstance(x, str)

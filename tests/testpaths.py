@@ -4,6 +4,12 @@ from xphyle.paths import *
 from . import *
 
 class PathTests(TestCase):
+    def setUp(self):
+        self.root = TestTempDir()
+    
+    def tearDown(self):
+        self.root.close()
+
     def test_invalid_access(self):
         with self.assertRaises(ValueError):
             get_access('z')
@@ -20,15 +26,23 @@ class PathTests(TestCase):
             check_access(STDERR, 'r')
     
     def test_check_access_file(self):
-        with make_file('rwx') as path:
-            check_access(path, 'r')
+        path = self.root.make_file(mode='rwx')
+        check_access(path, 'r')
+        check_access(path, 'w')
+        check_access(path, 'x')
+    
+    def set_access(self):
+        path = self.root.make_file()
+        with self.assertRaises(ValueError):
+            set_access(path, 'z')
+        set_access(path, 'r')
+        with self.assertRaises(IOError):
             check_access(path, 'w')
-            check_access(path, 'x')
-
+    
     def test_no_access(self):
         with self.assertRaises(IOError):
-            with make_file('r') as path:
-                check_access(path, 'w')
+            path = self.root.make_file(mode='r')
+            check_access(path, 'w')
     
     def test_abspath_std(self):
         self.assertEqual(abspath(STDOUT), STDOUT)
@@ -43,16 +57,16 @@ class PathTests(TestCase):
         self.assertEqual(abspath('foo'), os.path.join(cwd, 'foo'))
     
     def test_split_path(self):
-        with make_dir() as parent:
-            self.assertTupleEqual(
-                split_path(os.path.join(parent, 'foo'), keep_seps=False),
-                (parent, 'foo'))
-            self.assertTupleEqual(
-                split_path(os.path.join(parent, 'foo.tar.gz'), keep_seps=False),
-                (parent, 'foo', 'tar', 'gz'))
-            self.assertTupleEqual(
-                split_path(os.path.join(parent, 'foo.tar.gz'), keep_seps=True),
-                (parent, 'foo', '.tar', '.gz'))
+        parent = self.root.get_temp_dir()
+        self.assertTupleEqual(
+            split_path(os.path.join(parent, 'foo'), keep_seps=False),
+            (parent, 'foo'))
+        self.assertTupleEqual(
+            split_path(os.path.join(parent, 'foo.tar.gz'), keep_seps=False),
+            (parent, 'foo', 'tar', 'gz'))
+        self.assertTupleEqual(
+            split_path(os.path.join(parent, 'foo.tar.gz'), keep_seps=True),
+            (parent, 'foo', '.tar', '.gz'))
     
     def test_filename(self):
         self.assertEqual(filename('/path/to/foo.tar.gz'), 'foo')
@@ -62,45 +76,45 @@ class PathTests(TestCase):
         self.assertEqual(STDERR, resolve_path(STDERR))
     
     def test_resolve_file(self):
-        with make_file() as path:
-            self.assertEqual(abspath(path), resolve_path(path))
+        path = self.root.make_file()
+        self.assertEqual(abspath(path), resolve_path(path))
     
     def test_resolve_with_parent(self):
-        with make_dir() as parent:
-            with make_file(parent=parent) as path:
-                name = os.path.basename(path)
-                self.assertEqual(path, resolve_path(name, parent))
+        path = self.root.make_file(subdir='foo')
+        name = os.path.basename(path)
+        parent = os.path.dirname(path)
+        self.assertEqual(path, resolve_path(name, parent))
     
     def test_resolve_missing(self):
         with self.assertRaises(IOError):
             resolve_path('foo')
     
     def test_check_readable_file(self):
-        with make_file('r') as path:
+        path = self.root.make_file(mode='r')
+        check_readable_file(path)
+        with self.assertRaises(IOError):
+            path = self.root.make_file(mode='w')
             check_readable_file(path)
         with self.assertRaises(IOError):
-            with make_file('w') as path:
-                check_readable_file(path)
-        with self.assertRaises(IOError):
             check_readable_file('foo')
-        with make_dir() as path:
-            with self.assertRaises(IOError):
-                check_readable_file(path)
+        with self.assertRaises(IOError):
+            path = self.root.get_temp_dir()
+            check_readable_file(path)
     
     def test_check_writeable_file(self):
-        with make_file('w') as path:
-            check_writeable_file(path)
+        path = self.root.make_file(mode='w')
+        check_writeable_file(path)
         with self.assertRaises(IOError):
-            with make_file('r') as path:
-                check_writeable_file(path)
-        with make_dir() as parent:
+            path = self.root.make_file(mode='r')
+            check_writeable_file(path)
+        parent = self.root.get_temp_dir()
+        check_writeable_file(os.path.join(parent, 'foo'))
+        subdir_path = os.path.join(parent, 'bar', 'foo')
+        check_writeable_file(subdir_path)
+        self.assertTrue(os.path.exists(os.path.dirname(subdir_path)))
+        with self.assertRaises(IOError):
+            parent = self.root.get_temp_dir(mode='r')
             check_writeable_file(os.path.join(parent, 'foo'))
-            subdir_path = os.path.join(parent, 'bar', 'foo')
-            check_writeable_file(subdir_path)
-            self.assertTrue(os.path.exists(os.path.dirname(subdir_path)))
-        with make_dir('r') as parent:
-            with self.assertRaises(IOError):
-                check_writeable_file(os.path.join(parent, 'foo'))
     
     def test_check_path_std(self):
         check_path(STDOUT, 'f', 'r')
@@ -109,21 +123,32 @@ class PathTests(TestCase):
         with self.assertRaises(IOError):
             check_path(STDOUT, 'd', 'r')
     
+    def test_safe_checks(self):
+        path = self.root.make_file(mode='r')
+        self.assertTrue(safe_check_path(path, 'f', 'r'))
+        self.assertFalse(safe_check_path(path, 'd', 'r'))
+        self.assertFalse(safe_check_path(path, 'f', 'w'))
+        self.assertTrue(safe_check_readable_file(path))
+        self.assertFalse(safe_check_writeable_file(path))
+    
     def test_find(self):
-        with make_dir() as level1:
-            with make_dir(prefix='foo', parent=level1) as level2:
-                with make_empty_files(3, prefix='bar', parent=level2) as paths:
-                    x = find(level1, 'foo.*', 'd')
-                    self.assertEqual(1, len(x))
-                    self.assertEqual(level2, x[0])
-                    y = find(level1, 'bar.*', 'f')
-                    self.assertEqual(3, len(y))
-                    self.assertListEqual(sorted(paths), sorted(y))
+        level1 = self.root.get_temp_dir()
+        subdir1 = os.path.basename(level1)
+        level2 = self.root.get_temp_dir(prefix='foo', subdir=subdir1)
+        subdir2 = os.path.basename(level2)
+        paths = self.root.make_empty_files(
+            3, prefix='bar', subdir=os.path.join(subdir1, subdir2))
+        x = find(level1, 'foo.*', 'd')
+        self.assertEqual(1, len(x))
+        self.assertEqual(level2, x[0])
+        y = find(level1, 'bar.*', 'f')
+        self.assertEqual(3, len(y))
+        self.assertListEqual(sorted(paths), sorted(y))
     
     def test_get_executable_path(self):
-        with make_file(suffix=".exe") as exe:
-            exe_path = get_executable_path(exe)
-            self.assertIsNotNone(exe_path)
-            self.assertEqual(exe_path, get_executable_path(os.path.basename(exe)))
+        exe = self.root.make_file(suffix=".exe")
+        exe_path = get_executable_path(exe)
+        self.assertIsNotNone(exe_path)
+        self.assertEqual(exe_path, get_executable_path(os.path.basename(exe)))
         # TODO: how to test this fully, since we can't be sure of what
         # executables will be available on the installed system?
