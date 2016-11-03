@@ -3,11 +3,12 @@ from . import *
 from collections import OrderedDict
 import gzip
 import os
+from xphyle.paths import TempDir
 from xphyle.utils import *
 
 class UtilsTests(TestCase):
     def setUp(self):
-        self.root = TestTempDir()
+        self.root = TempDir()
     
     def tearDown(self):
         self.root.close()
@@ -237,7 +238,7 @@ class UtilsTests(TestCase):
         self.assertEqual(100, linecount(path))
     
     def test_linecount_empty(self):
-        path = self.root.make_empty_files(1)[0]
+        path = self.root.make_file()
         self.assertEqual(0, linecount(path))
     
     def test_file_manager(self):

@@ -3,11 +3,11 @@ from . import *
 import gzip
 from io import StringIO, BytesIO, TextIOWrapper
 from xphyle import *
-from xphyle.paths import STDIN, STDOUT, STDERR
+from xphyle.paths import TempDir, STDIN, STDOUT, STDERR
 
 class XphyleTests(TestCase):
     def setUp(self):
-        self.root = TestTempDir()
+        self.root = TempDir()
     
     def tearDown(self):
         self.root.close()

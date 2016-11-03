@@ -308,12 +308,9 @@ class TempPathDescriptor(object):
         self.name = name
         self.prefix = prefix
         self.suffix = suffix
-        if not mode and self.subdir:
-            self.mode = subdir.mode
-        else:
-            self.mode = mode
         self.contents = contents
         self.root = None
+        self._mode = mode
         self._abspath = None
         self._relpath = None
     
@@ -333,6 +330,14 @@ class TempPathDescriptor(object):
             self._init_path()
         return self._relpath
     
+    @property
+    def mode(self):
+        if not self._mode:
+            if not self.root:
+                raise Exception("Cannot determine mode without 'root'")
+            self._mode = self.root.mode
+        return self._mode
+    
     def _init_path(self):
         if self.root is None:
             raise Exception("Cannot determine absolute path without 'root'")
@@ -350,8 +355,8 @@ class TempPathDescriptor(object):
     def set_access(self, mode=None):
         if mode:
             self.mode = mode
-        if self.path is None or self.mode is None:
-            raise Exception("Both 'path' and 'mode' must be set before setting "
+        if self.root is None or self.mode is None:
+            raise Exception("Both 'root' and 'mode' must be set before setting "
                             "access permissions")
         set_access(self.absolute_path, self.mode)
     
@@ -373,11 +378,11 @@ class TempDir(object):
     Args:
         mode: Access mode to set on temp directory. All subdirectories and
             files will inherit this mode unless explicity set to be different.
-        paths: Iterable of TempPathDescriptors.
+        path_descriptors: Iterable of TempPathDescriptors.
         kwargs: Additional arguments passed to tempfile.mkdtemp
     
     By default all subdirectories and files inherit the mode of the temporary
-    directory. If TempPathDescriptors are specified, the files are created
+    directory. If TempPathDescriptors are specified, the paths are created
     before permissions are set, enabling creation of a read-only temporary file
     system.
     """
@@ -385,8 +390,8 @@ class TempDir(object):
         self.path = abspath(tempfile.mkdtemp(**kwargs))
         self.mode = mode
         self.paths = {}
-        if paths:
-            self.make_paths(*paths)
+        if path_descriptors:
+            self.make_paths(*path_descriptors)
         set_access(self.path, mode)
     
     def __enter__(self):
@@ -407,23 +412,43 @@ class TempDir(object):
         shutil.rmtree(self.path)
     
     def make_path(self, desc=None, apply_permissions=True, **kwargs):
+        """Create a file or directory within the TempDir.
+        
+        Args:
+            desc: A TempPathDescriptor
+            apply_permissions: Whether access permissions should be applied to
+                the new file/directory
+            kwargs: Arguments to TempPathDescriptor. Ignored unless ``desc``
+                is None
+        
+        Returns:
+            The absolute path to the new file/directory
+        """
         if not desc:
             desc = TempPathDescriptor(**kwargs)
         
-        parent = desc.subdir.path if desc.subdir else self.path
-        if desc.name:
-            path = os.path.join(parent, desc.name)
-        elif desc.path_type in ('d', 'dir'):
-            path = tempfile.mkdtemp(
-                prefix=desc.prefix, suffix=desc.suffix, dir=parent)[1]
-            desc.name = os.path.basename(path)
-        else:
-            path = tempfile.mkstemp(
-                prefix=desc.prefix, suffix=desc.suffix, dir=parent)[1]
-            desc.name = os.path.basename(path)
+        # If the subdirectory is given as a path, resolve it
+        if isinstance(desc.subdir, str):
+            desc.subdir = self[desc.subdir]
+        
+        # Determine the name of the new file/directory
+        create = True
+        if not desc.name:
+            parent = desc.subdir.absolute_path if desc.subdir else self.path
+            if desc.path_type in ('d', 'dir'):
+                path = tempfile.mkdtemp(
+                    prefix=desc.prefix, suffix=desc.suffix, dir=parent)
+                desc.name = os.path.basename(path)
+                # mkdtemp creates the directory for us
+                create = False
+            else:
+                path = tempfile.mkstemp(
+                    prefix=desc.prefix, suffix=desc.suffix, dir=parent)[1]
+                desc.name = os.path.basename(path)
         
         desc.set_root(self)
-        desc.create()
+        if create:
+            desc.create()
         if apply_permissions:
             desc.set_access()
         
@@ -432,7 +457,25 @@ class TempDir(object):
         
         return desc.absolute_path
     
+    def make_file(self, desc=None, apply_permissions=True, **kwargs):
+        kwargs['path_type'] = 'f'
+        return self.make_path(desc, apply_permissions, **kwargs)
+    
+    def make_directory(self, desc=None, apply_permissions=True, **kwargs):
+        kwargs['path_type'] = 'd'
+        return self.make_path(desc, apply_permissions, **kwargs)
+    
     def make_paths(self, *path_descriptors):
+        """Create multiple files/directories at once. The paths are created
+        before permissions are set, enabling creation of a read-only temporary
+        file system.
+        
+        Args:
+            path_descriptors: One or more TempPathDescriptor
+        
+        Returns:
+            A list of the created paths
+        """
         # Create files/directories without permissions
         paths = [
             self.make_path(desc, apply_permissions=False)
@@ -443,4 +486,12 @@ class TempDir(object):
         return paths
     
     def make_empty_files(self, n, **kwargs):
-        return list(self.make_path(FileDescriptor(**kwargs) for i in range(n)))
+        """Create randomly-named empty files.
+        
+        Args:
+            n: The number of files to create
+            kwargs: Arguments to pass to TempPathDescriptor.
+        """
+        return list(
+            self.make_path(TempPathDescriptor(**kwargs))
+            for i in range(n))

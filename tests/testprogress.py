@@ -1,7 +1,7 @@
 from unittest import TestCase
 from . import *
 import xphyle
-from xphyle.paths import STDOUT
+from xphyle.paths import TempDir, STDOUT
 from xphyle.utils import *
 
 class MockProgress(object):
@@ -12,7 +12,7 @@ class MockProgress(object):
 
 class ProgressTests(TestCase):
     def setUp(self):
-        self.root = TestTempDir()
+        self.root = TempDir()
     
     def tearDown(self):
         self.root.close()

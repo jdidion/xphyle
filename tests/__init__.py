@@ -6,7 +6,6 @@ import stat
 import sys
 import tempfile
 import shutil
-from xphyle.paths import TempDir, TempFileDescriptor, set_access
 
 def random_text(n=1024):
     return ''.join(chr(random.randint(32, 126)) for i in range(n))
