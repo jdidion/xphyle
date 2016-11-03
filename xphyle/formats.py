@@ -745,4 +745,8 @@ def iter_file_chunked(fh, chunksize : 'int,>0' = 1024):
                 yield data
             else:
                 break
-    return wrap(_itr())
+    try:
+        name = fh.name
+    except:
+        name = None
+    return wrap(_itr(), desc=name)

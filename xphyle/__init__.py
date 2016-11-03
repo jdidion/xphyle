@@ -212,7 +212,7 @@ class FileWrapper(object):
         return getattr(self._file, name)
     
     def __iter__(self):
-        return iter(xphyle.progress.wrap(self._file))
+        return iter(xphyle.progress.wrap(self._file, desc=self._path))
     
     def __enter__(self):
         if self.closed:
@@ -256,14 +256,18 @@ class StreamWrapper(object):
     """
     __slots__ = ['_stream']
     
-    def __init__(self, stream):
+    def __init__(self, stream, name=None):
         object.__setattr__(self, '_stream', stream)
     
     def __getattr__(self, name):
         return getattr(self._stream, name)
     
     def __iter__(self):
-        return iter(xphyle.progress.wrap(self._stream))
+        try:
+            name = self._stream.name
+        except:
+            name = None
+        return iter(xphyle.progress.wrap(self._stream, desc=name))
     
     def __enter__(self):
         return self

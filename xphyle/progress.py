@@ -14,10 +14,10 @@ class TqdmWrapper(object): # pragma: no-cover
         import tqdm
         self.fn = tqdm.tqdm
     
-    def __call__(self, itr, size):
-        return self.fn(itr, total=size)
+    def __call__(self, itr, desc, size):
+        return self.fn(itr, desc=desc, total=size)
 
-def wrap(itr, size=None):
+def wrap(itr, desc=None, size=None):
     global wrapper
     if wrapper is True:
         try:
@@ -25,7 +25,7 @@ def wrap(itr, size=None):
         except:
             wrapper = False
     if wrapper:
-        return wrapper(itr, size)
+        return wrapper(itr, desc, size)
     return itr
 
 def pv_command(pv=None): # pragma: no-cover

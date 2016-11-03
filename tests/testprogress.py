@@ -5,7 +5,9 @@ from xphyle.paths import TempDir, STDOUT
 from xphyle.utils import *
 
 class MockProgress(object):
-    def __call__(self, itr, size):
+    def __call__(self, itr, desc, size):
+        self.desc = desc
+        self.size = size
         for i, item in enumerate(itr, 1):
             yield item
         self.count = i
