@@ -4,43 +4,59 @@ from xphyle.paths import *
 from . import *
 
 class TempDirTests(TestCase):
+    def test_descriptor(self):
+        with self.assertRaises(ValueError):
+            TempPathDescriptor(path_type='d', contents='foo')
+        with TempDir(mode='rwx') as temp:
+            f = temp.make_file(name='foo', mode=None)
+            self.assertTrue('foo' in temp)
+            self.assertTrue(temp[f].exists)
+            self.assertEqual('foo', temp[f].relative_path)
+            self.assertEqual(os.path.join(temp.absolute_path, 'foo'), temp[f].absolute_path)
+            self.assertEqual('rwx', temp[f].mode)
+            temp[f].set_access('r')
+            with self.assertRaises(PermissionError):
+                open(f, 'w')
+    
     def test_context_manager(self):
         with TempDir() as temp:
             with open(temp.make_file(name='foo'), 'wt') as o:
                 o.write('foo')
-        self.assertFalse(os.path.exists(temp.path))
+        self.assertFalse(os.path.exists(temp.absolute_path))
     
     def test_dir(self):
         temp = TempDir()
         foo = temp.make_directory(name='foo')
-        self.assertEqual(foo, os.path.join(temp.path, 'foo'))
-        bar = temp.make_directory(name='bar', subdir=foo)
-        self.assertEqual(bar, os.path.join(temp.path, 'foo', 'bar'))
-        self.assertTrue(os.path.exists(os.path.join(temp.path, 'foo', 'bar')))
+        self.assertEqual(foo, os.path.join(temp.absolute_path, 'foo'))
+        bar = temp.make_directory(name='bar', parent=foo)
+        self.assertEqual(bar, os.path.join(temp.absolute_path, 'foo', 'bar'))
+        self.assertTrue(os.path.exists(os.path.join(temp.absolute_path, 'foo', 'bar')))
         temp.close()
-        self.assertFalse(os.path.exists(temp.path))
+        self.assertFalse(os.path.exists(temp.absolute_path))
     
     def test_tree(self):
         temp = TempDir()
         foo = temp.make_directory(name='foo')
-        bar = temp.make_directory(name='bar', subdir=foo)
-        f = temp.make_file(name='baz', subdir=bar)
-        self.assertEqual(f, os.path.join(temp.path, 'foo', 'bar', 'baz'))
+        bar = temp.make_directory(name='bar', parent=foo)
+        f = temp.make_file(name='baz', parent=bar)
+        self.assertEqual(f, os.path.join(temp.absolute_path, 'foo', 'bar', 'baz'))
         temp.close()
         self.assertFalse(os.path.exists(f))
     
-    # def test_mode(self):
-    #     with TempDir('r') as temp:
-    #         # Raises error because the tempdir is read-only
-    #         with self.assertRaises(PermissionError):
-    #             f = temp.get_file('bar', 'foo', True)
-    #
-    #
-    #         check_access(f, 'r')
-    #         with self.assertRaises(IOError):
-    #             check_access(f, 'w')
-    #         with self.assertRaises(PermissionError):
-    #             f.write('foo')
+    def test_mode(self):
+        with TempDir('r') as temp:
+            # Raises error because the tempdir is read-only
+            with self.assertRaises(PermissionError):
+                temp.make_file(name='bar')
+        # Should be able to create the tempdir with existing read-only files
+        with TempDir('r', [TempPathDescriptor(name='foo', contents='foo')]) as d:
+            self.assertTrue(os.path.exists(d.absolute_path))
+            self.assertTrue(os.path.exists(os.path.join(d.absolute_path, 'foo')))
+            with open(os.path.join(d.absolute_path, 'foo'), 'rt') as i:
+                self.assertEqual('foo', i.read())
+    
+    def test_fifo(self):
+        pass
 
 class PathTests(TestCase):
     def setUp(self):
@@ -120,7 +136,7 @@ class PathTests(TestCase):
     
     def test_resolve_with_parent(self):
         self.root.make_directory(name='foo')
-        path = self.root.make_file(subdir='foo')
+        path = self.root.make_file(parent='foo')
         name = os.path.basename(path)
         parent = os.path.dirname(path)
         self.assertEqual(path, resolve_path(name, parent))
@@ -173,8 +189,8 @@ class PathTests(TestCase):
     
     def test_find(self):
         level1 = self.root.make_directory()
-        level2 = self.root.make_directory(prefix='foo', subdir=level1)
-        paths = self.root.make_empty_files(3, prefix='bar', subdir=level2)
+        level2 = self.root.make_directory(prefix='foo', parent=level1)
+        paths = self.root.make_empty_files(3, prefix='bar', parent=level2)
         x = find(level1, 'foo.*', 'd')
         self.assertEqual(1, len(x))
         self.assertEqual(level2, x[0])
