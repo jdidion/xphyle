@@ -390,9 +390,14 @@ class TempPathDescriptor(TempPath):
                 if os.path.exists(self.absolute_path):
                     os.remove(self.absolute_path)
                 os.mkfifo(self.absolute_path)
-            if self.contents or self.path_type != 'fifo':
+            # TODO: Opening a FIFO for write blocks. It's possible to get around
+            # this using a subprocess to pipe through a buffering program (such
+            # as pv) to the FIFO instead
+            if self.path_type != 'fifo':
                 with open(self.absolute_path, 'wt') as fh:
                     fh.write(self.contents or '')
+            elif self.contents:
+                raise Exception("Currently, contents cannot be written to a FIFO")
         elif not os.path.exists(self.absolute_path):
             os.mkdir(self.absolute_path)
         if apply_permissions:
@@ -489,14 +494,6 @@ class TempDir(TempPath):
         
         return desc.absolute_path
     
-    def make_file(self, desc=None, apply_permissions=True, **kwargs):
-        kwargs['path_type'] = 'f'
-        return self.make_path(desc, apply_permissions, **kwargs)
-    
-    def make_directory(self, desc=None, apply_permissions=True, **kwargs):
-        kwargs['path_type'] = 'd'
-        return self.make_path(desc, apply_permissions, **kwargs)
-    
     def make_paths(self, *path_descriptors):
         """Create multiple files/directories at once. The paths are created
         before permissions are set, enabling creation of a read-only temporary
@@ -516,6 +513,20 @@ class TempDir(TempPath):
         for desc in path_descriptors:
             result = desc.set_access()
         return paths
+    
+    # Convenience methods
+    
+    def make_file(self, desc=None, apply_permissions=True, **kwargs):
+        kwargs['path_type'] = 'f'
+        return self.make_path(desc, apply_permissions, **kwargs)
+    
+    def make_fifo(self, desc=None, apply_permissions=True, **kwargs):
+        kwargs['path_type'] = 'fifo'
+        return self.make_path(desc, apply_permissions, **kwargs)
+    
+    def make_directory(self, desc=None, apply_permissions=True, **kwargs):
+        kwargs['path_type'] = 'd'
+        return self.make_path(desc, apply_permissions, **kwargs)
     
     def make_empty_files(self, n, **kwargs):
         """Create randomly-named empty files.

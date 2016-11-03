@@ -1,5 +1,6 @@
 from unittest import TestCase
 import os
+import subprocess
 from xphyle.paths import *
 from . import *
 
@@ -56,7 +57,14 @@ class TempDirTests(TestCase):
                 self.assertEqual('foo', i.read())
     
     def test_fifo(self):
-        pass
+        with TempDir() as temp:
+            path = temp.make_fifo()
+            p = subprocess.Popen('echo foo > {}'.format(path), shell=True)
+            with open(path, 'rt') as i:
+                self.assertEqual(i.read(), 'foo\n')
+            p.communicate()
+            with self.assertRaises(Exception):
+                path = temp.make_fifo(contents='foo')
 
 class PathTests(TestCase):
     def setUp(self):
