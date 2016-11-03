@@ -3,6 +3,54 @@ import os
 from xphyle.paths import *
 from . import *
 
+class TempDirTests(TestCase):
+    def test_context_manager(self):
+        with TempDir() as temp:
+            with open(temp.get_file('foo'), 'wt') as o:
+                o.write('foo')
+        self.assertFalse(os.path.exists(temp.root))
+    
+    def test_files(self):
+            temp = TempDir()
+            f = temp.get_file('baz', subdir='foo/bar', make_dirs=True)
+            self.assertEqual(f, os.path.join(temp.root, 'foo', 'bar', 'baz'))
+            self.assertTrue(os.path.exists(temp.root))
+            self.assertTrue(os.path.exists(os.path.join(temp.root, 'foo')))
+            self.assertTrue(os.path.exists(os.path.join(temp.root, 'foo', 'bar')))
+            temp.close()
+            self.assertFalse(os.path.exists(temp.root))
+    
+    def test_dirs(self):
+            temp = TempDir()
+            d = temp.get_directory('foo/bar', make_dirs=True)
+            self.assertEqual(d, os.path.join(temp.root, 'foo', 'bar'))
+            self.assertTrue(os.path.exists(os.path.join(temp.root, 'foo', 'bar')))
+            temp.close()
+            self.assertFalse(os.path.exists(temp.root))
+    
+    def test_mode(self):
+        with TempDir('r') as temp:
+            # Raises error because the tempdir is read-only
+            with self.assertRaises(PermissionError):
+                f = temp.get_file('bar', 'foo', True)
+                
+                
+            check_access(f, 'r')
+            with self.assertRaises(IOError):
+                check_access(f, 'w')
+            with self.assertRaises(PermissionError):
+                f.write('foo')
+        
+    
+    
+    def make_fifos(self, *names, subdir=None, mode='rwx', **kwargs):
+        fifo_paths = [
+            self.get_path(name, subdir, make_dirs=True, mode=mode)
+            for name in names]
+        for path in fifo_paths:
+            os.mkfifo(path, **kwargs)
+        return fifo_paths
+    
 class PathTests(TestCase):
     def setUp(self):
         self.root = TestTempDir()

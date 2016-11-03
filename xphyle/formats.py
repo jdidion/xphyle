@@ -224,10 +224,10 @@ def register_compression_format(format_class : 'class'):
     """
     fmt = format_class()
     aliases = set(fmt.exts)
-    if isinstance(fmt.system_commands, dict):
-        aliases = aliases | set(fmt.system_commands.values())
-    else:
-        aliases = aliases | set(fmt.system_commands)
+    #if isinstance(fmt.system_commands, dict):
+    #    aliases = aliases | set(fmt.system_commands.values())
+    #else:
+    aliases = aliases | set(fmt.system_commands)
     aliases.add(fmt.lib_name)
     for alias in aliases:
         # TODO: warn about overriding existing format?

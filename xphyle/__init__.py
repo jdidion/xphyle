@@ -76,7 +76,7 @@ def open_(f, mode : 'str' = 'r', **kwargs):
         yield f
 
 def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
-          use_system : 'bool' = True, context_wrapper : 'bool' = False,
+          use_system : 'bool' = True, context_wrapper : 'bool' = True,
           **kwargs) -> 'file':
     """
     Replacement for the `open` function that automatically handles
@@ -123,7 +123,7 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
         raise ValueError("'path' must be a string")
     if not any(m in mode for m in ('r','w','a','x')):
         raise ValueError("'mode' must contain one of (r,w,a,x)")
-    if 'U' in mode: # pragma: no-cover
+    if 'U' in mode:
         if 'newline' in kwargs and kwargs['newline'] is not None:
             raise ValueError("newline={} not compatible with universal newlines "
                              "('U') mode".format(kwargs['newline']))
@@ -150,7 +150,9 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
                 fh = fh.buffer
             fmt = get_compression_format(compression)
             fh = fmt.open_file_python(fh, mode, **kwargs)
-        if context_wrapper:
+            if context_wrapper:
+                return FileWrapper(fh)
+        elif context_wrapper:
             fh = StreamWrapper(fh)
         return fh
     
@@ -267,4 +269,4 @@ class StreamWrapper(object):
         return self
     
     def __exit__(self, exception_type, exception_value, traceback):
-        pass
+        self._stream.flush()
