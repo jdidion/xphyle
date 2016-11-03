@@ -2,7 +2,7 @@ from unittest import TestCase, skipIf
 import gzip
 import os
 from xphyle.formats import *
-from xphyle.paths import get_executable_path
+from xphyle.paths import TempDir, get_executable_path
 from . import *
 
 def get_format(ext):
@@ -81,7 +81,7 @@ class CompressionTests(TestCase):
 
 class FileTests(TestCase):
     def setUp(self):
-        self.root = TestTempDir()
+        self.root = TempDir()
     
     def tearDown(self):
         self.root.close()

@@ -292,58 +292,249 @@ def get_executable_path(executable : 'str') -> 'str':
 
 # tempfiles
 
-class TempDir(object):
+class TempPath(object):
+    def __init__(self, parent=None, mode='rwx', path_type='d'):
+        self.parent = parent
+        self.path_type = path_type
+        self._mode = mode
+    
+    @property
+    def mode(self):
+        """Get the access mode of the path. Defaults to the parent's mode.
+        """
+        if not self._mode:
+            if self.parent:
+                self._mode = self.parent.mode
+            else:
+                raise Exception("Cannot determine mode without 'parent'")
+        return self._mode
+    
+    def set_access(self, mode=None, set_parent=False, additive=False):
+        """Set the access mode for the path.
+        
+        Args:
+            mode: The new mode to set. If node, the existing mode is used
+            set_parent: Whether to recursively set the mode of all parents.
+                This is done additively.
+            additive: Whether permissions should be additive (e.g.
+                if ``mode == 'w'`` and ``self.mode == 'r'``, the new mode
+                is 'rw')
+        """
+        if not self.exists:
+            return None
+        if mode:
+            if additive:
+                self._mode = ''.join(set(self.mode) | set(mode))
+            else:
+                self._mode = mode
+        else:
+            mode = self.mode
+        if set_parent and self.parent:
+            self.parent.set_access(mode, True, True)
+        # Always set 'x' on directories, otherwise they are not listable
+        if self.path_type in ('d', 'dir') and 'x' not in mode:
+            mode += 'x'
+        set_access(self.absolute_path, mode)
+        return mode
+
+class TempPathDescriptor(TempPath):
+    """Describes a temporary file or directory within a TempDir.
+    
+    Args:
+        name: The file/direcotry name
+        parent: The parent directory, a TempPathDescriptor
+        mode: The access mode
+        suffix, prefix: The suffix and prefix to use when calling
+            ``mkstemp`` or ``mkdtemp``
+        path_type: 'f' or 'file' (for file), 'd' or 'dir' (for directory),
+            or 'fifo' (for FIFO)
+    """
+    def __init__(self, name=None, parent=None, mode=None,
+                 suffix='', prefix='', contents='', path_type='f'):
+        if contents and path_type != 'f':
+            raise ValueError("'contents' only valid for files")
+        super(TempPathDescriptor, self).__init__(parent, mode, path_type)
+        self.name = name
+        self.prefix = prefix
+        self.suffix = suffix
+        self.contents = contents
+        self._mode = mode
+        self._abspath = None
+        self._relpath = None
+    
+    @property
+    def exists(self):
+        return self._abspath is not None and os.path.exists(self._abspath)
+    
+    @property
+    def absolute_path(self):
+        if self._abspath is None:
+            self._init_path()
+        return self._abspath
+    
+    @property
+    def relative_path(self):
+        if self._relpath is None:
+            self._init_path()
+        return self._relpath
+    
+    def _init_path(self):
+        if self.parent is None:
+            raise Exception("Cannot determine absolute path without 'root'")
+        self._relpath = os.path.join(self.parent.relative_path, self.name)
+        self._abspath = os.path.join(self.parent.absolute_path, self.name)
+    
+    def create(self, apply_permissions=True):
+        if self.path_type not in ('d', 'dir'):
+            if self.path_type == 'fifo':
+                if os.path.exists(self.absolute_path):
+                    os.remove(self.absolute_path)
+                os.mkfifo(self.absolute_path)
+            # TODO: Opening a FIFO for write blocks. It's possible to get around
+            # this using a subprocess to pipe through a buffering program (such
+            # as pv) to the FIFO instead
+            if self.path_type != 'fifo':
+                with open(self.absolute_path, 'wt') as fh:
+                    fh.write(self.contents or '')
+            elif self.contents:
+                raise Exception("Currently, contents cannot be written to a FIFO")
+        elif not os.path.exists(self.absolute_path):
+            os.mkdir(self.absolute_path)
+        if apply_permissions:
+            self.set_access()
+
+class TempDir(TempPath):
     """Context manager that creates a temporary directory and cleans it up
     upon exit.
     
     Args:
-        kwargs: Arguments to pass to tempfile.mkdtemp
-    """
-    def __init__(self, mode='rwx', parent=".", suffix='', prefix=''):
-        self.root = abspath(tempfile.mkdtemp(
-            suffix=suffix, prefix=prefix, dir=parent))
-        set_access(self.root, mode)
+        mode: Access mode to set on temp directory. All subdirectories and
+            files will inherit this mode unless explicity set to be different.
+        path_descriptors: Iterable of TempPathDescriptors.
+        kwargs: Additional arguments passed to tempfile.mkdtemp
     
+    By default all subdirectories and files inherit the mode of the temporary
+    directory. If TempPathDescriptors are specified, the paths are created
+    before permissions are set, enabling creation of a read-only temporary file
+    system.
+    """
+    def __init__(self, mode='rwx', path_descriptors=None, **kwargs):
+        super(TempDir, self).__init__(mode=mode)
+        self.absolute_path = abspath(tempfile.mkdtemp(**kwargs))
+        self.relative_path = ''
+        self.paths = {}
+        if path_descriptors:
+            self.make_paths(*path_descriptors)
+        self.set_access()
+        
     def __enter__(self):
         return self
     
     def __exit__(self, exception_type, exception_value, traceback):
         self.close()
     
+    def __getitem__(self, path):
+        return self.paths[path]
+    
+    def __contains__(self, path):
+        return path in self.paths
+    
+    @property
+    def exists(self):
+        return os.path.exists(self.absolute_path)
+    
     def close(self):
-        shutil.rmtree(self.root)
+        """Delete the temporary directory and all files/subdirectories within.
+        """
+        # First need to make all paths removable
+        if not self.exists:
+            return
+        for path in self.paths.values():
+            path.set_access('rwx', True)
+        shutil.rmtree(self.absolute_path)
     
-    def get_temp_file(self, prefix='', suffix='', subdir=None, mode='rwx'):
-        parent = self.root
-        if subdir:
-            parent = self.get_directory(subdir, True)
-        path = tempfile.mkstemp(prefix=prefix, suffix=suffix, dir=parent)[1]
-        set_access(path, mode)
-        return path
-    
-    def get_temp_dir(self, prefix='', suffix='', subdir=None, mode='rwx'):
-        parent = os.path.join(self.root, subdir) if subdir else self.root
-        path = tempfile.mkdtemp(prefix=prefix, suffix=suffix, dir=parent)
-        set_access(path, mode)
-        return path
-    
-    def get_file(self, name, subdir=None, make_dirs=False, mode='rwx'):
-        parent = self.root
-        if subdir:
-            parent = self.get_directory(subdir, make_dirs, mode)
-        return os.path.join(parent, name)
-    
-    def get_directory(self, path, make_dirs=False, mode='rwx'):
-        d = os.path.join(self.root, path)
-        if make_dirs:
-            os.makedirs(d, exist_ok=True)
-        set_access(d, mode)
-        return d
+    def make_path(self, desc=None, apply_permissions=True, **kwargs):
+        """Create a file or directory within the TempDir.
         
-    def make_fifos(self, *names, subdir=None, mode='rwx', **kwargs):
-        fifo_paths = [
-            self.get_path(name, subdir, make_dirs=True, mode=mode)
-            for name in names]
-        for path in fifo_paths:
-            os.mkfifo(path, **kwargs)
-        return fifo_paths
+        Args:
+            desc: A TempPathDescriptor
+            apply_permissions: Whether access permissions should be applied to
+                the new file/directory
+            kwargs: Arguments to TempPathDescriptor. Ignored unless ``desc``
+                is None
+        
+        Returns:
+            The absolute path to the new file/directory
+        """
+        if not desc:
+            desc = TempPathDescriptor(**kwargs)
+        
+        # If the subdirectory is given as a path, resolve it
+        if not desc.parent:
+            desc.parent = self
+        elif isinstance(desc.parent, str):
+            desc.parent = self[desc.parent]
+        
+        # Determine the name of the new file/directory
+        if not desc.name:
+            parent = desc.parent.absolute_path
+            if desc.path_type in ('d', 'dir'):
+                path = tempfile.mkdtemp(
+                    prefix=desc.prefix, suffix=desc.suffix, dir=parent)
+                desc.name = os.path.basename(path)
+            else:
+                path = tempfile.mkstemp(
+                    prefix=desc.prefix, suffix=desc.suffix, dir=parent)[1]
+                desc.name = os.path.basename(path)
+        
+        desc.create(apply_permissions)
+        
+        self.paths[desc.absolute_path] = desc
+        self.paths[desc.relative_path] = desc
+        
+        return desc.absolute_path
+    
+    def make_paths(self, *path_descriptors):
+        """Create multiple files/directories at once. The paths are created
+        before permissions are set, enabling creation of a read-only temporary
+        file system.
+        
+        Args:
+            path_descriptors: One or more TempPathDescriptor
+        
+        Returns:
+            A list of the created paths
+        """
+        # Create files/directories without permissions
+        paths = [
+            self.make_path(desc, apply_permissions=False)
+            for desc in path_descriptors]
+        # Now apply permissions after all paths are created
+        for desc in path_descriptors:
+            result = desc.set_access()
+        return paths
+    
+    # Convenience methods
+    
+    def make_file(self, desc=None, apply_permissions=True, **kwargs):
+        kwargs['path_type'] = 'f'
+        return self.make_path(desc, apply_permissions, **kwargs)
+    
+    def make_fifo(self, desc=None, apply_permissions=True, **kwargs):
+        kwargs['path_type'] = 'fifo'
+        return self.make_path(desc, apply_permissions, **kwargs)
+    
+    def make_directory(self, desc=None, apply_permissions=True, **kwargs):
+        kwargs['path_type'] = 'd'
+        return self.make_path(desc, apply_permissions, **kwargs)
+    
+    def make_empty_files(self, n, **kwargs):
+        """Create randomly-named empty files.
+        
+        Args:
+            n: The number of files to create
+            kwargs: Arguments to pass to TempPathDescriptor.
+        """
+        return list(
+            self.make_path(TempPathDescriptor(**kwargs))
+            for i in range(n))

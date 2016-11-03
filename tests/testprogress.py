@@ -1,6 +1,7 @@
 from unittest import TestCase
 from . import *
 import xphyle
+from xphyle.paths import TempDir, STDOUT
 from xphyle.utils import *
 
 class MockProgress(object):
@@ -11,7 +12,7 @@ class MockProgress(object):
 
 class ProgressTests(TestCase):
     def setUp(self):
-        self.root = TestTempDir()
+        self.root = TempDir()
     
     def tearDown(self):
         self.root.close()
@@ -26,3 +27,12 @@ class ProgressTests(TestCase):
         gzfile = compress_file(
             path, compression='gz', use_system=False)
         self.assertEqual(100, progress.count)
+    
+    def test_iter_stream(self):
+        progress = MockProgress()
+        xphyle.configure(progress)
+        with intercept_stdin('foo\nbar\nbaz'):
+            with xopen(STDIN, 'rt') as o:
+                lines = list(o)
+                self.assertListEqual(['foo\n','bar\n','baz\n'], lines)
+        self.assertEquals(3, progress.count)

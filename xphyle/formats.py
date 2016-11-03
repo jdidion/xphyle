@@ -224,10 +224,10 @@ def register_compression_format(format_class : 'class'):
     """
     fmt = format_class()
     aliases = set(fmt.exts)
-    if isinstance(fmt.system_commands, dict):
-        aliases = aliases | set(fmt.system_commands.values())
-    else:
-        aliases = aliases | set(fmt.system_commands)
+    #if isinstance(fmt.system_commands, dict):
+    #    aliases = aliases | set(fmt.system_commands.values())
+    #else:
+    aliases = aliases | set(fmt.system_commands)
     aliases.add(fmt.lib_name)
     for alias in aliases:
         # TODO: warn about overriding existing format?
@@ -404,18 +404,18 @@ class CompressionFormat(FileFormat):
         
         return self.open_file_python(filename, mode, **kwargs)
     
-    def open_file_python(self, filename : 'str', mode : 'str', **kwargs):
+    def open_file_python(self, f, mode : 'str', **kwargs):
         """Open a file using the python library.
         
         Args:
-            filename: The file to open
+            f: The file to open -- a path or open file object
             mode: The file open mode
             kwargs: Additional arguments to pass to the open method
         
         Returns:
             A file-like object
         """
-        return self.lib.open(filename, mode, **kwargs)
+        return self.lib.open(f, mode, **kwargs)
     
     def compress_file(self, source, dest=None, keep : 'bool' = True,
                       compresslevel : 'int' = None,
