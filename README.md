@@ -53,8 +53,6 @@ total = sum(i for i in safe_iter('infile.gz', convert=int))
 ## 0.8
 
 * Documentation
-* Support multi-threaded gzip compression (via pigz)
-* Support multi-threaded lzma compression
 
 ## 0.9
 

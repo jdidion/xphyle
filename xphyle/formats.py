@@ -18,6 +18,13 @@ from xphyle.progress import *
 # by formats that support parallelization
 threads = 1
 
+def get_threads():
+    global threads
+    if not threads or threads < 1:
+        import multiprocessing
+        threads = multiprocessing.cpu_count()
+    return threads
+
 # File formats
 
 class FileFormat(object):
@@ -580,8 +587,7 @@ class Gzip(SingleExeCompressionFormat):
     """
     name = 'gzip'
     exts = ('gz',)
-    system_commands = ('gzip',)
-    compresslevel_range = (1, 9)
+    system_commands = ('pigz','gzip')
     default_compresslevel = 6
     magic_bytes = [(0x1f, 0x8b)]
     mime_types = (
@@ -590,6 +596,13 @@ class Gzip(SingleExeCompressionFormat):
         'application/x-gz',
         'application/x-gzip'
     )
+    
+    @property
+    def compresslevel_range(self):
+        if self.executable_name == 'pigz':
+            return (0, 11)
+        else:
+            return (1, 9)
     
     def get_command(self, op, src=STDIN, stdout=True, compresslevel=None):
         cmd = [self.executable_path]
@@ -600,6 +613,8 @@ class Gzip(SingleExeCompressionFormat):
             cmd.append('-d')
         if stdout:
             cmd.append('-c')
+        if self.executable_name == 'pigz' and get_threads() > 1:
+            cmd.append('-p', threads)
         if src != STDIN:
             cmd.append(src)
         return cmd
@@ -687,6 +702,8 @@ class Lzma(SingleExeCompressionFormat):
             cmd.append('-d')
         if stdout:
             cmd.append('-c')
+        if get_threads() > 1:
+            cmd.append('-T', threads)
         if src != STDIN:
             cmd.append(src)
         return cmd

@@ -27,7 +27,9 @@ def configure(progress=True, system_progress=True, threads=1):
             operations. If this is a string, it will be used as the command
             for producing the progress bar; pv is used by default.
         threads: The number of threads that can be used by compression formats
-            that support parallel compression/decompression.
+            that support parallel compression/decompression. Set to None or a
+            number < 1 to automatically initalize to the number of cores on
+            the local machine.
     """
     xphyle.progress.wrapper = progress
     xphyle.progress.system_wrapper = system_progress
