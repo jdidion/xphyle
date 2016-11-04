@@ -13,7 +13,7 @@ from ._version import get_versions
 __version__ = get_versions()['version']
 del get_versions
 
-def configure(progress=True, system_progress=True):
+def configure(progress=True, system_progress=True, threads=1):
     """Conifgure xphyle.
     
     Args:
@@ -23,9 +23,12 @@ def configure(progress=True, system_progress=True):
         system_progress: Whether to use progress bars for system-level
             operations. If this is a string, it will be used as the command
             for producing the progress bar; pv is used by default.
+        threads: The number of threads that can be used by compression formats
+            that support parallel compression/decompression.
     """
     xphyle.progress.wrapper = progress
     xphyle.progress.system_wrapper = system_progress
+    xphyle.formats.threads = threads
 
 # Guess file format
 

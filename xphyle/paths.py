@@ -290,7 +290,7 @@ def get_executable_path(executable : 'str') -> 'str':
     executable_cache[exe_name] = exe_file
     return exe_file
 
-# tempfiles
+# Temporary files and directories
 
 class TempPath(object):
     def __init__(self, parent=None, mode='rwx', path_type='d'):

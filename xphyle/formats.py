@@ -13,6 +13,10 @@ import tempfile
 from xphyle.paths import *
 from xphyle.progress import *
 
+# Number of concurrent threads that can be used
+# by formats that support parallelization
+threads = 1
+
 # Guessing file formats from magic numbers
 
 MAGIC = {
