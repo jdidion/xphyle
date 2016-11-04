@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 """Interfaces to compression file formats.
+Magic numbers from: https://en.wikipedia.org/wiki/List_of_file_signatures
 """
 from importlib import import_module
 import io
@@ -17,54 +18,11 @@ from xphyle.progress import *
 # by formats that support parallelization
 threads = 1
 
-# Guessing file formats from magic numbers
-
-MAGIC = {
-    0x1f : ('gz' , (0x8b,)),
-    0x42 : ('bz2', (0x5A, 0x68)),
-    0x4C : ('lz' , (0x5A, 0x49, 0x50)),
-    0xFD : ('xz' , (0x37, 0x7A, 0x58, 0x5A, 0x00)),
-    0x37 : ('7z' , (0x7A, 0xBC, 0xAF, 0x27, 0x1C))
-    #0x50 : ('zip', (0x4B, 0x03, 0x04)),
-    #0x75 : ('tar', (0x73, 0x74, 0x61, 0x72))
-}
-"""A collection of magic numbers.
-From: https://en.wikipedia.org/wiki/List_of_file_signatures
-"""
-
-MAX_MAGIC_BYTES = max(len(v[1]) for v in MAGIC.values()) + 1
-
-def guess_format_from_header(path : 'str') -> 'str':
-    """Guess file format from 'magic numbers' at the beginning of the file.
-    
-    Note that ``path`` must be an ``open``able file. If it is a named pipe or
-    other pseudo-file type, the magic bytes will be destructively consumed and
-    thus will open correctly.
-    
-    Args:
-        path: Path to the file
-    
-    Returns:
-        The name of the format, or ``None`` if it could not be guessed.
-    """
-    with open(path, 'rb') as fh:
-        magic = fh.read(MAX_MAGIC_BYTES)
-    
-    l = len(magic)
-    if l > 0:
-        if magic[0] in MAGIC:
-            fmt, tail = MAGIC[magic[0]]
-            if (l > len(tail) and
-                    tuple(magic[i] for i in range(1, len(tail)+1)) == tail):
-                return fmt
-    
-    return None
-
 # File formats
 
 class FileFormat(object):
     """Base class for classes that wrap built-in python file format libraries.
-    The subclass must provide the ``lib_name`` member.
+    The subclass must provide the ``name`` member.
     """
     _lib = None
     
@@ -79,7 +37,7 @@ class FileFormat(object):
             CompressionError if the module cannot be imported.
         """
         if not self._lib:
-            self._lib = import_module(self.lib_name)
+            self._lib = import_module(self.name)
         return self._lib
 
 # Interfaces to file compression formats. Most importantly, these attempt
@@ -220,6 +178,16 @@ class SystemWriter:
 compression_formats = {}
 """Dict of registered compression formats"""
 
+magic_bytes = {}
+"""Dict mapping the first byte in a 'magic' sequence to a tuple of
+(format, rest_of_sequence)
+"""
+max_magic_bytes = 0
+"""Maximum number of bytes in a registered magic byte sequence"""
+
+mime_types = {}
+"""Dict mapping MIME types to file formats"""
+
 def register_compression_format(format_class : 'class'):
     """Register a new compression format.
     
@@ -231,11 +199,17 @@ def register_compression_format(format_class : 'class'):
     #if isinstance(fmt.system_commands, dict):
     #    aliases = aliases | set(fmt.system_commands.values())
     #else:
-    aliases = aliases | set(fmt.system_commands)
-    aliases.add(fmt.lib_name)
+    aliases.update(fmt.system_commands)
+    aliases.add(fmt.name)
     for alias in aliases:
         # TODO: warn about overriding existing format?
         compression_formats[alias] = fmt
+    for magic in fmt.magic_bytes:
+        global max_magic_bytes
+        max_magic_bytes = max(max_magic_bytes, len(magic))
+        magic_bytes[magic[0]] = (fmt.name, magic[1:])
+    for mime in fmt.mime_types:
+        mime_types[mime] = fmt.name
 
 def get_compression_format(name : 'str') -> 'CompressionFormat':
     """Returns the CompressionFormat associated with the given name, or raises
@@ -256,6 +230,35 @@ def guess_compression_format(name : 'str') -> 'str':
         if ext in compression_formats:
             return ext
     return None
+
+def guess_format_from_header(path : 'str') -> 'str':
+    """Guess file format from 'magic numbers' at the beginning of the file.
+    
+    Note that ``path`` must be an ``open``able file. If it is a named pipe or
+    other pseudo-file type, the magic bytes will be destructively consumed and
+    thus will open correctly.
+    
+    Args:
+        path: Path to the file
+    
+    Returns:
+        The name of the format, or ``None`` if it could not be guessed.
+    """
+    with open(path, 'rb') as fh:
+        magic = fh.read(max_magic_bytes)
+    
+    l = len(magic)
+    if l > 0:
+        if magic[0] in magic_bytes:
+            fmt, tail = magic_bytes[magic[0]]
+            if (l > len(tail) and
+                    tuple(magic[i] for i in range(1, len(tail)+1)) == tail):
+                return fmt
+    
+    return None
+
+def get_format_for_mime_type(mime_type : 'str') -> 'str':
+    pass
 
 class CompressionFormat(FileFormat):
     """Base class for classes that provide access to system-level and
@@ -575,11 +578,18 @@ class SingleExeCompressionFormat(CompressionFormat):
 class Gzip(SingleExeCompressionFormat):
     """Implementation of CompressionFormat for gzip files.
     """
+    name = 'gzip'
     exts = ('gz',)
-    lib_name = 'gzip'
     system_commands = ('gzip',)
     compresslevel_range = (1, 9)
     default_compresslevel = 6
+    magic_bytes = [(0x1f, 0x8b)]
+    mime_types = (
+        'application/gz',
+        'application/gzip',
+        'application/x-gz',
+        'application/x-gzip'
+    )
     
     def get_command(self, op, src=STDIN, stdout=True, compresslevel=None):
         cmd = [self.executable_path]
@@ -608,11 +618,18 @@ register_compression_format(Gzip)
 class BZip2(SingleExeCompressionFormat):
     """Implementation of CompressionFormat for bzip2 files.
     """
+    name = 'bz2'
     exts = ('bz2','bzip','bzip2')
-    lib_name = 'bz2'
     system_commands = ('bzip2',)
     compresslevel_range = (1, 9)
     default_compresslevel = 6
+    magic_bytes = ((0x42, 0x5A, 0x68),)
+    mime_types = (
+        'application/bz2',
+        'application/bzip2',
+        'application/x-bz2',
+        'application/x-bzip2'
+    )
     
     def get_command(self, op, src=STDIN, stdout=True, compresslevel=6):
         cmd = [self.executable_path]
@@ -641,11 +658,24 @@ register_compression_format(BZip2)
 class Lzma(SingleExeCompressionFormat):
     """Implementation of CompressionFormat for lzma (.xz) files.
     """
+    name = 'lzma'
     exts = ('xz', 'lzma', '7z', '7zip')
-    lib_name = 'lzma'
     system_commands = ('xz', 'lzma')
     compresslevel_range = (0, 9)
     default_compresslevel = 6
+    magic_bytes = (
+        (0x4C, 0x5A, 0x49, 0x50), # lz
+        (0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00), # xz
+        (0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C) # 7z
+    )
+    mime_types = (
+        'application/lzma',
+        'application/x-lzma',
+        'application/xz',
+        'application/x-xz',
+        'application/7z-compressed'
+        'application/x-7z-compressed'
+    )
     
     def get_command(self, op, src=STDIN, stdout=True, compresslevel=6):
         cmd = [self.executable_path]
@@ -705,7 +735,7 @@ register_compression_format(Lzma)
 #
 # class Lzw(DualExeCompressionFormat):
 #     exts = ('Z', 'lzw')
-#     lib_name = 'lzw'
+#     name = 'lzw'
 #     system_commands = dict(compress='compress', uncompress='uncompress')
 #     compresslevel_range = (0, 7)
 #     default_compresslevel = 7
