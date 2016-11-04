@@ -1,4 +1,4 @@
-from unittest import TestCase
+from unittest import TestCase, skipIf
 from . import *
 import gzip
 from io import StringIO, BytesIO, TextIOWrapper
@@ -91,3 +91,11 @@ class XphyleTests(TestCase):
             o.write('foo')
         with gzip.open(path, 'rt') as i:
             self.assertEqual(i.read(), 'foo')
+    
+    @skipIf(no_internet(), "No internet connection")
+    def test_xopen_url(self):
+        url = 'https://github.com/jdidion/xphyle/blob/master/tests/foo.gz?raw=True'
+        with self.assertRaises(ValueError):
+            xopen(url, 'w')
+        with open_(url, 'rt') as i:
+            self.assertEqual(i.read(), 'foo\n')

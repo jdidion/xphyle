@@ -50,14 +50,9 @@ total = sum(i for i in safe_iter('infile.gz', convert=int))
 
 # TODO
 
-## 0.7
-
-* Documentation
-
 ## 0.8
 
-* Make all file I/O functions work transparently with URLs (via urllib2)
-* Plug-in interface for alternative url schemes
+* Documentation
 * Support multi-threaded gzip compression (via pigz)
 * Support multi-threaded lzma compression
 

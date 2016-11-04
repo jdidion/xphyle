@@ -141,6 +141,8 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
     
     # The file handle we will open
     fh = None
+    # The wrapper to use if context_wrapper is True
+    wrapper = FileWrapper
     
     # standard input and standard output handling
     if path in (STDOUT, STDERR):
@@ -152,17 +154,11 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
         if 'b' in mode:
             fh = fh.buffer
         if compression:
-            if compression == True:
-                raise ValueError("Compression can not be determined "
-                                 "automatically from stdin")
+            use_system = False
             if 't' in mode:
                 fh = fh.buffer
-            fmt = get_compression_format(compression)
-            fh = fmt.open_file_python(fh, mode, **kwargs)
-            if context_wrapper:
-                fh = FileWrapper(fh)
         elif context_wrapper:
-            fh = StreamWrapper(fh)
+            wrapper = StreamWrapper
     
     else:
         # URL handling
@@ -172,8 +168,11 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
                 raise ValueError("URLs can only be opened in read mode")
             
             fh = open_url(path)
-            if not fh:
+            if not fh: # pragma: no cover
                 raise ValueError("Could not open URL {}".format(path))
+            
+            wrapper = StreamWrapper
+            use_system = False
             
             # Get compression format if not specified
             if compression in (None, True):
@@ -186,7 +185,7 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
                 if not guess:
                     name = get_url_file_name(fh, url_parts)
                     if name:
-                        guess = guess_file_format(path)
+                        guess = guess_file_format(name)
                 if guess:
                     compression = guess
     
@@ -202,18 +201,18 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
                 if guess:
                     compression = guess
         
-        if compression is True:
-            raise ValueError(
-                "Could not guess compression format from {}".format(path))
+    if compression is True:
+        raise ValueError(
+            "Could not guess compression format from {}".format(path))
 
-        if compression:
-            fmt = get_compression_format(compression)
-            fh = fmt.open_file(fh or path, mode, use_system=use_system, **kwargs)
-        elif not fh:
-            fh = open(path, mode, **kwargs)
+    if compression:
+        fmt = get_compression_format(compression)
+        fh = fmt.open_file(fh or path, mode, use_system=use_system, **kwargs)
+    elif not fh:
+        fh = open(path, mode, **kwargs)
         
-        if context_wrapper:
-            fh = FileWrapper(fh)
+    if context_wrapper:
+        fh = wrapper(fh)
     
     return fh
 

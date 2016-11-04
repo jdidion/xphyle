@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Methods for handling URLs.
 """
+import copy
 import re
 from urllib.request import urlopen, Request
 from urllib.parse import urlparse
@@ -19,13 +20,10 @@ def parse_url(s):
         be valid and still not be openable (for example, if the scheme is
         recognized by urlopen).
     """
-    try:
-        url = urlparse(s)
-        if not all(url.scheme, url.netloc):
-            return None
-        return url
-    except:
+    url = urlparse(s)
+    if not (url.scheme and (url.netloc or url.path)):
         return None
+    return url
 
 def open_url(url, byte_range=None, headers={}, **kwargs):
     """Open a URL for reading.
@@ -38,11 +36,11 @@ def open_url(url, byte_range=None, headers={}, **kwargs):
     Returns:
         A response object, or None if the URL is not valid or cannot be opened
     """
-    headers = copy.copy(headers)
     if byte_range:
+        headers = copy.copy(headers)
         headers['Range'] = 'bytes={}-{}'.format(*byte_range)
-    request = Request(url, headers=headers, **kwargs)
     try:
+        request = Request(url, headers=headers, **kwargs)
         return urlopen(request)
     except:
         return None
@@ -68,6 +66,6 @@ def get_url_file_name(response, parsed_url=None):
             return match.groups(1)
     if not parsed_url:
         parsed_url = parse_url(response.geturl())
-        if parsed_url and hasattr(parsed_url, 'path'):
-            return parsed_url.path
+    if parsed_url and hasattr(parsed_url, 'path'):
+        return parsed_url.path
     return None
