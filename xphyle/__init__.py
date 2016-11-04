@@ -3,9 +3,12 @@
 """
 from collections import defaultdict
 from contextlib import contextmanager
+import copy
 import os
 import sys
+
 from xphyle.formats import *
+from xphyle.urls import *
 from xphyle.paths import *
 import xphyle.progress
 
@@ -136,6 +139,9 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
     elif not any(f in mode for f in ('b', 't')):
         raise ValueError("'mode' must contain one of (b,t)")
     
+    # The file handle we will open
+    fh = None
+    
     # standard input and standard output handling
     if path in (STDOUT, STDERR):
         if path == STDERR:
@@ -154,34 +160,60 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
             fmt = get_compression_format(compression)
             fh = fmt.open_file_python(fh, mode, **kwargs)
             if context_wrapper:
-                return FileWrapper(fh)
+                fh = FileWrapper(fh)
         elif context_wrapper:
             fh = StreamWrapper(fh)
-        return fh
     
-    if 'r' in mode:
-        path = check_readable_file(path)
     else:
-        path = check_writeable_file(path)
+        # URL handling
+        url_parts = parse_url(path)
+        if url_parts:
+            if 'r' not in mode:
+                raise ValueError("URLs can only be opened in read mode")
+            
+            fh = open_url(path)
+            if not fh:
+                raise ValueError("Could not open URL {}".format(path))
+            
+            # Get compression format if not specified
+            if compression in (None, True):
+                guess = None
+                # Check if the MIME type indicates that the file is compressed
+                mime = get_url_mime_type(fh)
+                if mime:
+                    guess = get_format_for_mime_type(mime)
+                # Try to guess from the file name
+                if not guess:
+                    name = get_url_file_name(fh, url_parts)
+                    if name:
+                        guess = guess_file_format(path)
+                if guess:
+                    compression = guess
     
-    if compression in (None, True):
-        guess = guess_file_format(path)
-        if guess is not None:
-            compression = guess
-        elif compression == True:
+        # Local file handling
+        else:
+            if 'r' in mode:
+                path = check_readable_file(path)
+            else:
+                path = check_writeable_file(path)
+            
+            if compression in (None, True):
+                guess = guess_file_format(path)
+                if guess:
+                    compression = guess
+        
+        if compression is True:
             raise ValueError(
                 "Could not guess compression format from {}".format(path))
-        else:
-            compression = False
-    
-    if compression:
-        fmt = get_compression_format(compression)
-        fh = fmt.open_file(path, mode, use_system=use_system, **kwargs)
-    else:
-        fh = open(path, mode, **kwargs)
-    
-    if context_wrapper:
-        fh = FileWrapper(fh)
+
+        if compression:
+            fmt = get_compression_format(compression)
+            fh = fmt.open_file(fh or path, mode, use_system=use_system, **kwargs)
+        elif not fh:
+            fh = open(path, mode, **kwargs)
+        
+        if context_wrapper:
+            fh = FileWrapper(fh)
     
     return fh
 

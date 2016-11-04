@@ -24,7 +24,7 @@ class XphyleTests(TestCase):
         path = self.root.make_file()
         with gzip.open(path, 'wt') as o:
             o.write('foo')
-        self.assertEqual(guess_file_format(path), 'gz')
+        self.assertEqual(guess_file_format(path), 'gzip')
         
     def test_open_(self):
         path = self.root.make_file(contents='foo')
