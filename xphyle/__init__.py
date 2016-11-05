@@ -35,8 +35,6 @@ def configure(progress=True, system_progress=True, threads=1):
     xphyle.progress.system_wrapper = system_progress
     xphyle.formats.threads = threads
 
-# Guess file format
-
 def guess_file_format(path : 'str') -> 'str':
     """Try to guess the file format, first from the extension, and then
     from the header bytes.
@@ -53,8 +51,6 @@ def guess_file_format(path : 'str') -> 'str':
     if fmt is None and safe_check_readable_file(path):
         fmt = guess_format_from_header(path)
     return fmt
-
-# Opening files
 
 @contextmanager
 def open_(f, mode : 'str' = 'r', **kwargs):
@@ -143,8 +139,10 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
     
     # The file handle we will open
     fh = None
-    # The wrapper to use if context_wrapper is True
-    wrapper = FileWrapper
+    # Whether the file object is a stream (e.g. stdout or URL)
+    is_stream = False
+    # The name to use for the file
+    name = None
     
     # standard input and standard output handling
     if path in (STDOUT, STDERR):
@@ -160,7 +158,7 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
             if 't' in mode:
                 fh = fh.buffer
         elif context_wrapper:
-            wrapper = StreamWrapper
+            is_stream = True
     
     else:
         # URL handling
@@ -173,7 +171,8 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
             if not fh: # pragma: no cover
                 raise ValueError("Could not open URL {}".format(path))
             
-            wrapper = StreamWrapper
+            is_stream = True
+            name = get_url_file_name(fh, url_parts)
             use_system = False
             
             # Get compression format if not specified
@@ -184,13 +183,11 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
                 if mime:
                     guess = get_format_for_mime_type(mime)
                 # Try to guess from the file name
-                if not guess:
-                    name = get_url_file_name(fh, url_parts)
-                    if name:
-                        guess = guess_file_format(name)
+                if not guess and name:
+                    guess = guess_file_format(name)
                 if guess:
                     compression = guess
-    
+        
         # Local file handling
         else:
             if 'r' in mode:
@@ -202,23 +199,24 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
                 guess = guess_file_format(path)
                 if guess:
                     compression = guess
-        
+    
     if compression is True:
         raise ValueError(
             "Could not guess compression format from {}".format(path))
-
+    
     if compression:
         fmt = get_compression_format(compression)
         fh = fmt.open_file(fh or path, mode, use_system=use_system, **kwargs)
     elif not fh:
         fh = open(path, mode, **kwargs)
-        
+    
     if context_wrapper:
-        fh = wrapper(fh)
+        if is_stream:
+            fh = StreamWrapper(fh, name=name)
+        else:
+            fh = FileWrapper(fh)
     
     return fh
-
-# File wrapper
 
 class FileWrapper(object):
     """Wrapper around a file object that adds two features:
@@ -293,17 +291,19 @@ class StreamWrapper(object):
     __slots__ = ['_stream']
     
     def __init__(self, stream, name=None):
+        if name is None:
+            try:
+                name = self._stream.name
+            except:
+                name = None
+        object.__setattr__(self, 'name', name)
         object.__setattr__(self, '_stream', stream)
     
     def __getattr__(self, name):
         return getattr(self._stream, name)
     
     def __iter__(self):
-        try:
-            name = self._stream.name
-        except:
-            name = None
-        return iter(xphyle.progress.wrap(self._stream, desc=name))
+        return iter(xphyle.progress.wrap(self._stream, desc=self.name))
     
     def __enter__(self):
         return self
