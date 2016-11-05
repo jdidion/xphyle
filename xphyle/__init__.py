@@ -288,7 +288,7 @@ class StreamWrapper(object):
     Args:
         stream: The stream to wrap
     """
-    __slots__ = ['_stream']
+    __slots__ = ['name', '_stream']
     
     def __init__(self, stream, name=None):
         if name is None:
