@@ -2,23 +2,18 @@
 ![https://travis-ci.org/jdidion/xphyle](https://travis-ci.org/jdidion/xphyle.svg?branch=master)
 [![Coverage Status](https://coveralls.io/repos/github/jdidion/xphyle/badge.svg?branch=master)](https://coveralls.io/github/jdidion/xphyle?branch=master)
 
-# xphyle: easier access to compressed files
+# xphyle: extraordinarily simple file handling
 
 xphyle is a small python (3.3+) library that makes it easy to open compressed
 files for the highest-possible performance available on your system. It also
 provides some convenience methods for working with file paths.
 
-xphyle is organized as follows:
-
-* The `xphyle` module (i.e. \_\_init\_\_.py) provides `xopen()`, a drop-in replacement for the python `open()` method that tries to automatically and transparently handle common compression and archive formats. In addition, `open_()` transparently makes both paths and open file objects work with `wait`.
-* The `xphyle.utils` module provides some useful methods on top of `xopen()/open_()` for reading and writing files.
-* The `xphyle.formats` module implements the details of different file formats. The goal of this module is to try to use the system-level program/library (which is generally the fastest) when possible, and fall back to a pure-python module.
-* The `xphyle.paths` module offers useful functions for locating and resolving files and directories.
+`Documentation <https://xphyle.readthedocs.io>`_
 
 # Installation
 
 ```
-pip install git+git://github.com/jdidion/xphyle.git
+pip install xphyle
 ```
 
 # Example usages:
@@ -48,7 +43,7 @@ lines = list(safe_iter('infile.gz'))
 total = sum(i for i in safe_iter('infile.gz', convert=int))
 ```
 
-# TODO
+# Roadmap
 
 ## 0.8
 

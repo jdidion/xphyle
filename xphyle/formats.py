@@ -20,7 +20,9 @@ threads = 1
 
 def get_threads():
     global threads
-    if not threads or threads < 1:
+    if threads == False:
+        threads = 1
+    elif not (isinstance(threads, int) and threads >= 1):
         import multiprocessing
         threads = multiprocessing.cpu_count()
     return threads

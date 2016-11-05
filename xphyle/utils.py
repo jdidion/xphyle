@@ -87,7 +87,7 @@ def write_iterable(iterable : 'iterable', path : 'str', linesep : 'str' = '\n',
         iterable: An iterable
         path: Path to the file
         linesep: The delimiter to use to separate the strings, or
-            ``os.linesep`` if None (defaults to '\n')
+            ``os.linesep`` if None (defaults to '\\n')
         convert: Function that converts a value to a string
         kwargs: Additional arguments to pass top ``open_``
     """
@@ -130,7 +130,7 @@ def write_dict(d : 'dict', path : 'str', sep : 'str' = '=',
         path: Path to the file
         sep: The delimiter between key and value (defaults to '=')
         linesep: The delimiter between values, or ``os.linesep`` if None
-            (defaults to '\n')
+            (defaults to '\\n')
         convert: Function that converts a value to a string
     """
     if linesep is None:
@@ -415,7 +415,7 @@ def linecount(f, linesep : 'str' = None, buf_size : 'int' = 1024 * 1024) -> 'int
     
     Args:
         path: File object, or path to the file
-        linesep: Line delimiter, specified as a byte string (e.g. b'\n')
+        linesep: Line delimiter, specified as a byte string (e.g. b'\\n')
         bufsize: How many bytes to read at a time (1 Mb by default)
     
     Returns:

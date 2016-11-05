@@ -16,24 +16,34 @@ from ._version import get_versions
 __version__ = get_versions()['version']
 del get_versions
 
-def configure(progress=True, system_progress=True, threads=1):
+def configure(progress : 'bool|callable' = None,
+              system_progress : 'bool|str|list' = None,
+              threads : 'int|bool' = None,
+              executable_path : 'str|list' = None):
     """Conifgure xphyle.
     
     Args:
         progress: Whether to wrap long-running operations with a progress bar.
-            If this is callable, it will be called to obtain the wrapped
-            iterable.
+            If this is callable, it will be called with an iterable argument to
+            obtain the wrapped iterable.
         system_progress: Whether to use progress bars for system-level
-            operations. If this is a string, it will be used as the command
-            for producing the progress bar; pv is used by default.
+            operations. If this is a string or tuple, it will be used as the
+            command for producing the progress bar; pv is used by default.
         threads: The number of threads that can be used by compression formats
             that support parallel compression/decompression. Set to None or a
             number < 1 to automatically initalize to the number of cores on
             the local machine.
+        executable_paths: List of paths where xphyle should look for system
+            executables. These will be searched before the default system path.
     """
-    xphyle.progress.wrapper = progress
-    xphyle.progress.system_wrapper = system_progress
-    xphyle.formats.threads = threads
+    if progress is not None:
+        xphyle.progress.wrapper = progress
+    if system_progress is not None:
+        xphyle.progress.system_wrapper = system_progress
+    if threads is not None:
+        xphyle.formats.threads = threads
+    if executable_path:
+        xphyle.paths.add_executable_path(executable_path)
 
 def guess_file_format(path : 'str') -> 'str':
     """Try to guess the file format, first from the extension, and then

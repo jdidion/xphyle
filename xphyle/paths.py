@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Convenience functions for working with file paths.
 """
+import copy
 import errno
 import os
 import re
@@ -258,6 +259,21 @@ def find(root : 'str', pattern, types : 'str' = 'f',
                 found.append(os.path.join(root, f))
     return found
 
+executable_paths = copy.copy(os.get_exec_path())
+"""List of paths that are searched for executables"""
+
+def add_executable_path(paths):
+    """Add directories to the beginning of the executable search path.
+    
+    Args:
+        paths: List of paths, or a string with directories separated by
+            ``os.path.sep``
+    """
+    global executable_paths
+    if isinstance(path, 'str'):
+        path = path.split(os.path.sep)
+    executable_paths = list(paths) + executable_paths
+
 executable_cache = {}
 """Cache of full paths to executables"""
 
@@ -282,8 +298,9 @@ def get_executable_path(executable : 'str') -> 'str':
     
     exe_file = check_executable(executable)
     if not exe_file:
-        for path in os.get_exec_path():
-            exe_file = check_executable(os.path.join(path.strip('"'), executable))
+        for path in executable_paths:
+            exe_file = check_executable(
+                os.path.join(path.strip('"'), executable))
             if exe_file:
                 break
     
