@@ -96,6 +96,10 @@ You can add support for another compression format by extending one of the base 
         def open_file_python(self, filename, mode, **kwargs):
             return self.lib.open_foo(filename, mode, **kwargs)
 
+Then, register your format::
+
+    xphyle.formats.register_compression_format(FooFormat)
+
 Also, note that you can support custom URL schemes by the standard method of adding `urllib <https://docs.python.org/3/library/urllib.request.html#openerdirector-objects>`_ handlers::
     
     import urllib.request

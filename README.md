@@ -49,13 +49,6 @@ total = sum(i for i in safe_iter('infile.gz', convert=int))
 
 * Documentation
 
-## 0.9
-
-* Formalize the plug-in interface for alternative compression formats
-* Consider natively supporting other popular compression formats:
-    * LZW: the only decent library is python-lzw, and it doesn't provide an open method
-    * Snappy (via python-snappy): this is problematic since it depends on libsnappy, with no pure python fallback
-
 ## 1.0
 
 * Add support for archive formats
@@ -64,3 +57,9 @@ total = sum(i for i in safe_iter('infile.gz', convert=int))
     * Support 7zip archives: this is problematic as it depends on 7zip being installed, with no pure python fallback
     * Consider using libarchive (if installed) via one of the several available python packages. Will have to do performance testing to determine whether this should be the first option or the second to try.
     * Many other archive formats that might be supported - which are most important? arc, cab (windows-specific), dmg (mac-specific), iso9660, lzh, rar, xar, zz
+
+## Beyond
+
+* Consider natively supporting other popular compression formats:
+    * LZW: the only decent library is python-lzw, and it doesn't provide an open method
+    * Snappy (via python-snappy): this is problematic since it depends on libsnappy, with no pure python fallback

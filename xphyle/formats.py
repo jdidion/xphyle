@@ -581,8 +581,8 @@ class CompressionFormat(FileFormat):
         return dest
 
 class SingleExeCompressionFormat(CompressionFormat):
-    """CompressionFormat that uses the same executable for compressing and
-    uncompressing.
+    """Base class form ``CompressionFormat``s that use the same executable for
+    compressing and uncompressing.
     """
     @property
     def executable_path(self) -> 'str':
