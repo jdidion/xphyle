@@ -1,6 +1,7 @@
 from unittest import TestCase, skipIf
 import gzip
 import os
+import xphyle.formats
 from xphyle.formats import *
 from xphyle.paths import TempDir, get_executable_path
 from . import *
@@ -17,6 +18,7 @@ def read_file(fmt, path, ext, use_system, mode='rt'):
         return f.read()
 
 gz_path = get_format('gz').executable_path
+no_pigz = gz_path is None or get_format('gz').executable_name != 'pigz'
 bz_path = get_format('bz2').executable_path
 xz_path = get_format('xz').executable_path
 
@@ -46,6 +48,24 @@ class CompressionTests(TestCase):
         self.assertEqual(
             gz.get_command('d', 'foo.gz'),
             [gz_path, '-d', '-c', 'foo.gz'])
+    
+    @skipIf(no_pigz, "'pigz' not available")
+    def test_pigz(self):
+        xphyle.formats.threads = 2
+        gz = get_format('gz')
+        self.assertEqual(gz.default_ext, 'gz')
+        self.assertEqual(
+            gz.get_command('c', compresslevel=5),
+            [gz_path, '-5', '-c', '-p', '2'])
+        self.assertEqual(
+            gz.get_command('c', 'foo.bar', compresslevel=5),
+            [gz_path, '-5', '-c', '-p', '2', 'foo.bar'])
+        self.assertEqual(
+            gz.get_command('d'),
+            [gz_path, '-d', '-c', '-p', '2'])
+        self.assertEqual(
+            gz.get_command('d', 'foo.gz'),
+            [gz_path, '-d', '-c', '-p', '2', 'foo.gz'])
     
     def test_bzip2(self):
         bz = get_format('bz2')

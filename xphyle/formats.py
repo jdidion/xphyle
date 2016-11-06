@@ -22,7 +22,7 @@ def get_threads():
     global threads
     if threads == False:
         threads = 1
-    elif not (isinstance(threads, int) and threads >= 1):
+    elif threads is True or not (isinstance(threads, int) and threads >= 1):
         import multiprocessing
         threads = multiprocessing.cpu_count()
     return threads
@@ -240,10 +240,10 @@ def guess_compression_format(name : 'str') -> 'str':
             return ext
     return None
 
-def guess_format_from_header(path : 'str') -> 'str':
-    """Guess file format from 'magic numbers' at the beginning of the file.
+def guess_format_from_file_header(path : 'str') -> 'str':
+    """Guess file format from 'magic bytes' at the beginning of the file.
     
-    Note that ``path`` must be an ``open``able file. If it is a named pipe or
+    Note that ``path`` must be openable and readable. If it is a named pipe or
     other pseudo-file type, the magic bytes will be destructively consumed and
     thus will open correctly.
     
@@ -254,16 +254,35 @@ def guess_format_from_header(path : 'str') -> 'str':
         The name of the format, or ``None`` if it could not be guessed.
     """
     with open(path, 'rb') as fh:
-        magic = fh.read(max_magic_bytes)
+        return guess_format_from_header_bytes(fh.read(max_magic_bytes))
+
+def guess_format_from_buffer(buffer : 'str') -> 'str':
+    """Guess file format from a byte buffer that provides a ``peek`` method.
     
-    l = len(magic)
-    if l > 0:
-        if magic[0] in magic_bytes:
-            fmt, tail = magic_bytes[magic[0]]
-            if (l > len(tail) and
-                    tuple(magic[i] for i in range(1, len(tail)+1)) == tail):
+    Args:
+        buffer: The buffer object
+    
+    Returns:
+        The name of the format, or ``None`` if it could not be guessed.
+    """
+    return guess_format_from_header_bytes(buffer.peek(max_magic_bytes))
+
+def guess_format_from_header_bytes(b : 'bytes') -> 'str':
+    """Guess file format from a sequence of bytes from a file header.
+    
+    Args:
+        bytes: The bytes
+    
+    Returns:
+        The name of the format, or ``None`` if it could not be guessed.
+    """
+    num_bytes = len(b)
+    if num_bytes > 0:
+        if b[0] in magic_bytes:
+            fmt, tail = magic_bytes[b[0]]
+            if (num_bytes > len(tail) and
+                    tuple(b[i] for i in range(1, len(tail)+1)) == tail):
                 return fmt
-    
     return None
 
 def get_format_for_mime_type(mime_type : 'str') -> 'str':
@@ -616,7 +635,7 @@ class Gzip(SingleExeCompressionFormat):
         if stdout:
             cmd.append('-c')
         if self.executable_name == 'pigz' and get_threads() > 1:
-            cmd.append('-p', threads)
+            cmd.extend(('-p', str(threads)))
         if src != STDIN:
             cmd.append(src)
         return cmd
@@ -705,7 +724,7 @@ class Lzma(SingleExeCompressionFormat):
         if stdout:
             cmd.append('-c')
         if get_threads() > 1:
-            cmd.append('-T', threads)
+            cmd.extend(('-T', str(threads)))
         if src != STDIN:
             cmd.append(src)
         return cmd
@@ -780,8 +799,8 @@ def _resolve_exe(names):
     for cmd in names:
         exe = get_executable_path(cmd)
         if exe:
-            path = cmd
-            name = exe
+            path = exe
+            name = cmd
             break
     return (path, name)
 

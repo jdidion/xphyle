@@ -270,8 +270,8 @@ def add_executable_path(paths):
             ``os.path.sep``
     """
     global executable_paths
-    if isinstance(path, 'str'):
-        path = path.split(os.path.sep)
+    if isinstance(paths, str):
+        paths = paths.split(os.path.sep)
     executable_paths = list(paths) + executable_paths
 
 executable_cache = {}
