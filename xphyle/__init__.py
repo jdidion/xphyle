@@ -59,7 +59,7 @@ def guess_file_format(path : 'str') -> 'str':
         raise ValueError("Cannot guess format from {}".format(path))
     fmt = guess_compression_format(path)
     if fmt is None and safe_check_readable_file(path):
-        fmt = guess_format_from_header(path)
+        fmt = guess_format_from_file_header(path)
     return fmt
 
 @contextmanager
@@ -149,26 +149,31 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
     
     # The file handle we will open
     fh = None
+    # Guessed compression type, if compression in (None, True)
+    guess = None
     # Whether the file object is a stream (e.g. stdout or URL)
     is_stream = False
     # The name to use for the file
     name = None
     
     # standard input and standard output handling
-    if path in (STDOUT, STDERR):
+    if path in (STDIN, STDOUT, STDERR):
+        use_system = False
         if path == STDERR:
             assert 'r' not in mode
             fh = sys.stderr
         else:
             fh = sys.stdin if 'r' in mode else sys.stdout
-        if 'b' in mode:
-            fh = fh.buffer
         if compression:
-            use_system = False
-            if 't' in mode:
-                fh = fh.buffer
-        elif context_wrapper:
+            fh = fh.buffer
+            if compression in (None, True) and 'r' in mode:
+                if not hasattr(fh, 'peek'):
+                    fh = io.BufferedReader(fh)
+                guess = guess_format_from_buffer(fh)
+        if not (compression or guess):
             is_stream = True
+            if 'b' in mode:
+                fh = fh.buffer
     
     else:
         # URL handling
@@ -187,7 +192,6 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
             
             # Get compression format if not specified
             if compression in (None, True):
-                guess = None
                 # Check if the MIME type indicates that the file is compressed
                 mime = get_url_mime_type(fh)
                 if mime:
@@ -195,8 +199,6 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
                 # Try to guess from the file name
                 if not guess and name:
                     guess = guess_file_format(name)
-                if guess:
-                    compression = guess
         
         # Local file handling
         else:
@@ -207,10 +209,10 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
             
             if compression in (None, True):
                 guess = guess_file_format(path)
-                if guess:
-                    compression = guess
     
-    if compression is True:
+    if guess:
+        compression = guess
+    elif compression is True:
         raise ValueError(
             "Could not guess compression format from {}".format(path))
     
@@ -228,44 +230,43 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
     
     return fh
 
-class FileWrapper(object):
-    """Wrapper around a file object that adds two features:
+class Wrapper(object):
+    """Base class for wrappers around file-like objects. Adds the following:
     
-    1. An event system by which registered listeners can respond to file events.
-    Currently, 'close' is the only supported event.
-    2. Wraps a file iterator in a progress bar (if configured)
+    1. A simple event system by which registered listeners can respond to
+    file events. Currently, 'close' is the only supported event
+    2. Wraps file iterators in a progress bar (if configured)
     
     Args:
-        source: Path or file object
-        mode: File open mode
-        kwargs: Additional arguments to pass to xopen
+        fileobj: The file-like object to wrap
     """
-    __slots__ = ['_file', '_path', '_listeners']
-    
-    def __init__(self, source, mode='w', **kwargs):
-        if isinstance(source, str):
-            path = source
-            source = xopen(source, mode=mode, **kwargs)
-        else:
-            path = source.name
-        object.__setattr__(self, '_file', source)
-        object.__setattr__(self, '_path', path)
+    def __init__(self, fileobj):
+        object.__setattr__(self, '_fileobj', fileobj)
         object.__setattr__(self, '_listeners', defaultdict(lambda: []))
     
     def __getattr__(self, name):
-        return getattr(self._file, name)
+        return getattr(self._fileobj, name)
     
     def __iter__(self):
-        return iter(xphyle.progress.wrap(self._file, desc=self._path))
+        return iter(xphyle.progress.wrap(self._fileobj, desc=self.name))
     
     def __enter__(self):
         if self.closed:
-            raise ValueError("I/O operation on closed file.")
+            raise IOError("I/O operation on closed file.")
         return self
     
     def __exit__(self, exception_type, exception_value, traceback):
         self.close()
     
+    def close(self):
+        self._close()
+        if 'close' in self._listeners:
+            for listener in self._listeners['close']:
+                listener(self)
+    
+    def _close(self):
+        self._fileobj.close()
+
     def register_listener(self, event : 'str', listener):
         """Register an event listener.
         
@@ -275,14 +276,33 @@ class FileWrapper(object):
                 single argument -- this file wrapper.
         """
         self._listeners[event].append(listener)
+
+class FileWrapper(Wrapper):
+    """Wrapper around a file object.
     
-    def close(self):
-        self._file.close()
-        if 'close' in self._listeners:
-            for listener in self._listeners['close']:
-                listener(self)
+    Args:
+        source: Path or file object
+        mode: File open mode
+        kwargs: Additional arguments to pass to xopen
+    """
+    def __init__(self, source, mode='w', **kwargs):
+        if isinstance(source, str):
+            path = source
+            source = xopen(source, mode=mode, **kwargs)
+        else:
+            path = source.name
+        super(FileWrapper, self).__init__(source)
+        object.__setattr__(self, '_path', path)
 
 class FileEventListener(object):
+    """Base class for listener events that can be registered on a FileWrapper.
+    
+    Subclasses must implement ``execute(self, file_wrapper, ...)``
+    
+    Args:
+        args: positional arguments to pass through to ``execute``
+        kwargs: keyword arguments to pass through to ``execute``
+    """
     def __init__(self, *args, **kwargs):
         self.args = args
         self.kwargs = kwargs
@@ -290,33 +310,22 @@ class FileEventListener(object):
     def __call__(self, file_wrapper):
         self.execute(file_wrapper._path, *self.args, **self.kwargs)
 
-class StreamWrapper(object):
-    """Wrapper around a stream (such as stdout) that implements the
-    ContextManager operations and wraps iterators in a progress bar
-    (if configured).
+class StreamWrapper(Wrapper):
+    """EventWrapper around a stream.
     
     Args:
         stream: The stream to wrap
     """
-    __slots__ = ['name', '_stream']
-    
     def __init__(self, stream, name=None):
         if name is None:
             try:
                 name = self._stream.name
             except:
                 name = None
+        super(StreamWrapper, self).__init__(stream)
         object.__setattr__(self, 'name', name)
-        object.__setattr__(self, '_stream', stream)
+        object.__setattr__(self, 'closed', False)
     
-    def __getattr__(self, name):
-        return getattr(self._stream, name)
-    
-    def __iter__(self):
-        return iter(xphyle.progress.wrap(self._stream, desc=self.name))
-    
-    def __enter__(self):
-        return self
-    
-    def __exit__(self, exception_type, exception_value, traceback):
-        self._stream.flush()
+    def _close(self):
+        self._fileobj.flush()
+        self.closed = True

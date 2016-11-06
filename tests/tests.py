@@ -12,6 +12,23 @@ class XphyleTests(TestCase):
     def tearDown(self):
         self.root.close()
     
+    def test_configure(self):
+        import xphyle.progress
+        import xphyle.formats
+        import xphyle.paths
+        configure(progress=True, system_progress=True, threads=2, executable_path=['foo'])
+        self.assertTrue(xphyle.progress.wrapper)
+        self.assertTrue(xphyle.progress.system_wrapper)
+        self.assertEqual(2, xphyle.formats.get_threads())
+        self.assertTrue('foo' in xphyle.paths.executable_paths)
+        
+        configure(threads=False)
+        self.assertEqual(1, xphyle.formats.get_threads())
+        
+        import multiprocessing
+        configure(threads=True)
+        self.assertEqual(multiprocessing.cpu_count(), xphyle.formats.get_threads())
+    
     def test_guess_format(self):
         with self.assertRaises(ValueError):
             guess_file_format(STDOUT)
@@ -46,7 +63,7 @@ class XphyleTests(TestCase):
         with self.assertRaises(ValueError):
             xopen('foo', 'rU', newline='\n')
         with self.assertRaises(ValueError):
-            xopen(STDOUT, compression=True)
+            xopen(STDOUT, 'w', compression=True)
         with self.assertRaises(ValueError):
             xopen('foo.bar', 'w', compression=True)
     
@@ -82,6 +99,12 @@ class XphyleTests(TestCase):
             with xopen(STDOUT, 'wt', compression='gz') as o:
                 o.write('foo')
             self.assertEqual(gzip.decompress(i.getvalue()), b'foo')
+    
+    def test_xopen_compressed_stream(self):
+        # Try autodetect compressed
+        with intercept_stdin(gzip.compress(b'foo\n'), is_bytes=True):
+            with xopen(STDIN, 'rt', compression=True) as i:
+                self.assertEqual(i.read(), 'foo\n')
     
     def test_xopen_file(self):
         with self.assertRaises(IOError):

@@ -1,5 +1,5 @@
 from contextlib import contextmanager
-from io import StringIO
+from io import StringIO, BytesIO, TextIOWrapper
 import os
 import random
 import stat
@@ -28,12 +28,19 @@ def intercept_stderr(i):
         sys.stderr = sys.__stderr__
 
 @contextmanager
-def intercept_stdin(content):
-    i = StringIO()
+def intercept_stdin(content, is_bytes=False):
+    if is_bytes:
+        i = BytesIO()
+    else:
+        i = StringIO()
     i.write(content)
-    if not content.endswith('\n'):
-        i.write('\n')
+    if not is_bytes:
+        linesep = b'\n' if is_bytes else '\n'
+        if not content.endswith(linesep):
+            i.write(linesep)
     i.seek(0)
+    if is_bytes:
+        i = TextIOWrapper(i)
     try:
         sys.stdin = i
         yield
