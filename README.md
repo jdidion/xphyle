@@ -20,12 +20,26 @@ pip install xphyle
 
 ```python
 from xphyle import *
+from xphyle.paths import STDIN
 
-# Open a compressed file
+# Open a compressed file...
 myfile = xopen('infile.gz')
 
-# Print all lines in a compressed file
+# ...or a compressed stream
+# e.g. gzip -c afile | python my_program.py
+stdin = xopen(STDIN)
+
+# We have to tell xopen what kind of compression
+# to use when writing
+stdout = xopen(STDOUT, compression='gz')
+
+# Print all lines in a compressed file...
 with open_('infile.gz') as myfile:
+    for line in myfile:
+        print(line)
+
+# ... or a compressed URL
+with open_('http://foo.com/myfile.gz') as myfile:
     for line in myfile:
         print(line)
 
