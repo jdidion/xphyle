@@ -1,14 +1,13 @@
 ![https://pypi.python.org/pypi/xphyle](https://img.shields.io/pypi/v/xphyle.svg?branch=master)
 ![https://travis-ci.org/jdidion/xphyle](https://travis-ci.org/jdidion/xphyle.svg?branch=master)
 [![Coverage Status](https://coveralls.io/repos/github/jdidion/xphyle/badge.svg?branch=master)](https://coveralls.io/github/jdidion/xphyle?branch=master)
+![http://xphyle.readthedocs.io/en/latest/?badge=latest](https://xphyle.readthedocs.io)
 
 # xphyle: extraordinarily simple file handling
 
 xphyle is a small python (3.3+) library that makes it easy to open compressed
 files for the highest-possible performance available on your system. It also
 provides some convenience methods for working with file paths.
-
-[Documentation](https://xphyle.readthedocs.io)
 
 # Installation
 
@@ -56,6 +55,8 @@ lines = list(safe_iter('infile.gz'))
 # Sum the rows in a compressed file where each line is an integer value
 total = sum(i for i in safe_iter('infile.gz', convert=int))
 ```
+
+See the [Documentation](https://xphyle.readthedocs.io) for full usage information.
 
 # Roadmap
 
