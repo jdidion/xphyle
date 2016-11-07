@@ -5,7 +5,8 @@
 
 # xphyle: extraordinarily simple file handling
 
-![](https://github.com/jdidion/xphyle/blob/master/docs/logo.png?raw=true =200x200)
+<img src="https://github.com/jdidion/xphyle/blob/master/docs/logo.png?raw=true"
+     alt="logo" width="200" height="200">
 
 xphyle is a small python (3.3+) library that makes it easy to open compressed
 files for the highest-possible performance available on your system. It also
