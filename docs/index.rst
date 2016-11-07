@@ -21,7 +21,7 @@ xphyle is available from pypi::
 
 xphyle tries to use the compression programs installed on your local machine (e.g. gzip, bzip2); if it can't, it will use the built-in python libraries (which are slower). Thus, xphyle has no required dependencies, but we recommend that if you install gzip, etc. if you don't already have them.
 
-xphyle will use `pigz <http://zlib.net/pigz/>`_ for multi-threaded gzip compression if it is available. Multithreading is support disabled by default; to set the number of threads that xphyle should use::
+xphyle will use `pigz <http://zlib.net/pigz/>`_ for multi-threaded gzip compression if it is available. Multithreading support is disabled by default; to set the number of threads that xphyle should use::
 
     xphyle.configure(threads=4)
 
@@ -52,10 +52,10 @@ For system-level operations, an executable is required that reads from stdin and
     
     xphyle.configure(system_progress=True)
 
-You can also use your own preferred program by passing a tuple with the command and arguments (:ref:`<xphyle.progress.system_progress_command>` simplifies this)::
+You can also use your own preferred program by passing a tuple with the command and arguments (:py:func:`<xphyle.progress.system_progress_command>` simplifies this)::
     
     xphyle.configure(system_progress=xphyle.progress.system_progress_command(
-        'pv', '-pre', require=True)
+        'pv', '-pre', require=True))
 
 Opening files
 -------------
@@ -66,7 +66,7 @@ Other useful tools
 Extending xphyle
 ----------------
 
-You can add support for another compression format by extending one of the base classes in :ref:`<xphyle.format>`::
+You can add support for another compression format by extending one of the base classes in :py:mod:`<xphyle.format>`::
     
     class FooFormat(SingleExeCompressionFormat):
         """Implementation of CompressionFormat for bzip2 files.
