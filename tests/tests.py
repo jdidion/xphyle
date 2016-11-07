@@ -50,7 +50,19 @@ class XphyleTests(TestCase):
         with open(path) as fh:
             with open_(fh, compression=False) as fh2:
                 self.assertEqual(fh2.read(), 'foo')
-
+    
+    def test_open_safe(self):
+        with self.assertRaises(IOError):
+            with open_('foobar', mode='r', errors=True) as fh:
+                pass
+        with self.assertRaises(ValueError):
+            with open_(None, mode='r', errors=True) as fh:
+                pass
+        with open_('foobar', mode='r', errors=False) as fh:
+            self.assertIsNone(fh)
+        with open_(None, mode='r', errors=False) as fh:
+            self.assertIsNone(fh)
+    
     def test_xopen_invalid(self):
         # invalid path
         with self.assertRaises(ValueError):

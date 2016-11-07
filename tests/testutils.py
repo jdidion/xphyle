@@ -13,22 +13,21 @@ class UtilsTests(TestCase):
     def tearDown(self):
         self.root.close()
     
-    def test_safe_read(self):
-        self.assertEqual(safe_read('foobar'), '')
-        self.assertListEqual(list(safe_iter('foobar')), [])
+    def test_iter_lines(self):
+        self.assertListEqual(list(iter_lines('foobar', errors=False)), [])
         
         path = self.root.make_file()
         with open(path, 'wt') as o:
             o.write("1\n2\n3")
-        self.assertEqual(safe_read(path), "1\n2\n3")
         self.assertListEqual(
-            list(safe_iter(path)),
+            list(iter_lines(path)),
             ['1','2','3'])
         self.assertListEqual(
-            list(safe_iter(path, convert=int)),
+            list(iter_lines(path, convert=int)),
             [1,2,3])
 
     def test_read_chunked(self):
+        self.assertListEqual([], list(chunked_iter('foobar', errors=False)))
         path = self.root.make_file()
         with open(path, 'wt') as o:
             o.write("1234567890")
@@ -36,17 +35,23 @@ class UtilsTests(TestCase):
         self.assertListEqual([b'123', b'456', b'789', b'0'], chunks)
 
     def test_write_iterable(self):
+        linesep_len = len(os.linesep)
         path = self.root.make_file()
-        write_iterable(['foo'], path, linesep=None)
-        self.assertEqual(safe_read(path), 'foo')
+        self.assertEquals(3, write_iterable(['foo'], path, linesep=None))
+        self.assertEqual(list(iter_lines(path)), ['foo'])
         path = self.root.make_file()
-        write_iterable(('foo', 'bar', 'baz'), path, linesep=None)
+        self.assertEquals(
+            9 + (2*linesep_len),
+            write_iterable(('foo', 'bar', 'baz'), path, linesep=None))
         self.assertEqual(
-            safe_read(path),
-            os.linesep.join(('foo','bar','baz')))
+            list(iter_lines(path)),
+            ['foo','bar','baz'])
         path = self.root.make_file()
-        write_iterable(('foo', 'bar', 'baz'), path, linesep='|')
-        self.assertEqual(safe_read(path), 'foo|bar|baz')
+        self.assertEquals(
+            11, write_iterable(('foo', 'bar', 'baz'), path, linesep='|'))
+        self.assertEqual(list(iter_lines(path)), ['foo|bar|baz'])
+        path = self.root.make_file(mode='r')
+        self.assertEqual(-1, write_iterable(['foo'], path, errors=False))
     
     def test_read_dict(self):
         path = self.root.make_file()
@@ -64,10 +69,12 @@ class UtilsTests(TestCase):
         path = self.root.make_file()
         write_dict(OrderedDict([('foo',1), ('bar',2)]), path, linesep=None)
         self.assertEqual(
-            safe_read(path),
-            os.linesep.join(('foo=1','bar=2')))
+            list(iter_lines(path)),
+            ['foo=1','bar=2'])
     
     def test_tsv(self):
+        self.assertListEqual([], list(delimited_file_iter('foobar', errors=False)))
+        
         path = self.root.make_file()
         with open(path, 'wt') as o:
             o.write('a\tb\tc\n')
@@ -229,12 +236,17 @@ class UtilsTests(TestCase):
             self.assertEqual(i.read(), 'foo')
     
     def test_linecount(self):
+        self.assertEqual(-1, linecount('foobar', errors=False))
         path = self.root.make_file()
         with open(path, 'wt') as o:
             for i in range(100):
                 o.write(random_text())
                 if i != 99:
                     o.write('\n')
+        with self.assertRaises(ValueError):
+            linecount(path, buffer_size=-1)
+        with self.assertRaises(ValueError):
+            linecount(path, mode='wb')
         self.assertEqual(100, linecount(path))
     
     def test_linecount_empty(self):

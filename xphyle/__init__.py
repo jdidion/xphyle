@@ -63,16 +63,20 @@ def guess_file_format(path : 'str') -> 'str':
     return fmt
 
 @contextmanager
-def open_(f, mode : 'str' = 'r', **kwargs):
+def open_(f, mode : 'str' = 'r', errors : 'bool' = True, **kwargs):
     """Context manager that frees you from checking if an argument is a path
     or a file object. Calls ``xopen`` to open files.
     
     Args:
         f: A path or file-like object
+        mode: The file open mode
+        errors: Whether to raise an error if there is a problem opening the
+            file. If False, yields None when there is an error.
         kwargs: Additional args to pass through to xopen (if ``f`` is a path)
     
     Yields:
-        A file-like object
+        A file-like object, or None if ``errors`` is False and there is a
+        problem opening the file.
     
     Examples:
         with open_('myfile') as infile:
@@ -84,8 +88,16 @@ def open_(f, mode : 'str' = 'r', **kwargs):
     """
     if isinstance(f, str):
         kwargs['context_wrapper'] = True
-        with xopen(f, mode, **kwargs) as fp:
-            yield fp
+        try:
+            with xopen(f, mode, **kwargs) as fp:
+                yield fp
+        except IOError:
+            if errors:
+                raise
+            else:
+                yield None
+    elif f is None and errors:
+        raise ValueError("'f' cannot be None")
     else:
         yield f
 
