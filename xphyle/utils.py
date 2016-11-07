@@ -96,6 +96,8 @@ def write_iterable(iterable : 'iterable', path : 'str', linesep : 'str' = '\n',
     with open_(path, mode='w', **kwargs) as f:
         f.write(linesep.join(convert(s) for s in iterable))
 
+# key=value files
+
 def read_dict(path, sep : 'str' = '=', convert : 'callable' = None,
               ordered : 'bool' = False, **kwargs) -> 'dict':
     """Read lines from simple property file (key=value). Comment lines (starting
@@ -139,7 +141,7 @@ def write_dict(d : 'dict', path : 'str', sep : 'str' = '=',
         ("{}{}{}".format(k, sep, convert(v)) for k, v in d.items()),
         path, linesep=linesep)
 
-## Delimited files
+## Other delimited files
 
 def delimited_file_iter(path : 'str', sep : 'str' = '\t',
                         header : 'bool|iterable' = False,
@@ -333,17 +335,17 @@ def uncompress_file(compressed_file, dest_file=None,
 # Some useful FileEventListeners
 
 class CompressOnClose(FileEventListener):
-    """Compress a file."""
+    """Compress a file after it is closed."""
     def execute(self, path, *args, **kwargs):
         self.compressed_path = compress_file(path, *args, **kwargs)
 
 class MoveOnClose(FileEventListener):
-    """Move a file."""
+    """Move a file after it is closed.."""
     def execute(self, path, dest):
         shutil.move(path, dest)
 
 class RemoveOnClose(FileEventListener):
-    """Remove a file."""
+    """Remove a file after it is closed.."""
     def execute(self, path):
         os.remove(path)
 
@@ -422,12 +424,14 @@ def linecount(f, linesep : 'str' = None, buf_size : 'int' = 1024 * 1024) -> 'int
         The number of lines in the file. Blank lines (including the last line
         in the file) are included.
     """
+    if buf_size < 1:
+        raise ValueError("'bufsize' must be >= ")
     if linesep is None:
         linesep = os.linesep.encode()
     with open_(f, 'rb') as fh:
         read_f = fh.read # loop optimization
         buf = read_f(buf_size)
-        if len(buf) == 0:
+        if len(buf) == 0: # empty file case
             return 0
         lines = 1
         while buf:
