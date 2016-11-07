@@ -19,7 +19,7 @@ pip install xphyle
 
 ```python
 from xphyle import *
-from xphyle.paths import STDIN
+from xphyle.paths import STDIN, STDOUT
 
 # Open a compressed file...
 myfile = xopen('infile.gz')
