@@ -232,12 +232,12 @@ def guess_compression_format(name : 'str') -> 'str':
     """Guess the compression format by name or file extension.
     """
     if name in compression_formats:
-        return name
+        return compression_formats[name].name
     i = name.rfind(os.extsep)
     if i >= 0:
         ext = name[(i+1):]
         if ext in compression_formats:
-            return ext
+            return compression_formats[ext].name
     return None
 
 def guess_format_from_file_header(path : 'str') -> 'str':

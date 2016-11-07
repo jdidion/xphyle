@@ -34,7 +34,7 @@ class ProgressTests(TestCase):
         progress = MockProgress()
         xphyle.configure(progress)
         with intercept_stdin('foo\nbar\nbaz'):
-            with xopen(STDIN, 'rt', context_wrapper=True) as o:
+            with xopen(STDIN, 'rt', context_wrapper=True, compression=False) as o:
                 lines = list(o)
                 self.assertListEqual(['foo\n','bar\n','baz\n'], lines)
         self.assertEquals(3, progress.count)
