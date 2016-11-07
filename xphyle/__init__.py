@@ -103,7 +103,7 @@ def open_(f, mode : 'str' = 'r', errors : 'bool' = True, **kwargs):
 
 def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
           use_system : 'bool' = True, context_wrapper : 'bool' = True,
-          **kwargs) -> 'file':
+          validate : 'bool' = True, **kwargs) -> 'file':
     """
     Replacement for the `open` function that automatically handles
     compressed files. If `use_system==True` and the file is compressed,
@@ -117,22 +117,24 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
     
     Args:
         path: A relative or absolute path. Must be a string. If
-          you have a situation you want to automatically handle either
-          a path or a file object, use the ``open_`` wrapper instead.
+            you have a situation you want to automatically handle either
+            a path or a file object, use the ``open_`` wrapper instead.
         mode: Some combination of the open mode ('r', 'w', 'a', or 'x')
-          and the format ('b' or 't'). If the later is not given, 't'
-          is used by default.
+            and the format ('b' or 't'). If the later is not given, 't'
+            is used by default.
         compression: If None or True, compression type (if any) will be
-          determined automatically. If False, no attempt will be made to
-          determine compression type. Otherwise this must specify the
-          compression type (e.g. 'gz'). See `xphyle.compression` for
-          details. Note that compression will *not* be guessed for
-          '-' (stdin).
+            determined automatically. If False, no attempt will be made to
+            determine compression type. Otherwise this must specify the
+            compression type (e.g. 'gz'). See `xphyle.compression` for
+            details. Note that compression will *not* be guessed for
+            '-' (stdin).
         use_system: Whether to attempt to use system-level compression
-          programs.
+            programs.
         context_wrapper: If True and ``path`` == '-' or '_', returns
-          a ContextManager (i.e. usable with ``with``) that wraps the
-          system stream and is no-op on close.
+            a ContextManager (i.e. usable with ``with``) that wraps the
+            system stream and is no-op on close.
+        validate: Whether to validate that a file is acutally of the format
+            specified by ``compression``.
         kwargs: Additional keyword arguments to pass to ``open``.
     
     Returns:
@@ -143,6 +145,8 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
             * ``compression==True`` and compression format cannot be
             determined
             * the specified compression format is invalid
+            * ``validate==True`` and the specified compression format is not the
+                acutal format of the file
             * the path or mode are invalid
     """
     if not isinstance(path, str):
@@ -161,6 +165,10 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
     
     # The file handle we will open
     fh = None
+    # Whether to try and guess file format
+    guess_format = compression in (None, True)
+    # Whether to validate that the actually compression format matches expected
+    validate = validate and compression and not guess_format
     # Guessed compression type, if compression in (None, True)
     guess = None
     # Whether the file object is a stream (e.g. stdout or URL)
@@ -176,12 +184,12 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
             fh = sys.stderr
         else:
             fh = sys.stdin if 'r' in mode else sys.stdout
-        if compression:
+        if compression is not False:
             fh = fh.buffer
-            if compression in (None, True) and 'r' in mode:
-                if not hasattr(fh, 'peek'):
-                    fh = io.BufferedReader(fh)
-                guess = guess_format_from_buffer(fh)
+        if 'r' in mode and (validate or guess_format):
+            if not hasattr(fh, 'peek'):
+                fh = io.BufferedReader(fh)
+            guess = guess_format_from_buffer(fh)
         if not (compression or guess):
             is_stream = True
             if 'b' in mode:
@@ -195,7 +203,7 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
                 raise ValueError("URLs can only be opened in read mode")
             
             fh = open_url(path)
-            if not fh: # pragma: no cover
+            if not fh:
                 raise ValueError("Could not open URL {}".format(path))
             
             is_stream = True
@@ -203,26 +211,36 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
             use_system = False
             
             # Get compression format if not specified
-            if compression in (None, True):
-                # Check if the MIME type indicates that the file is compressed
-                mime = get_url_mime_type(fh)
-                if mime:
-                    guess = get_format_for_mime_type(mime)
-                # Try to guess from the file name
-                if not guess and name:
-                    guess = guess_file_format(name)
+            if validate or guess_format:
+                guess = guess_format_from_buffer(fh)
+                # The following code is never used, unless there is some
+                # scenario in which the file type cannot be guessed from
+                # the header bytes.
+                # if guess is None and guess_format:
+                #     # Check if the MIME type indicates that the file is
+                #     # compressed
+                #     mime = get_url_mime_type(fh)
+                #     if mime:
+                #         guess = get_format_for_mime_type(mime)
+                #     # Try to guess from the file name
+                #     if not guess and name:
+                #         guess = guess_file_format(name)
         
         # Local file handling
         else:
             if 'r' in mode:
                 path = check_readable_file(path)
+                if validate or guess_format:
+                    guess = guess_format_from_file_header(path)
             else:
                 path = check_writeable_file(path)
-            
-            if compression in (None, True):
-                guess = guess_file_format(path)
+                if guess_format:
+                    guess = guess_compression_format(path)
     
-    if guess:
+    if validate and guess != compression:
+        raise ValueError("Acutal compression format {} does not match expected "
+                         "format {}".format(guess, compression))
+    elif guess:
         compression = guess
     elif compression is True:
         raise ValueError(
@@ -230,6 +248,7 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
     
     if compression:
         fmt = get_compression_format(compression)
+        compression = fmt.name
         fh = fmt.open_file(fh or path, mode, use_system=use_system, **kwargs)
     elif not fh:
         fh = open(path, mode, **kwargs)

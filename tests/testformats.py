@@ -24,9 +24,9 @@ xz_path = get_format('xz').executable_path
 
 class CompressionTests(TestCase):
     def test_guess_format(self):
-        self.assertEqual('gz', guess_compression_format('gz'))
-        self.assertEqual('gz', guess_compression_format('.gz'))
-        self.assertEqual('gz', guess_compression_format('foo.gz'))
+        self.assertEqual('gzip', guess_compression_format('gz'))
+        self.assertEqual('gzip', guess_compression_format('.gz'))
+        self.assertEqual('gzip', guess_compression_format('foo.gz'))
     
     def test_invalid_format(self):
         self.assertIsNone(guess_compression_format('foo'))

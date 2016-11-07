@@ -37,7 +37,7 @@ class XphyleTests(TestCase):
         path = self.root.make_file(suffix='.gz')
         with gzip.open(path, 'wt') as o:
             o.write('foo')
-        self.assertEqual(guess_file_format(path), 'gz')
+        self.assertEqual(guess_file_format(path), 'gzip')
         path = self.root.make_file()
         with gzip.open(path, 'wt') as o:
             o.write('foo')
@@ -84,26 +84,26 @@ class XphyleTests(TestCase):
     def test_xopen_std(self):
         # Try stdin
         with intercept_stdin('foo\n'):
-            with xopen(STDIN, 'r', context_wrapper=True) as i:
+            with xopen(STDIN, 'r', context_wrapper=True, compression=False) as i:
                 content = i.read()
                 self.assertEqual(content, 'foo\n')
         # Try stdout
         i = StringIO()
         with intercept_stdout(i):
-            with xopen(STDOUT, 'w', context_wrapper=True) as o:
+            with xopen(STDOUT, 'w', context_wrapper=True, compression=False) as o:
                 o.write('foo')
             self.assertEqual(i.getvalue(), 'foo')
         # Try stderr
         i = StringIO()
         with intercept_stderr(i):
-            with xopen(STDERR, 'w', context_wrapper=True) as o:
+            with xopen(STDERR, 'w', context_wrapper=True, compression=False) as o:
                 o.write('foo')
             self.assertEqual(i.getvalue(), 'foo')
         
         # Try binary
         i = BytesIO()
         with intercept_stdout(TextIOWrapper(i)):
-            with xopen(STDOUT, 'wb', context_wrapper=True) as o:
+            with xopen(STDOUT, 'wb', context_wrapper=True, compression=False) as o:
                 o.write(b'foo')
             self.assertEqual(i.getvalue(), b'foo')
         
@@ -111,7 +111,7 @@ class XphyleTests(TestCase):
         i = BytesIO()
         with intercept_stdout(TextIOWrapper(i)):
             with xopen(STDOUT, 'wt', compression='gz') as o:
-                self.assertEqual(o.compression, 'gz')
+                self.assertEqual(o.compression, 'gzip')
                 o.write('foo')
             self.assertEqual(gzip.decompress(i.getvalue()), b'foo')
     
@@ -127,15 +127,22 @@ class XphyleTests(TestCase):
             xopen('foobar', 'r')
         path = self.root.make_file(suffix='.gz')
         with xopen(path, 'w', compression=True) as o:
-            self.assertEqual(o.compression, 'gz')
+            self.assertEqual(o.compression, 'gzip')
             o.write('foo')
         with gzip.open(path, 'rt') as i:
             self.assertEqual(i.read(), 'foo')
+        with self.assertRaises(ValueError):
+            with xopen(path, 'rt', compression='bz2', validate=True):
+                pass
     
     @skipIf(no_internet(), "No internet connection")
     def test_xopen_url(self):
+        badurl = 'http://blorf.blurp'
+        with self.assertRaises(ValueError):
+            xopen(badurl)
         url = 'https://github.com/jdidion/xphyle/blob/master/tests/foo.gz?raw=True'
         with self.assertRaises(ValueError):
             xopen(url, 'w')
         with open_(url, 'rt') as i:
-            self.assertEqual(i.read(), 'foo\n')
+            self.assertEqual('gzip', i.compression)
+            self.assertEqual('foo\n', i.read())
