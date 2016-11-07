@@ -47,6 +47,8 @@ class XphyleTests(TestCase):
         path = self.root.make_file(contents='foo')
         with open_(path, compression=False) as fh:
             self.assertEqual(fh.read(), 'foo')
+        with open_(path, compression=False) as fh:
+            self.assertEqual(next(fh), 'foo')
         with open(path) as fh:
             with open_(fh, compression=False) as fh2:
                 self.assertEqual(fh2.read(), 'foo')
@@ -109,6 +111,7 @@ class XphyleTests(TestCase):
         i = BytesIO()
         with intercept_stdout(TextIOWrapper(i)):
             with xopen(STDOUT, 'wt', compression='gz') as o:
+                self.assertEqual(o.compression, 'gz')
                 o.write('foo')
             self.assertEqual(gzip.decompress(i.getvalue()), b'foo')
     
@@ -116,6 +119,7 @@ class XphyleTests(TestCase):
         # Try autodetect compressed
         with intercept_stdin(gzip.compress(b'foo\n'), is_bytes=True):
             with xopen(STDIN, 'rt', compression=True) as i:
+                self.assertEqual(i.compression, 'gzip')
                 self.assertEqual(i.read(), 'foo\n')
     
     def test_xopen_file(self):
@@ -123,6 +127,7 @@ class XphyleTests(TestCase):
             xopen('foobar', 'r')
         path = self.root.make_file(suffix='.gz')
         with xopen(path, 'w', compression=True) as o:
+            self.assertEqual(o.compression, 'gz')
             o.write('foo')
         with gzip.open(path, 'rt') as i:
             self.assertEqual(i.read(), 'foo')
