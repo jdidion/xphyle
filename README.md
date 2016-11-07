@@ -56,7 +56,7 @@ lines = list(safe_iter('infile.gz'))
 total = sum(safe_iter('infile.gz', convert=int))
 ```
 
-See the [Documentation](https://xphyle.readthedocs.io) for full usage information.
+See the [Documentation](http://xphyle.readthedocs.io/en/latest/?badge=latest) for full usage information.
 
 # Roadmap
 
