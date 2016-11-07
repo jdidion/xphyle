@@ -62,22 +62,4 @@ See the [Documentation](http://xphyle.readthedocs.io/en/latest/?badge=latest) fo
 
 # Roadmap
 
-## 0.8
-
-* Documentation
-
-## 1.0
-
-* Add support for archive formats
-    * tar, zip
-    * Recognize .tgz, .tbz2, and .tlz extensions
-
-## Beyond
-
-* Support other popular compression formats:
-    * LZW: the only decent library is python-lzw, and it doesn't provide an open method
-    * Snappy (via python-snappy): this is problematic since it depends on libsnappy, with no pure python fallback
-* Support other popular archive formats
-    * 7zip archives: this is problematic as it depends on 7zip being installed, with no pure python fallback
-    * Consider using libarchive (if installed) via one of the several available python packages. Will have to do performance testing to determine whether this should be the first option or the second to try.
-    * Which others? arc, cab (windows-specific), dmg (mac-specific), iso9660, lzh, rar, xar, zz
+The xphyle public API is now set. The 1.0 release is imminent, pending completion of the user documentation. Future releases will be mapped using [GitHub Projects](https://github.com/jdidion/xphyle/projects).
