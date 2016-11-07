@@ -1,7 +1,7 @@
 ![https://pypi.python.org/pypi/xphyle](https://img.shields.io/pypi/v/xphyle.svg?branch=master)
 ![https://travis-ci.org/jdidion/xphyle](https://travis-ci.org/jdidion/xphyle.svg?branch=master)
 [![Coverage Status](https://coveralls.io/repos/github/jdidion/xphyle/badge.svg?branch=master)](https://coveralls.io/github/jdidion/xphyle?branch=master)
-![http://xphyle.readthedocs.io/en/latest/?badge=latest](https://xphyle.readthedocs.io)
+![http://xphyle.readthedocs.io/en/latest/?badge=latest](http://xphyle.readthedocs.io/en/latest/)
 
 # xphyle: extraordinarily simple file handling
 
@@ -69,12 +69,13 @@ See the [Documentation](https://xphyle.readthedocs.io) for full usage informatio
 * Add support for archive formats
     * tar, zip
     * Recognize .tgz, .tbz2, and .tlz extensions
-    * Support 7zip archives: this is problematic as it depends on 7zip being installed, with no pure python fallback
-    * Consider using libarchive (if installed) via one of the several available python packages. Will have to do performance testing to determine whether this should be the first option or the second to try.
-    * Many other archive formats that might be supported - which are most important? arc, cab (windows-specific), dmg (mac-specific), iso9660, lzh, rar, xar, zz
 
 ## Beyond
 
-* Consider natively supporting other popular compression formats:
+* Support other popular compression formats:
     * LZW: the only decent library is python-lzw, and it doesn't provide an open method
     * Snappy (via python-snappy): this is problematic since it depends on libsnappy, with no pure python fallback
+* Support other popular archive formats
+    * 7zip archives: this is problematic as it depends on 7zip being installed, with no pure python fallback
+    * Consider using libarchive (if installed) via one of the several available python packages. Will have to do performance testing to determine whether this should be the first option or the second to try.
+    * Which others? arc, cab (windows-specific), dmg (mac-specific), iso9660, lzh, rar, xar, zz
