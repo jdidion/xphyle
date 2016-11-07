@@ -454,7 +454,7 @@ class CompressionFormat(FileFormat):
     
     def compress_file(self, source, dest=None, keep : 'bool' = True,
                       compresslevel : 'int' = None,
-                      use_system : 'bool' = True) -> 'str':
+                      use_system : 'bool' = True, **kwargs) -> 'str':
         """Compress data from one file and write to another.
         
         Args:
@@ -464,6 +464,8 @@ class CompressionFormat(FileFormat):
             keep: Whether to keep the source file
             compresslevel: Compression level
             use_system: Whether to try to use system-level compression
+            kwargs: Additional arguments to pass to the open method when opening
+                the destination file
         
         Returns:
             Path to the destination file
@@ -498,7 +500,7 @@ class CompressionFormat(FileFormat):
                 p.communicate()
             else:
                 source_file = open(source, 'rb') if source_is_path else source
-                dest_file = self.open_file_python(dest, 'wb')
+                dest_file = self.open_file_python(dest, 'wb', **kwargs)
                 try:
                     # Perform sequential compression as the source
                     # file might be quite large
@@ -519,7 +521,7 @@ class CompressionFormat(FileFormat):
         return dest
     
     def uncompress_file(self, source, dest=None, keep : 'bool' = True,
-                        use_system : 'bool' = True) -> 'str':
+                        use_system : 'bool' = True, **kwargs) -> 'str':
         """Uncompress data from one file and write to another.
         
         Args:
@@ -528,6 +530,8 @@ class CompressionFormat(FileFormat):
                 If None, the file name is determined from ``source``.
             keep: Whether to keep the source file
             use_system: Whether to try to use system-level compression
+            kwargs: Additional arguments to passs to the open method when
+                opening the compressed file
         
         Returns:
             Path to the destination file
@@ -544,7 +548,9 @@ class CompressionFormat(FileFormat):
         if dest is None:
             in_place = True
             if len(source_parts) > 2:
-                dest = os.path.join(*source_parts[0:2]) + ''.join(source_parts[2:-1])
+                dest = (
+                    os.path.join(*source_parts[0:2]) +
+                    ''.join(source_parts[2:-1]))
             else:
                 raise Exception("Cannot determine path for uncompressed file")
         dest_is_path = isinstance(dest, str)
@@ -560,7 +566,7 @@ class CompressionFormat(FileFormat):
                 p = wrap_subprocess(cmd, stdin=psrc, stdout=dest_file)
                 p.communicate()
             else:
-                source_file = self.open_file_python(source, 'rb')
+                source_file = self.open_file_python(source, 'rb', **kwargs)
                 try:
                     # Perform sequential decompression as the source
                     # file might be quite large
