@@ -29,19 +29,20 @@ def safe_read(path : 'str', **kwargs) -> 'str':
         The contents of the file as a string, or empty string if the file does
         not exist.
     """
-    try:
-        path = check_readable_file(path)
-        with open_(path, mode='rt', **kwargs) as f:
-            return f.read()
-    except IOError:
-        return ""
+    if isinstance(path, str):
+        try:
+            path = check_readable_file(path)
+        except IOError:
+            return ""
+    with open_(path, mode='rt', **kwargs) as f:
+        return f.read()
     
-def safe_iter(path : 'str', convert : 'callable' = None,
+def safe_iter(path : 'str|file', convert : 'callable' = None,
               strip_linesep : 'bool' = True, **kwargs) -> 'generator':
     """Iterate over a file if it exists.
     
     Args:
-        path: Path to the file.
+        path: Path to the file, or a file-like object
         convert: Function to call on each line in the file.
         kwargs: Additional arguments to pass to open_
     
@@ -49,10 +50,11 @@ def safe_iter(path : 'str', convert : 'callable' = None,
         Iterator over the lines of a file, with line endings stripped, or
         None if the file doesn't exist or is not readable.
     """
-    try:
-        path = check_readable_file(path)
-    except IOError:
-        return ()
+    if isinstance(path, str):
+        try:
+            path = check_readable_file(path)
+        except IOError:
+            return ()
     with open_(path, **kwargs) as f:
         itr = f
         if strip_linesep:
@@ -64,10 +66,11 @@ def safe_iter(path : 'str', convert : 'callable' = None,
 
 def chunked_iter(path : 'str', chunksize : 'int,>0' = 1024,
                  **kwargs) -> 'generator':
-    """Iterate over a file in chunks. The mode will always be overridden to 'rb'.
+    """Iterate over a file in chunks. The mode will always be overridden
+    to 'rb'.
     
     Args:
-        path: Path to the file
+        path: Path to the file, or a file-like object
         chunksize: Number of bytes to read at a time
         kwargs: Additional arguments to pass top ``open_``
     
@@ -79,13 +82,14 @@ def chunked_iter(path : 'str', chunksize : 'int,>0' = 1024,
         for chunk in iter_file_chunked(infile, chunksize):
             yield chunk
 
-def write_iterable(iterable : 'iterable', path : 'str', linesep : 'str' = '\n',
-                   convert : 'callable' = str, **kwargs):
+def write_iterable(iterable : 'iterable', path : 'str|file',
+                   linesep : 'str' = '\n', convert : 'callable' = str,
+                   **kwargs):
     """Write delimiter-separated strings to a file.
     
     Args:
         iterable: An iterable
-        path: Path to the file
+        path: Path to the file, or a file-like object
         linesep: The delimiter to use to separate the strings, or
             ``os.linesep`` if None (defaults to '\\n')
         convert: Function that converts a value to a string
@@ -98,7 +102,7 @@ def write_iterable(iterable : 'iterable', path : 'str', linesep : 'str' = '\n',
 
 # key=value files
 
-def read_dict(path, sep : 'str' = '=', convert : 'callable' = None,
+def read_dict(path: 'str|file', sep : 'str' = '=', convert : 'callable' = None,
               ordered : 'bool' = False, **kwargs) -> 'dict':
     """Read lines from simple property file (key=value). Comment lines (starting
     with '#') are ignored.

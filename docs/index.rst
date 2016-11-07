@@ -57,11 +57,15 @@ You can also use your own preferred program by passing a tuple with the command 
     xphyle.configure(system_progress=xphyle.progress.system_progress_command(
         'pv', '-pre', require=True))
 
-Opening files
--------------
+Working with files
+------------------
+
+The heart of xphyle is the simplicity of working with files. There is a single interface for opening "file-like objects", regardless of whether they represent local files, remote files (referenced by URLs), or system streams (stdin, stdout, stderr); and regardless of whether they are compressed or encrypted.
 
 Other useful tools
 ------------------
+
+
 
 Extending xphyle
 ----------------

@@ -62,4 +62,17 @@ See the [Documentation](http://xphyle.readthedocs.io/en/latest/?badge=latest) fo
 
 # Roadmap
 
-The xphyle public API is now set. The 1.0 release is imminent, pending completion of the user documentation. Future releases will be mapped using [GitHub Projects](https://github.com/jdidion/xphyle/projects).
+## 0.8
+
+* Generalize file translation: make compression, encryption, and other transformations have the same interface, and make them composable.
+
+## 0.9
+
+* Encryption support based on cryptography (https://cryptography.io/en/latest/)
+* Automatically generate file hashes using python hashlib
+
+## 1.0
+
+* User documentation
+
+Beyond 1.0, releases will be mapped using [GitHub Projects](https://github.com/jdidion/xphyle/projects).
