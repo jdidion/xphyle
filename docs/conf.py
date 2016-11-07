@@ -77,7 +77,7 @@ exclude_patterns = [
     'setup.py',
     'build',
     'dist',
-	'_build'
+    '_build'
 ]
 
 # The reST default role (used for this markup: `text`) to use for all
