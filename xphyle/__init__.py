@@ -236,9 +236,9 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
     
     if context_wrapper:
         if is_stream:
-            fh = StreamWrapper(fh, name=name)
+            fh = StreamWrapper(fh, name=name, compression=compression)
         else:
-            fh = FileWrapper(fh)
+            fh = FileWrapper(fh, compression=compression)
     
     return fh
 
@@ -252,15 +252,22 @@ class Wrapper(object):
     Args:
         fileobj: The file-like object to wrap
     """
-    def __init__(self, fileobj):
+    def __init__(self, fileobj, compression=False):
         object.__setattr__(self, '_fileobj', fileobj)
+        object.__setattr__(self, 'compression', compression)
         object.__setattr__(self, '_listeners', defaultdict(lambda: []))
     
     def __getattr__(self, name):
         return getattr(self._fileobj, name)
     
+    def __next__(self):
+        return next(iter(self))
+    
     def __iter__(self):
-        return iter(xphyle.progress.wrap(self._fileobj, desc=self.name))
+        if not hasattr(self, '_iterator'):
+            setattr(self, '_iterator',
+                    iter(xphyle.progress.wrap(self._fileobj, desc=self.name)))
+        return self._iterator
     
     def __enter__(self):
         if self.closed:
@@ -272,6 +279,8 @@ class Wrapper(object):
     
     def close(self):
         self._close()
+        if hasattr(self, '_iterator'):
+            delattr(self, '_iterator')
         if 'close' in self._listeners:
             for listener in self._listeners['close']:
                 listener(self)
@@ -297,13 +306,13 @@ class FileWrapper(Wrapper):
         mode: File open mode
         kwargs: Additional arguments to pass to xopen
     """
-    def __init__(self, source, mode='w', **kwargs):
+    def __init__(self, source, mode='w', compression=False, **kwargs):
         if isinstance(source, str):
             path = source
-            source = xopen(source, mode=mode, **kwargs)
+            source = xopen(source, mode=mode, compression=compression, **kwargs)
         else:
             path = source.name
-        super(FileWrapper, self).__init__(source)
+        super(FileWrapper, self).__init__(source, compression=compression)
         object.__setattr__(self, '_path', path)
 
 class FileEventListener(object):
@@ -328,13 +337,13 @@ class StreamWrapper(Wrapper):
     Args:
         stream: The stream to wrap
     """
-    def __init__(self, stream, name=None):
+    def __init__(self, stream, name=None, compression=False):
         if name is None:
             try:
                 name = self._stream.name
             except:
                 name = None
-        super(StreamWrapper, self).__init__(stream)
+        super(StreamWrapper, self).__init__(stream, compression=compression)
         object.__setattr__(self, 'name', name)
         object.__setattr__(self, 'closed', False)
     
