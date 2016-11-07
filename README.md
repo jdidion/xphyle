@@ -29,7 +29,7 @@ myfile = xopen('infile.gz')
 stdin = xopen(STDIN)
 
 # We have to tell xopen what kind of compression
-# to use when writing
+# to use when writing to stdout
 stdout = xopen(STDOUT, compression='gz')
 
 # Print all lines in a compressed file...
@@ -49,11 +49,11 @@ def dostuff(path_or_file):
             print(line)
 
 # Read all lines in a compressed file into a list
-from xphyle.utils import safe_file_iter
+from xphyle.utils import safe_iter
 lines = list(safe_iter('infile.gz'))
 
 # Sum the rows in a compressed file where each line is an integer value
-total = sum(i for i in safe_iter('infile.gz', convert=int))
+total = sum(safe_iter('infile.gz', convert=int))
 ```
 
 See the [Documentation](https://xphyle.readthedocs.io) for full usage information.

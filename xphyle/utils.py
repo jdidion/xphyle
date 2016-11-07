@@ -52,7 +52,7 @@ def safe_iter(path : 'str', convert : 'callable' = None,
     try:
         path = check_readable_file(path)
     except IOError:
-        return
+        return ()
     with open_(path, **kwargs) as f:
         itr = f
         if strip_linesep:
