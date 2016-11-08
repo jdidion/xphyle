@@ -5,6 +5,7 @@ managing files. All of these functions are 'safe', meaning that if you pass
 handled gracefully.
 """
 from collections import OrderedDict, Iterable
+import copy
 import csv
 import io
 from itertools import cycle
@@ -334,22 +335,47 @@ class RemoveOnClose(FileEventListener):
     def execute(self, path):
         os.remove(path)
 
-# Misc
+# Replacement for fileinput, plus fileoutput
 
 class FileManager(object):
-    """Dict-like container for files. Has a ``close`` method that closes
-    all open files.
+    """Dict-like container for files. Files are opened lazily (upon first
+    request) using ``xopen``.
+    
+    Args:
+        files: An iterable of files to add. Each item can either be a string
+            path or a (key, fileobj) tuple.
+        kwargs: Default arguments to pass to xopen
     """
-    def __init__(self):
-        self.files = {}
+    def __init__(self, files=None, **kwargs):
+        self.files = OrderedDict()
+        self.paths = {}
+        self.default_open_args = kwargs
+        if files:
+            for f in files:
+                if isinstance(f, str):
+                    self.add(f)
+                else:
+                    self.add(f[1], key=f[0])
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exception_type, exception_value, traceback):
+        self.close()
+    
+    def __del__(self):
+        self.close()
     
     def __len__(self):
         return len(self.files)
     
-    def __getitem__(self, key : 'str'):
-        return self.files[key]
+    def __getitem__(self, key : 'str|int'):
+        f = self.get(key)
+        if not f:
+            raise KeyError(key)
+        return f
     
-    def __setitem__(self, key : 'str', f):
+    def __setitem__(self, key : 'str', f : 'str|file'):
         """Add a file.
         
         Args:
@@ -369,14 +395,13 @@ class FileManager(object):
             f: Path or file object. If this is a path, the file will be
                 opened with the specified mode.
             key: Dict key. Defaults to the file name.
-            kwargs: Arguments to pass to xopen
-        
-        Returns:
-            A file object
+            kwargs: Arguments to pass to xopen. These override any keyword
+                arguments passed to the FileManager's constructor.
         """
         if isinstance(f, str):
             path = f
-            f = xopen(f, **kwargs)
+            f = copy.copy(self.default_open_args)
+            f.update(kwargs)
         else:
             path = f.name
         if key is None:
@@ -384,19 +409,285 @@ class FileManager(object):
         if key in self.files:
             raise ValueError("Already tracking file with key {}".format(key))
         self.files[key] = f
+        self.paths[key] = path
+    
+    def get(self, key : 'str|int'):
+        """Get the file object associated with a path. If the file is not
+        already open, it is first opened with ``xopen``.
+        """
+        f = self.files.get(key, None)
+        if f is None:
+            if isinstance(key, int) and len(self) > key:
+                key = list(self.keys)[key]
+                f = self.files[key]
+            else:
+                return None
+        if isinstance(f, dict):
+            path = self.paths[key]
+            f = xopen(path, **f)
+            self.files[key] = f
         return f
     
-    def items(self):
-        """Returns a list of all (key, file) pairs.
+    def get_path(self, key : 'str'):
+        """Returns the file path associated with a key.
+        
+        Args:
+            key: The key to resolve
         """
-        return self.files.items()
+        return self.paths[key]
+    
+    @property
+    def keys(self):
+        """Returns a list of all keys in the order they were added.
+        """
+        return self.files.keys()
+    
+    def paths(self):
+        """Returns a list of all paths in the order they were added.
+        """
+        return list(self.paths[key] for key in self.keys)
+    
+    def iter_files(self):
+        """Iterates over all (key, file) pairs in the order they were added.
+        """
+        keys = list(self.keys)
+        for key in keys:
+            yield (key, self.get(key))
     
     def close(self):
         """Close all files being tracked.
         """
         for fh in self.files.values():
-            if fh and not fh.closed:
+            if fh and not (isinstance(fh, dict) or fh.closed):
                 fh.close()
+
+class FileInput(FileManager):
+    """Similar to python's ``fileinput`` that uses ``xopen`` to open files.
+    Currently only support sequential line-oriented access via ``next`` or
+    ``readline``.
+    """
+    def __init__(self, files=None, mode='t', encoding=None):
+        if not files:
+            files = sys.argv[1:] or (STDIN,)
+        elif isinstance(files, str):
+            files = (files,)
+        for m in mode:
+            if m not in ('r', 't', 'b', 'U'):
+                raise ValueError("Invalid mode: {}".format(mode))
+            if 'r' not in mode:
+                mode = 'r' + mode
+        super(FileInput, self).__init__(files, mode=mode)
+        self._is_binary = 'b' in mode
+        self.fileno = -1
+        self._startlineno = 0
+        self.filelineno = 0
+        self._pending = True
+    
+    @property
+    def filekey(self):
+        if self.fileno < 0:
+            return None
+        return list(self.keys)[self.fileno]
+    
+    @property
+    def filename(self):
+        """Returns the name of the file currently being read.
+        """
+        if self.fileno < 0:
+            return None
+        return self.get_path(self.fileno)
+    
+    @property
+    def lineno(self):
+        return self._startlineno + self.filelineno
+    
+    @property
+    def finished(self):
+        return self.fileno >= len(self)
+    
+    def add(self, f, key : 'str' = None, **kwargs):
+        """Overrides FileManager.add() to prevent file-specific open args.
+        """
+        if len(kwargs) > 0:
+            raise ValueError("FileInput does not allow per-file open arguments")
+        super(FileInput, self).add(f, key)
+        # If we've already finished reading all the files,
+        # put us back in a pending state
+        if self.finished:
+            self._pending = True
+    
+    def __next__(self):
+        while True:
+            if not self._ensure_file():
+                raise StopIteration()
+            try:
+                line = _nextline()
+                if not line:
+                    raise StopIteration()
+                self._filelineno += 1
+                return line
+            except StopIteration:
+                self._pending = True
+    
+    def _ensure_file(self):
+        if self.finished:
+            return False
+        if self._pending:
+            self.fileno += 1
+            self._startlineno += self.filelineno
+            self.filelineno = 0
+            # set the _nextline method
+            curfile = self.get(self.fileno)
+            if is_iterable(curfile):
+                self._nextline = lambda: next(curfile)
+            elif hasattr(curfile, 'readline'):
+                self._nextline = curfile.readline
+            else:
+                raise Exception("File associated with key {} is not iterable "
+                                "and does not have a 'readline' method".format(
+                                self._curkey))
+            self._pending = False
+        return True
+    
+    def readline(self):
+        """Read the next line from the current file (advancing to the next
+        file if necessary and possible).
+        
+        Returns:
+            The next line, or the empty string if ``self.finished==True``
+        """
+        try:
+            line = next(self)
+        except StopIteration:
+            return b'' if self._is_binary else ''
+
+class FileOutput(FileManager):
+    """Base class for file manager that writes to multiple files.
+    """
+    def __init__(self, files=None, mode='t', linesep=os.linesep, encoding=None):
+        if not files:
+            files = sys.argv[1:] or (STDOUT,)
+        elif isinstance(files, str):
+            files = (files,)
+        for m in mode:
+            if m not in ('w', 'a', 'x', 't', 'b', 'U'):
+                raise ValueError("Invalid mode: {}".format(mode))
+            if not any(m in mode for m in ('w', 'a', 'x')):
+                mode = 'w' + mode
+        super(FileInput, self).__init__(files, mode=mode)
+        self._is_binary = 'b' in mode
+        self.num_lines = 0
+        if self._is_binary and isinstance(linesep, str):
+            self.linesep = linesep.encode(encoding)
+        else:
+            self.linesep = linesep
+        self._linesep_len = len(linesep)
+    
+    def add(self, f, key : 'str' = None, **kwargs):
+        """Overrides FileManager.add() to prevent file-specific open args.
+        """
+        if len(kwargs) > 0:
+            raise ValueError("FileInput does not allow per-file open arguments")
+        super(FileInput, self).add(f, key)
+    
+    def writelines(self, lines : 'iterable', newlines : 'bool' = True):
+        """Write an iterable of lines to the output(s).
+        
+        Args:
+            lines: An iterable of lines to write
+            newlines: Whether to add line separators after each line
+        """
+        if not lines:
+            return
+        for line in lines:
+            self.writeline(line, newline=newlines)
+    
+    def writeline(self, line : 'str', newline : 'bool' = None):
+        """Write a line to the output(s).
+        
+        Args:
+            line: The line to write
+            newline: Whether to also write a line separator. If None (the
+                default), the line will be checked to see if it already has a
+                line separator, and one will be written if it does not.
+        """
+        first = self.num_lines == 0
+        sep = None
+        if newline:
+            self.num_lines += 1
+            sep = self.linesep
+        elif not line:
+            return
+        
+        if first:
+            self.num_lines += 1
+        
+        self._writeline(self._encode(line), sep)
+    
+    def _writeline(self, line=None, sep=None):
+        """Does the work of writing a line to the output(s). Must be implemented
+        by subclasses.
+        """
+        raise NotImplemented()
+    
+    def _encode(self, line):
+        is_binary = isinstance(line, bytes)
+        if self._is_binary and not is_binary:
+            line = line.encode(self.encoding)
+        elif not self._is_binary and is_binary:
+            line = line.decode(self.encoding)
+        return line
+    
+    def _write_to_file(self, f, line, sep):
+        """Writes a line to a file, gracefully handling the (rare? nonexistant?)
+        case where the file has a ``writelines`` but not a ``write`` method.
+        """
+        try:
+            if line:
+                f.write(line)
+            if sep:
+                f.write(sep)
+        except:
+            if sep:
+                line += sep
+            f.writelines((line,))
+
+class TeeFileOutput(FileOutput):
+    """Write output to mutliple files simultaneously.
+    """
+    def _writeline(self, line=None, sep=None):
+        for key, f in self.iter_files():
+            self._write_to_file(f, line, sep)
+
+class CycleFileOutput(FileOutput):
+    def __init__(self, files=None, mode='t', n=1, **kwargs):
+        super(CycleFileOutput, self).__init__(files=files, mode=mode, **kwargs)
+        self._cur_file_idx = 0
+    
+    def _writeline(self, line=None, sep=None):
+        self._write_to_file(self.get(self._cur_file_idx), line, sep)
+        self._cur_file_idx = (self._cur_file_idx + 1) % len(self)
+        
+class NCycleFileOutput(FileOutput):
+    """Alternate output lines between files. The ``n`` argument specifies how
+    many lines to write to a file before moving on to the next file.
+    """
+    def __init__(self, files=None, mode='t', n=1, **kwargs):
+        super(CycleFileOutput, self).__init__(files=files, mode=mode, **kwargs)
+        self.n = n
+        self._cur_line_idx = 0
+        self._cur_file_idx = 0
+    
+    def _writeline(self, line=None, sep=None):
+        if self._cur_line_idx >= self.n:
+            self._cur_line_idx = 0
+            self._cur_file_idx += 1
+        if self._cur_file_idx >= len(self):
+            self._cur_file_idx = 0
+        self._write_to_file(self.get(self._cur_file_idx), line, sep)
+        self._cur_line_idx += 1
+
+# Misc
 
 def linecount(f, linesep : 'str' = None, buffer_size : 'int' = 1024 * 1024,
               **kwargs) -> 'int':

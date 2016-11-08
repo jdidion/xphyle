@@ -235,6 +235,9 @@ class UtilsTests(TestCase):
         with open(path, 'rt') as i:
             self.assertEqual(i.read(), 'foo')
     
+    def test_transcode(self):
+        pass
+    
     def test_linecount(self):
         self.assertEqual(-1, linecount('foobar', errors=False))
         path = self.root.make_file()
@@ -265,11 +268,12 @@ class UtilsTests(TestCase):
         path3 = self.root.make_file()
         f['path3'] = path3
         self.assertEqual(len(f), 5)
-        for key, fh in f.items():
+        for key, fh in f.iter_files():
+            print(key, fh)
             self.assertFalse(fh.closed)
         f.close()
         self.assertEqual(len(f), 5)
-        for key, fh in f.items():
+        for key, fh in f.iter_files():
             self.assertTrue(fh.closed)
     
     def test_file_manager_dup_files(self):
