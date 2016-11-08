@@ -60,7 +60,20 @@ You can also use your own preferred program by passing a tuple with the command 
 Working with files
 ------------------
 
-The heart of xphyle is the simplicity of working with files. There is a single interface for opening "file-like objects", regardless of whether they represent local files, remote files (referenced by URLs), or system streams (stdin, stdout, stderr); and regardless of whether they are compressed or encrypted.
+The heart of xphyle is the simplicity of working with files. There is a single interface -- ``xopen`` -- for opening "file-like objects", regardless of whether they represent local files, remote files (referenced by URLs), or system streams (stdin, stdout, stderr); and regardless of whether they are compressed.
+
+The following are functionally equivalent ways to open a gzip file::
+    
+    import gzip
+    f = gzip.open('input.gz', 'rt')
+    
+    from xphyle import xopen
+    f = xopen('input.gz', 'tr')
+
+So then why use xphyle? Two reasons:
+
+1. The ``gzip.open`` method of opening a gzip file above requires you to know that you are expecting a gzip file and only a gzip file. If your program optionally accepts either a compressed or an uncompressed file, then you'll need several extra lines of code to either detect the file format or to make the user specify the format of the file they are providing. This becomes increasingly cumbersome with each additional format you want to support. On the other hand, ``xopen`` has the same interface regardless of the compression format. Furthermore, if xphyle doesn't currently support a file format that you would like to use, it enables you to add it via a simple API.
+2. The ``gzip.open`` method of opening a gzip file uses python code to uncompress the file. It's well written, highly optimized python code, but unfortunately it's still slower than your natively compiled system-level applications (e.g. pigz or gzip). The ``xopen`` method of opening a gzip file first tries to use pigz or gzip to uncompress the file and provides access to the resulting stream of uncompressed data (as a file-like object), and only falls back to ``gzip.open`` if neither program is available.
 
 Other useful tools
 ------------------
