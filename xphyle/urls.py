@@ -2,6 +2,7 @@
 """Methods for handling URLs.
 """
 import copy
+import io
 import re
 from urllib.request import urlopen, Request
 from urllib.parse import urlparse
@@ -41,7 +42,11 @@ def open_url(url, byte_range=None, headers={}, **kwargs):
         headers['Range'] = 'bytes={}-{}'.format(*byte_range)
     try:
         request = Request(url, headers=headers, **kwargs)
-        return urlopen(request)
+        response = urlopen(request)
+        # HTTPResponse didn't have 'peek' until 3.5
+        if response and not hasattr(response, 'peek'):
+            response = io.BufferedReader(response)
+        return response
     except:
         return None
 

@@ -190,6 +190,8 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
             if not hasattr(fh, 'peek'):
                 fh = io.BufferedReader(fh)
             guess = guess_format_from_buffer(fh)
+        else:
+            validate = False
         if not (compression or guess):
             is_stream = True
             if 'b' in mode:
@@ -234,7 +236,7 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
                     guess = guess_format_from_file_header(path)
             else:
                 path = check_writeable_file(path)
-                if guess_format:
+                if validate or guess_format:
                     guess = guess_compression_format(path)
     
     if validate and guess != compression:

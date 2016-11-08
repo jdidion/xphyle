@@ -137,7 +137,7 @@ class XphyleTests(TestCase):
     
     @skipIf(no_internet(), "No internet connection")
     def test_xopen_url(self):
-        badurl = 'http://blorf.blurp'
+        badurl = 'http://google.com/__badurl__'
         with self.assertRaises(ValueError):
             xopen(badurl)
         url = 'https://github.com/jdidion/xphyle/blob/master/tests/foo.gz?raw=True'
