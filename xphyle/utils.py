@@ -45,7 +45,7 @@ def iter_lines(path : 'str|file', convert : 'callable' = None,
         for line in itr:
             yield line
 
-def chunked_iter(path : 'str', chunksize : 'int,>0' = 1024,
+def chunked_iter(path : 'str|file', chunksize : 'int,>0' = 1024,
                  **kwargs) -> 'generator':
     """Iterate over a file in chunks. The mode will always be overridden
     to 'rb'.
@@ -253,7 +253,7 @@ def delimited_file_to_dict(path : 'str', sep : 'str' = '\t',
 
 ## Compressed files
 
-def compress_file(source_file, compressed_file=None,
+def compress_file(source_file : 'str|file', compressed_file : 'str|file' = None,
                   compression : 'bool|str' = None,
                   keep : 'bool' = True, compresslevel : 'int' = None,
                   use_system : 'bool' = True, **kwargs) -> 'str':
@@ -264,8 +264,8 @@ def compress_file(source_file, compressed_file=None,
         compressed_file: The compressed path or file-like object. If None,
             compression is performed in-place. If True, file name is determined
             from ``source_file`` and the uncompressed file is retained.
-        compression: None or True, to guess compression format from the file
-            name, or the name of any supported compression format.
+        compression: If True, guess compression format from the file
+            name, otherwise the name of any supported compression format.
         keep: Whether to keep the source file
         compresslevel: Compression level
         use_system: Whether to try to use system-level compression
@@ -287,7 +287,7 @@ def compress_file(source_file, compressed_file=None,
     return fmt.compress_file(
         source_file, compressed_file, keep, compresslevel, use_system, **kwargs)
 
-def uncompress_file(compressed_file, dest_file=None,
+def uncompress_file(compressed_file : 'str|file', dest_file : 'str|file' = None,
                     compression : 'bool|str' = None,
                     keep : 'bool' = True, use_system : 'bool' = True,
                     **kwargs) -> 'str':
@@ -318,6 +318,43 @@ def uncompress_file(compressed_file, dest_file=None,
     return fmt.uncompress_file(
         compressed_file, dest_file, keep, use_system, **kwargs)
 
+def transcode_file(source_file : 'str|file', dest_file : 'str|file',
+                   source_compression : 'str|bool' = True,
+                   dest_compression : 'str|bool' = True,
+                   use_system : 'bool' = True,
+                   source_open_args : 'dict' = {},
+                   dest_open_args : 'dict' = {}):
+    """Convert from one file format to another.
+    
+    Args:
+        source_file: The path or file-like object to read from. If a file, it
+            must be opened in mode 'rb'.
+        dest_file: The path or file-like object to write to. If a file, it
+            must be opened in binary mode.
+        source_compression: The compression type of the source file. If True,
+            guess compression format from the file name, otherwise the name of
+            any supported compression format.
+        dest_compression: The compression type of the dest file. If True,
+            guess compression format from the file name, otherwise the name of
+            any supported compression format.
+        source_open_args: Additional arguments to pass to xopen for the source
+            file
+        dest_open_args: Additional arguments to pass to xopen for the
+            destination file
+    """
+    src_args = copy.copy(source_open_args)
+    if 'mode' not in src_args:
+        src_args['mode'] = 'rb'
+    dst_args = copy.copy(dest_open_args)
+    if 'mode' not in dst_args:
+        dst_args['mode'] = 'wb'
+    with open_(source_file, compression=source_compression,
+               use_system=use_system, **src_args) as src, \
+            open_(dest_file, compression=dest_compression,
+                  use_system=use_system, **dst_args) as dst:
+        for chunk in iter_file_chunked(src):
+            dst.write(chunk)
+
 # FileEventListeners
 
 class CompressOnClose(FileEventListener):
@@ -347,8 +384,8 @@ class FileManager(object):
         kwargs: Default arguments to pass to xopen
     """
     def __init__(self, files=None, **kwargs):
-        self.files = OrderedDict()
-        self.paths = {}
+        self._files = OrderedDict()
+        self._paths = {}
         self.default_open_args = kwargs
         if files:
             for f in files:
@@ -367,7 +404,7 @@ class FileManager(object):
         self.close()
     
     def __len__(self):
-        return len(self.files)
+        return len(self._files)
     
     def __getitem__(self, key : 'str|int'):
         f = self.get(key)
@@ -386,7 +423,7 @@ class FileManager(object):
         self.add(f, key)
     
     def __contains__(self, key : 'str'):
-        return key in self.files
+        return key in self._files
         
     def add(self, f, key : 'str' = None, **kwargs):
         """Add a file.
@@ -406,26 +443,26 @@ class FileManager(object):
             path = f.name
         if key is None:
             key = path
-        if key in self.files:
+        if key in self._files:
             raise ValueError("Already tracking file with key {}".format(key))
-        self.files[key] = f
-        self.paths[key] = path
+        self._files[key] = f
+        self._paths[key] = path
     
     def get(self, key : 'str|int'):
         """Get the file object associated with a path. If the file is not
         already open, it is first opened with ``xopen``.
         """
-        f = self.files.get(key, None)
+        f = self._files.get(key, None)
         if f is None:
             if isinstance(key, int) and len(self) > key:
                 key = list(self.keys)[key]
-                f = self.files[key]
+                f = self._files[key]
             else:
                 return None
         if isinstance(f, dict):
-            path = self.paths[key]
+            path = self._paths[key]
             f = xopen(path, **f)
-            self.files[key] = f
+            self._files[key] = f
         return f
     
     def get_path(self, key : 'str'):
@@ -434,18 +471,19 @@ class FileManager(object):
         Args:
             key: The key to resolve
         """
-        return self.paths[key]
+        return self._paths[key]
     
     @property
     def keys(self):
         """Returns a list of all keys in the order they were added.
         """
-        return self.files.keys()
+        return self._files.keys()
     
+    @property
     def paths(self):
         """Returns a list of all paths in the order they were added.
         """
-        return list(self.paths[key] for key in self.keys)
+        return list(self._paths[key] for key in self.keys)
     
     def iter_files(self):
         """Iterates over all (key, file) pairs in the order they were added.
@@ -457,7 +495,7 @@ class FileManager(object):
     def close(self):
         """Close all files being tracked.
         """
-        for fh in self.files.values():
+        for fh in self._files.values():
             if fh and not (isinstance(fh, dict) or fh.closed):
                 fh.close()
 

@@ -2,6 +2,7 @@ from unittest import TestCase
 from . import *
 from collections import OrderedDict
 import gzip
+import bz2
 import os
 from xphyle.paths import TempDir
 from xphyle.utils import *
@@ -236,7 +237,14 @@ class UtilsTests(TestCase):
             self.assertEqual(i.read(), 'foo')
     
     def test_transcode(self):
-        pass
+        path = self.root.make_file()
+        gzfile = path + '.gz'
+        with gzip.open(gzfile, 'wt') as o:
+            o.write('foo')
+        bzfile = path + '.bz2'
+        transcode_file(gzfile, bzfile)
+        with bz2.open(bzfile, 'rt') as i:
+            self.assertEqual('foo', i.read())
     
     def test_linecount(self):
         self.assertEqual(-1, linecount('foobar', errors=False))
@@ -257,22 +265,34 @@ class UtilsTests(TestCase):
         self.assertEqual(0, linecount(path))
     
     def test_file_manager(self):
-        f = FileManager()
-        paths = self.root.make_empty_files(3)
-        for p in paths:
-            f.add(p, mode='wt')
-            self.assertTrue(p in f)
-            self.assertFalse(f[p].closed)
-        path2 = open(self.root.make_file(), 'wt')
-        f.add(path2)
-        path3 = self.root.make_file()
-        f['path3'] = path3
-        self.assertEqual(len(f), 5)
-        for key, fh in f.iter_files():
-            print(key, fh)
-            self.assertFalse(fh.closed)
-        f.close()
-        self.assertEqual(len(f), 5)
+        paths12 = [
+            self.root.make_empty_files(1)[0],
+            ('path2', self.root.make_empty_files(1)[0])
+        ]
+        with FileManager(paths12, mode='wt') as f:
+            paths34 = self.root.make_empty_files(2)
+            for p in paths34:
+                f.add(p, mode='wt')
+                self.assertTrue(p in f)
+                self.assertFalse(f[p].closed)
+            path5 = self.root.make_file()
+            path5_fh = open(path5, 'wt')
+            f.add(path5_fh)
+            path6 = self.root.make_file()
+            f['path6'] = path6
+            self.assertEqual(path6, f.get_path('path6'))
+            all_paths = [paths12[0], paths12[1][1]] + paths34 + [path5, path6]
+            self.assertListEqual(all_paths, f.paths)
+            self.assertEqual(len(f), 6)
+            for key, fh in f.iter_files():
+                self.assertFalse(fh.closed)
+            self.assertIsNotNone(f['path2'])
+            self.assertIsNotNone(f.get('path2'))
+            self.assertEqual(f['path2'], f.get(1))
+            with self.assertRaises(KeyError):
+                f['foo']
+            self.assertIsNone(f.get('foo'))
+        self.assertEqual(len(f), 6)
         for key, fh in f.iter_files():
             self.assertTrue(fh.closed)
     
@@ -318,3 +338,6 @@ class UtilsTests(TestCase):
             wrapper.register_listener('close', RemoveOnClose())
             wrapper.write('foo')
         self.assertFalse(os.path.exists(path))
+    
+    def test_file_input(self):
+        pass
