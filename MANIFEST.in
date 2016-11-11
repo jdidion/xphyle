@@ -1,6 +1,6 @@
 include versioneer.py
 include xphyle/_version.py
-include README.md
+include README.rst
 include LICENSE
 include tests/test*.py
 include docs/*.rst
