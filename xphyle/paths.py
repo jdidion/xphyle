@@ -59,7 +59,7 @@ def set_access(path, mode):
     os.chmod(path, mode_flag)
     return mode_flag
 
-def check_access(path : 'str', access : 'int'):
+def check_access(path : 'str', access : 'int|str'):
     """Check that ``path`` is accessible.
     """
     if isinstance(access, str):
@@ -152,7 +152,8 @@ def resolve_path(path : 'str', parent : 'str' = None) -> 'str':
         raise IOError(errno.ENOENT, "{} does not exist".format(path), path)
     return path
 
-def check_path(path : 'str', ptype : 'str' = None, access=None) -> 'str':
+def check_path(path : 'str', ptype : 'str' = None,
+               access : 'int|str' = None) -> 'str':
     """Resolves the path (using ``resolve_path``) and checks that the path is
     of the specified type and allows the specified access.
     
@@ -234,7 +235,7 @@ def safe_check_writeable_file(path : 'str') -> 'str':
     except IOError:
         return None
 
-def find(root : 'str', pattern, types : 'str' = 'f',
+def find(root : 'str', pattern : 'str|regexp', types : 'str' = 'f',
          recursive : 'bool' = True) -> 'list':
     """Find all paths under ``root`` that match ``pattern``.
     
