@@ -187,6 +187,9 @@ class SystemWriter:
 compression_formats = {}
 """Dict of registered compression formats"""
 
+compression_format_aliases = {}
+"""Dict mapping aliases to cmopression format names."""
+
 magic_bytes = {}
 """Dict mapping the first byte in a 'magic' sequence to a tuple of
 (format, rest_of_sequence)
@@ -204,15 +207,10 @@ def register_compression_format(format_class : 'class'):
         ``format_class`` -- a subclass of CompressionFormat
     """
     fmt = format_class()
-    aliases = set(fmt.exts)
-    #if isinstance(fmt.system_commands, dict):
-    #    aliases = aliases | set(fmt.system_commands.values())
-    #else:
-    aliases.update(fmt.system_commands)
-    aliases.add(fmt.name)
-    for alias in aliases:
+    compression_formats[fmt.name] = fmt
+    for alias in fmt.aliases:
         # TODO: warn about overriding existing format?
-        compression_formats[alias] = fmt
+        compression_format_aliases[alias] = fmt.name
     for magic in fmt.magic_bytes:
         global max_magic_bytes
         max_magic_bytes = max(max_magic_bytes, len(magic))
@@ -220,24 +218,28 @@ def register_compression_format(format_class : 'class'):
     for mime in fmt.mime_types:
         mime_types[mime] = fmt.name
 
+def list_compression_formats() -> 'tuple':
+    return tuple(compression_formats.keys())
+
 def get_compression_format(name : 'str') -> 'CompressionFormat':
     """Returns the CompressionFormat associated with the given name, or raises
     ValueError if that format is not supported.
     """
-    if name in compression_formats:
+    if name in compression_format_aliases:
+        name = compression_format_aliases[name]
         return compression_formats[name]
     raise ValueError("Unsupported compression format: {}".format(name))
 
 def guess_compression_format(name : 'str') -> 'str':
     """Guess the compression format by name or file extension.
     """
-    if name in compression_formats:
-        return compression_formats[name].name
+    if name in compression_format_aliases:
+        return compression_format_aliases[name]
     i = name.rfind(os.extsep)
     if i >= 0:
         ext = name[(i+1):]
-        if ext in compression_formats:
-            return compression_formats[ext].name
+        if ext in compression_format_aliases:
+            return compression_format_aliases[ext]
     return None
 
 def guess_format_from_file_header(path : 'str') -> 'str':
@@ -296,7 +298,21 @@ class CompressionFormat(FileFormat):
     python-level implementations of compression formats.
     """
     @property
+    def aliases(self) -> 'tuple':
+        """All of the aliases by which this format is known.
+        """
+        aliases = set(self.exts)
+        #if isinstance(fmt.system_commands, dict):
+        #    aliases = aliases | set(fmt.system_commands.values())
+        #else:
+        aliases.update(self.system_commands)
+        aliases.add(self.name)
+        return tuple(aliases)
+    
+    @property
     def default_ext(self) -> 'str':
+        """The default file extension for this format.
+        """
         return self.exts[0]
     
     def _get_compresslevel(self, level=None):
@@ -310,14 +326,14 @@ class CompressionFormat(FileFormat):
     
     @property
     def can_use_system_compression(self) -> 'bool':
-        """Returns True if at least one command in ``self.system_commands``
+        """Whether at least one command in ``self.system_commands``
         resolves to an existing, executable file.
         """
         return self.compress_path is not None
     
     @property
     def can_use_system_uncompression(self) -> 'bool':
-        """Returns True if at least one command in ``self.system_commands``
+        """Whether at least one command in ``self.system_commands``
         resolves to an existing, executable file.
         """
         return self.uncompress_path is not None

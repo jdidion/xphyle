@@ -4,4 +4,3 @@ dist/
 *.pyc
 xphyle.egg-info/
 docs/_build/
-release.sh

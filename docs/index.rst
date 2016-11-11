@@ -1,5 +1,5 @@
 xphyle: extraordinarily simple file handling
-===================================
+============================================
 
 .. image:: logo.png
    :height: 200px
@@ -68,12 +68,30 @@ The following are functionally equivalent ways to open a gzip file::
     f = gzip.open('input.gz', 'rt')
     
     from xphyle import xopen
-    f = xopen('input.gz', 'tr')
+    f = xopen('input.gz', 'rt')
 
 So then why use xphyle? Two reasons:
 
 1. The ``gzip.open`` method of opening a gzip file above requires you to know that you are expecting a gzip file and only a gzip file. If your program optionally accepts either a compressed or an uncompressed file, then you'll need several extra lines of code to either detect the file format or to make the user specify the format of the file they are providing. This becomes increasingly cumbersome with each additional format you want to support. On the other hand, ``xopen`` has the same interface regardless of the compression format. Furthermore, if xphyle doesn't currently support a file format that you would like to use, it enables you to add it via a simple API.
 2. The ``gzip.open`` method of opening a gzip file uses python code to uncompress the file. It's well written, highly optimized python code, but unfortunately it's still slower than your natively compiled system-level applications (e.g. pigz or gzip). The ``xopen`` method of opening a gzip file first tries to use pigz or gzip to uncompress the file and provides access to the resulting stream of uncompressed data (as a file-like object), and only falls back to ``gzip.open`` if neither program is available.
+
+If you want to be explicit about whether to expect a compressed file, what type of compression to expect, or whether to try and use system programs, you can::
+    
+    # Expect the file to not be compressed
+    f = xopen('input', 'rb', compression=False)
+    
+    # Open a remote file. Expect the file to be compressed, and throw an error
+    # if it's not, or if the compression format cannot be determined.
+    f = xopen('http://foo.com/input.gz', 'rt', compression=True)
+    
+    # Open stdin. Expect the input to be gzip compressed, and throw an error if
+    # it's not
+    f = xopen(STDIN, 'rt', compression='gzip')
+    
+    # Do not try to use the system-level gzip program for decompression
+    f = xopen('input.gz', 'rt', compression='gzip', use_system=False)
+
+
 
 Other useful tools
 ------------------

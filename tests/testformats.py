@@ -23,6 +23,14 @@ bz_path = get_format('bz2').executable_path
 xz_path = get_format('xz').executable_path
 
 class CompressionTests(TestCase):
+    def test_list_formats(self):
+        self.assertSetEqual(
+            set(('gzip','bz2','lzma')),
+            set(list_compression_formats()))
+        self.assertSetEqual(
+            set(('gzip','gz','pigz')),
+            set(get_format('gzip').aliases))
+    
     def test_guess_format(self):
         self.assertEqual('gzip', guess_compression_format('gz'))
         self.assertEqual('gzip', guess_compression_format('.gz'))
