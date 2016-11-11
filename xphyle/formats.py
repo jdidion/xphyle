@@ -83,7 +83,7 @@ class SystemReader:
     def flush(self): pass
     
     def close(self):
-        self.close = True
+        self.closed = True
         retcode = self.process.poll()
         if retcode is None:
             # still running

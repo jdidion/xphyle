@@ -388,11 +388,7 @@ class FileManager(object):
         self._paths = {}
         self.default_open_args = kwargs
         if files:
-            for f in files:
-                if isinstance(f, str):
-                    self.add(f)
-                else:
-                    self.add(f[1], key=f[0])
+            self.add_all(files)
     
     def __enter__(self):
         return self
@@ -448,6 +444,24 @@ class FileManager(object):
         self._files[key] = f
         self._paths[key] = path
     
+    def add_all(self, files, **kwargs):
+        """Add all files from an iterable or dict.
+        
+        Args:
+            files: An iterable or dict of files to add. If an iterable, each
+                item can either be a string path or a (key, fileobj) tuple.
+            kwargs: Additional arguments to pass to ``add``
+        """
+        if isinstance(files, dict):
+            for key, f in files.items():
+                self.add(f, key=key)
+        else:
+            for f in files:
+                if isinstance(f, str):
+                    self.add(f, **kwargs)
+                else:
+                    self.add(f[1], key=f[0], **kwargs)
+    
     def get(self, key : 'str|int'):
         """Get the file object associated with a path. If the file is not
         already open, it is first opened with ``xopen``.
@@ -471,6 +485,8 @@ class FileManager(object):
         Args:
             key: The key to resolve
         """
+        if isinstance(key, int) and len(self) > key:
+            key = list(self.keys)[key]
         return self._paths[key]
     
     @property
@@ -504,22 +520,20 @@ class FileInput(FileManager):
     Currently only support sequential line-oriented access via ``next`` or
     ``readline``.
     """
-    def __init__(self, files=None, mode='t', encoding=None):
-        if not files:
-            files = sys.argv[1:] or (STDIN,)
-        elif isinstance(files, str):
-            files = (files,)
+    def __init__(self, files=None, mode='t', encoding='utf-8'):
+        if 'r' not in mode:
+            mode = 'r' + mode
+        super(FileInput, self).__init__(mode=mode)
         for m in mode:
             if m not in ('r', 't', 'b', 'U'):
                 raise ValueError("Invalid mode: {}".format(mode))
-            if 'r' not in mode:
-                mode = 'r' + mode
-        super(FileInput, self).__init__(files, mode=mode)
         self._is_binary = 'b' in mode
         self.fileno = -1
         self._startlineno = 0
         self.filelineno = 0
         self._pending = True
+        if files:
+            self.add_all(files)
     
     @property
     def filekey(self):
@@ -543,49 +557,50 @@ class FileInput(FileManager):
     def finished(self):
         return self.fileno >= len(self)
     
-    def add(self, f, key : 'str' = None, **kwargs):
+    def add(self, f, key : 'str' = None):
         """Overrides FileManager.add() to prevent file-specific open args.
         """
-        if len(kwargs) > 0:
-            raise ValueError("FileInput does not allow per-file open arguments")
-        super(FileInput, self).add(f, key)
         # If we've already finished reading all the files,
         # put us back in a pending state
         if self.finished:
             self._pending = True
+            self.fileno -= 1
+        super(FileInput, self).add(f, key)
+    
+    def __iter__(self):
+        return self
     
     def __next__(self):
         while True:
             if not self._ensure_file():
                 raise StopIteration()
             try:
-                line = _nextline()
-                if not line:
-                    raise StopIteration()
-                self._filelineno += 1
+                line = self._nextline()
+                #if not line:
+                #    raise StopIteration()
+                self.filelineno += 1
                 return line
             except StopIteration:
                 self._pending = True
     
     def _ensure_file(self):
-        if self.finished:
-            return False
         if self._pending:
             self.fileno += 1
             self._startlineno += self.filelineno
             self.filelineno = 0
-            # set the _nextline method
-            curfile = self.get(self.fileno)
-            if is_iterable(curfile):
-                self._nextline = lambda: next(curfile)
-            elif hasattr(curfile, 'readline'):
-                self._nextline = curfile.readline
-            else:
-                raise Exception("File associated with key {} is not iterable "
-                                "and does not have a 'readline' method".format(
-                                self._curkey))
+            if not self.finished:
+                # set the _nextline method
+                curfile = self.get(self.fileno)
+                if is_iterable(curfile):
+                    self._nextline = lambda: next(curfile)
+                #elif hasattr(curfile, 'readline'):
+                #    self._nextline = curfile.readline
+                else: # pragma: no-cover
+                    raise Exception("File associated with key {} is not "
+                                    "iterable and does not have a 'readline' "
+                                    "method".format(self.filekey))
             self._pending = False
-        return True
+        return not self.finished
     
     def readline(self):
         """Read the next line from the current file (advancing to the next
@@ -595,38 +610,30 @@ class FileInput(FileManager):
             The next line, or the empty string if ``self.finished==True``
         """
         try:
-            line = next(self)
+            return next(self)
         except StopIteration:
             return b'' if self._is_binary else ''
 
 class FileOutput(FileManager):
     """Base class for file manager that writes to multiple files.
     """
-    def __init__(self, files=None, mode='t', linesep=os.linesep, encoding=None):
-        if not files:
-            files = sys.argv[1:] or (STDOUT,)
-        elif isinstance(files, str):
-            files = (files,)
+    def __init__(self, files=None, mode='t', linesep=os.linesep, encoding='utf-8'):
+        if not any(m in mode for m in ('w', 'a', 'x')):
+            mode = 'w' + mode
+        super(FileOutput, self).__init__(mode=mode)
         for m in mode:
             if m not in ('w', 'a', 'x', 't', 'b', 'U'):
                 raise ValueError("Invalid mode: {}".format(mode))
-            if not any(m in mode for m in ('w', 'a', 'x')):
-                mode = 'w' + mode
-        super(FileInput, self).__init__(files, mode=mode)
-        self._is_binary = 'b' in mode
+        self.encoding = encoding
         self.num_lines = 0
+        self._is_binary = 'b' in mode
         if self._is_binary and isinstance(linesep, str):
             self.linesep = linesep.encode(encoding)
         else:
             self.linesep = linesep
         self._linesep_len = len(linesep)
-    
-    def add(self, f, key : 'str' = None, **kwargs):
-        """Overrides FileManager.add() to prevent file-specific open args.
-        """
-        if len(kwargs) > 0:
-            raise ValueError("FileInput does not allow per-file open arguments")
-        super(FileInput, self).add(f, key)
+        if files:
+            self.add_all(files)
     
     def writelines(self, lines : 'iterable', newlines : 'bool' = True):
         """Write an iterable of lines to the output(s).
@@ -635,12 +642,10 @@ class FileOutput(FileManager):
             lines: An iterable of lines to write
             newlines: Whether to add line separators after each line
         """
-        if not lines:
-            return
         for line in lines:
             self.writeline(line, newline=newlines)
     
-    def writeline(self, line : 'str', newline : 'bool' = None):
+    def writeline(self, line : 'str' = None, newline : 'bool' = True):
         """Write a line to the output(s).
         
         Args:
@@ -649,20 +654,15 @@ class FileOutput(FileManager):
                 default), the line will be checked to see if it already has a
                 line separator, and one will be written if it does not.
         """
-        first = self.num_lines == 0
+        if self.num_lines == 0:
+            self.num_lines += 1
         sep = None
         if newline:
             self.num_lines += 1
             sep = self.linesep
-        elif not line:
-            return
-        
-        if first:
-            self.num_lines += 1
-        
         self._writeline(self._encode(line), sep)
     
-    def _writeline(self, line=None, sep=None):
+    def _writeline(self, line : 'str', sep : 'str'):
         """Does the work of writing a line to the output(s). Must be implemented
         by subclasses.
         """
@@ -685,7 +685,7 @@ class FileOutput(FileManager):
                 f.write(line)
             if sep:
                 f.write(sep)
-        except:
+        except: # pragma: no-cover
             if sep:
                 line += sep
             f.writelines((line,))
@@ -711,7 +711,7 @@ class NCycleFileOutput(FileOutput):
     many lines to write to a file before moving on to the next file.
     """
     def __init__(self, files=None, mode='t', n=1, **kwargs):
-        super(CycleFileOutput, self).__init__(files=files, mode=mode, **kwargs)
+        super(NCycleFileOutput, self).__init__(files=files, mode=mode, **kwargs)
         self.n = n
         self._cur_line_idx = 0
         self._cur_file_idx = 0
@@ -724,6 +724,46 @@ class NCycleFileOutput(FileOutput):
             self._cur_file_idx = 0
         self._write_to_file(self.get(self._cur_file_idx), line, sep)
         self._cur_line_idx += 1
+
+def fileinput(files=None, mode='t', encoding='utf-8'):
+    """Convenience method that creates a new ``FileInput``.
+    
+    Args:
+        files: The files to open. If None, files passed on the command line are
+            used, or STDIN if there are no command line arguments.
+        mode: The default read mode ('t' for text or 'b' for binary)
+        encoding: The default character encoding
+    
+    Returns:
+        A FileInput instance
+    """
+    if not files:
+        files = sys.argv[1:] or (STDIN,)
+    elif isinstance(files, str):
+        files = (files,)
+    return FileInput(files, mode, encoding)
+
+def fileoutput(files=None, mode='t', linesep=os.linesep, encoding='utf-8',
+               file_output_type=TeeFileOutput, **kwargs):
+    """Convenience function to create a fileoutput.
+    
+    Args:
+        files: The files to write to
+        mode: The write mode ('t' or 'b')
+        linesep: The separator to use when writing lines
+        encoding: The default file encoding to use
+        file_output_type: The specific subclass of FileOutput to create
+        kwargs: additional arguments to pass to the FileOutput constructo
+    
+    Returns:
+        A FileOutput instance
+    """
+    if not files:
+        files = sys.argv[1:] or (STDOUT,)
+    elif isinstance(files, str):
+        files = (files,)
+    return file_output_type(files, mode=mode, linesep=linesep,
+                            encoding=encoding, **kwargs)
 
 # Misc
 

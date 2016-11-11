@@ -4,12 +4,15 @@ from collections import OrderedDict
 import gzip
 import bz2
 import os
+import xphyle
 from xphyle.paths import TempDir
 from xphyle.utils import *
 
 class UtilsTests(TestCase):
     def setUp(self):
         self.root = TempDir()
+        self.system_args = sys.argv
+        xphyle.configure(False, False)
     
     def tearDown(self):
         self.root.close()
@@ -265,10 +268,9 @@ class UtilsTests(TestCase):
         self.assertEqual(0, linecount(path))
     
     def test_file_manager(self):
-        paths12 = [
-            self.root.make_empty_files(1)[0],
-            ('path2', self.root.make_empty_files(1)[0])
-        ]
+        paths12 = dict(
+            path1=self.root.make_empty_files(1)[0],
+            path2=self.root.make_empty_files(1)[0])
         with FileManager(paths12, mode='wt') as f:
             paths34 = self.root.make_empty_files(2)
             for p in paths34:
@@ -281,14 +283,14 @@ class UtilsTests(TestCase):
             path6 = self.root.make_file()
             f['path6'] = path6
             self.assertEqual(path6, f.get_path('path6'))
-            all_paths = [paths12[0], paths12[1][1]] + paths34 + [path5, path6]
+            all_paths = list(paths12.values()) + paths34 + [path5, path6]
             self.assertListEqual(all_paths, f.paths)
             self.assertEqual(len(f), 6)
             for key, fh in f.iter_files():
                 self.assertFalse(fh.closed)
             self.assertIsNotNone(f['path2'])
             self.assertIsNotNone(f.get('path2'))
-            self.assertEqual(f['path2'], f.get(1))
+            self.assertEqual(f['path6'], f.get(5))
             with self.assertRaises(KeyError):
                 f['foo']
             self.assertIsNone(f.get('foo'))
@@ -340,4 +342,163 @@ class UtilsTests(TestCase):
         self.assertFalse(os.path.exists(path))
     
     def test_file_input(self):
-        pass
+        file1 = self.root.make_file(suffix='.gz')
+        with gzip.open(file1, 'wt') as o:
+            o.write('foo\nbar\n')
+        with self.assertRaises(ValueError):
+            fileinput(file1, mode='z')
+        with fileinput(file1) as i:
+            lines = list(i)
+            self.assertListEqual(['foo\n','bar\n'], lines)
+        file2 = self.root.make_file(suffix='.gz')
+        with gzip.open(file2, 'wt') as o:
+            o.write('baz\n')
+        with fileinput((file1, file2)) as i:
+            lines = list(i)
+            self.assertListEqual(['foo\n','bar\n', 'baz\n'], lines)
+        with fileinput([('key1',file1), ('key2', file2)]) as i:
+            self.assertEqual(i.filekey, None)
+            self.assertEqual(i.filename, None)
+            self.assertEqual(i.lineno, 0)
+            self.assertEqual(i.filelineno, 0)
+            
+            self.assertEqual(next(i), 'foo\n')
+            self.assertEqual(i.filekey, 'key1')
+            self.assertEqual(i.filename, file1)
+            self.assertEqual(i.lineno, 1)
+            self.assertEqual(i.filelineno, 1)
+            
+            self.assertEqual(next(i), 'bar\n')
+            self.assertEqual(i.filekey, 'key1')
+            self.assertEqual(i.filename, file1)
+            self.assertEqual(i.lineno, 2)
+            self.assertEqual(i.filelineno, 2)
+            
+            self.assertEqual(next(i), 'baz\n')
+            self.assertEqual(i.filekey, 'key2')
+            self.assertEqual(i.filename, file2)
+            self.assertEqual(i.lineno, 3)
+            self.assertEqual(i.filelineno, 1)
+        
+    def test_pending(self):
+        file1 = self.root.make_file(suffix='.gz')
+        with gzip.open(file1, 'wt') as o:
+            o.write('foo\nbar\n')
+        f = FileInput()
+        self.assertTrue(f._pending)
+        f.add(file1)
+        l = list(f)
+        self.assertTrue(f.finished)
+        self.assertFalse(f._pending)
+        file2 = self.root.make_file(suffix='.gz')
+        with gzip.open(file2, 'wt') as o:
+            o.write('baz\n')
+        f.add(file2)
+        self.assertTrue(f._pending)
+        self.assertFalse(f.finished)
+        self.assertEqual('baz\n', f.readline())
+        self.assertEqual('', f.readline())
+        with self.assertRaises(StopIteration):
+            next(f)
+        self.assertTrue(f.finished)
+        self.assertFalse(f._pending)
+    
+    def test_file_input_stdin(self):
+        path = self.root.make_file()
+        with open(path, 'wt') as o:
+            o.write('foo\nbar\n')
+        sys.argv = [self.system_args[0], path]
+        self.assertEqual(
+            ['foo\n','bar\n'],
+            list(fileinput()))
+        sys.argv = []
+        with intercept_stdin(b'foo\nbar\n', is_bytes=True) as i:
+            self.assertEqual(
+            [b'foo\n',b'bar\n'],
+            list(fileinput()))
+    
+    def test_tee_file_output(self):
+        file1 = self.root.make_file(suffix='.gz')
+        file2 = self.root.make_file()
+        with self.assertRaises(ValueError):
+            fileoutput(file1, mode='z')
+        with fileoutput((file1,file2), file_output_type=TeeFileOutput) as o:
+            o.writelines(('foo','bar','baz'))
+        with gzip.open(file1, 'rt') as i:
+            self.assertEqual('foo\nbar\nbaz\n', i.read())
+        with open(file2, 'rt') as i:
+            self.assertEqual('foo\nbar\nbaz\n', i.read())
+    
+    def test_tee_file_output_binary(self):
+        file1 = self.root.make_file(suffix='.gz')
+        file2 = self.root.make_file()
+        with fileoutput((file1,file2), mode='b',
+                        file_output_type=TeeFileOutput) as o:
+            o.writelines((b'foo',b'bar',b'baz'))
+        with gzip.open(file1, 'rb') as i:
+            self.assertEqual(b'foo\nbar\nbaz\n', i.read())
+        with open(file2, 'rb') as i:
+            self.assertEqual(b'foo\nbar\nbaz\n', i.read())
+        
+        with fileoutput((file1,file2), mode='t',
+                        file_output_type=TeeFileOutput) as o:
+            o.writelines((b'foo',b'bar',b'baz'))
+        with gzip.open(file1, 'rt') as i:
+            self.assertEqual('foo\nbar\nbaz\n', i.read())
+        with open(file2, 'rt') as i:
+            self.assertEqual('foo\nbar\nbaz\n', i.read())
+        
+        with fileoutput((file1,file2), mode='b',
+                        file_output_type=TeeFileOutput) as o:
+            o.writelines(('foo',b'bar',b'baz'))
+        with gzip.open(file1, 'rb') as i:
+            self.assertEqual(b'foo\nbar\nbaz\n', i.read())
+        with open(file2, 'rb') as i:
+            self.assertEqual(b'foo\nbar\nbaz\n', i.read())
+    
+    def test_tee_file_output_no_newline(self):
+        file1 = self.root.make_file(suffix='.gz')
+        file2 = self.root.make_file()
+        with fileoutput((file1,file2), file_output_type=TeeFileOutput) as o:
+            o.writeline('foo', False)
+            o.writeline(newline=True)
+            o.writeline('bar', True)
+            self.assertEqual(3, o.num_lines)
+        with gzip.open(file1, 'rb') as i:
+            self.assertEqual(b'foo\nbar\n', i.read())
+        with open(file2, 'rb') as i:
+            self.assertEqual(b'foo\nbar\n', i.read())
+    
+    def test_file_output_stdout(self):
+        path = self.root.make_file()
+        sys.argv = [self.system_args, path]
+        with fileoutput() as o:
+            o.writelines(('foo','bar','baz'))
+        with open(path, 'rt') as i:
+            self.assertEqual('foo\nbar\nbaz\n', i.read())
+        sys.argv = []
+        outbuf = BytesIO()
+        with intercept_stdout(TextIOWrapper(outbuf)):
+            with fileoutput(mode='b') as o:
+                o.writelines((b'foo',b'bar',b'baz'))
+            self.assertEqual(b'foo\nbar\nbaz\n', outbuf.getvalue())
+    
+    def test_cycle_file_output(self):
+        file1 = self.root.make_file(suffix='.gz')
+        file2 = self.root.make_file()
+        with fileoutput((file1,file2), file_output_type=CycleFileOutput) as o:
+            o.writelines(('foo','bar','baz'))
+        with gzip.open(file1, 'rt') as i:
+            self.assertEqual('foo\nbaz\n', i.read())
+        with open(file2, 'rt') as i:
+            self.assertEqual('bar\n', i.read())
+    
+    def test_ncycle_file_output(self):
+        file1 = self.root.make_file(suffix='.gz')
+        file2 = self.root.make_file()
+        with fileoutput((file1,file2), n=2, file_output_type=NCycleFileOutput) as o:
+            o.writelines(('foo','bar','baz','blorf','bing'))
+        with gzip.open(file1, 'rt') as i:
+            self.assertEqual('foo\nbar\nbing\n', i.read())
+        with open(file2, 'rt') as i:
+            self.assertEqual('baz\nblorf\n', i.read())
