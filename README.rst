@@ -15,7 +15,7 @@ common file I/O operations.
 Installation
 ============
 
-From pypi::
+::
 
     pip install xphyle
 
@@ -55,11 +55,11 @@ Example usages:
                 print(line)
 
     # Read all lines in a compressed file into a list
-    from xphyle.utils import safe_iter
-    lines = list(safe_iter('infile.gz'))
+    from xphyle.utils import read_lines
+    lines = list(read_lines('infile.gz'))
 
     # Sum the rows in a compressed file where each line is an integer value
-    total = sum(safe_iter('infile.gz', convert=int))
+    total = sum(read_lines('infile.gz', convert=int))
 
 See the
 `Documentation <http://xphyle.readthedocs.io/en/latest/?badge=latest>`__
