@@ -17,45 +17,60 @@ class UtilsTests(TestCase):
     def tearDown(self):
         self.root.close()
     
-    def test_iter_lines(self):
-        self.assertListEqual(list(iter_lines('foobar', errors=False)), [])
+    def test_read_lines(self):
+        self.assertListEqual(list(read_lines('foobar', errors=False)), [])
         
         path = self.root.make_file()
         with open(path, 'wt') as o:
             o.write("1\n2\n3")
         self.assertListEqual(
-            list(iter_lines(path)),
+            list(read_lines(path)),
             ['1','2','3'])
         self.assertListEqual(
-            list(iter_lines(path, convert=int)),
+            list(read_lines(path, convert=int)),
             [1,2,3])
 
     def test_read_chunked(self):
-        self.assertListEqual([], list(chunked_iter('foobar', errors=False)))
+        self.assertListEqual([], list(read_bytes('foobar', errors=False)))
         path = self.root.make_file()
         with open(path, 'wt') as o:
             o.write("1234567890")
-        chunks = list(chunked_iter(path, 3))
+        chunks = list(read_bytes(path, 3))
         self.assertListEqual([b'123', b'456', b'789', b'0'], chunks)
 
-    def test_write_iterable(self):
+    def test_write_lines(self):
         linesep_len = len(os.linesep)
         path = self.root.make_file()
-        self.assertEquals(3, write_iterable(['foo'], path, linesep=None))
-        self.assertEqual(list(iter_lines(path)), ['foo'])
+        self.assertEquals(3, write_lines(['foo'], path, linesep=None))
+        self.assertEqual(list(read_lines(path)), ['foo'])
         path = self.root.make_file()
         self.assertEquals(
             9 + (2*linesep_len),
-            write_iterable(('foo', 'bar', 'baz'), path, linesep=None))
+            write_lines(('foo', 'bar', 'baz'), path, linesep=None))
         self.assertEqual(
-            list(iter_lines(path)),
+            list(read_lines(path)),
             ['foo','bar','baz'])
         path = self.root.make_file()
         self.assertEquals(
-            11, write_iterable(('foo', 'bar', 'baz'), path, linesep='|'))
-        self.assertEqual(list(iter_lines(path)), ['foo|bar|baz'])
+            11, write_lines(('foo', 'bar', 'baz'), path, linesep='|'))
+        self.assertEqual(list(read_lines(path)), ['foo|bar|baz'])
         path = self.root.make_file(mode='r')
-        self.assertEqual(-1, write_iterable(['foo'], path, errors=False))
+        self.assertEqual(-1, write_lines(['foo'], path, errors=False))
+    
+    def test_write_bytes(self):
+        path = self.root.make_file()
+        linesep_len = len(os.linesep)
+        self.assertEquals(3, write_bytes([b'foo'], path))
+        self.assertEqual(list(read_bytes(path)), [b'foo'])
+        path = self.root.make_file()
+        self.assertEquals(
+            9 + (2*linesep_len),
+            write_bytes(('foo', 'bar', 'baz'), path, sep=None))
+        self.assertEqual(
+            os.linesep.encode().join((b'foo',b'bar',b'baz')),
+            b''.join(read_bytes(path)))
+        path = self.root.make_file(mode='r')
+        self.assertEqual(-1, write_bytes([b'foo'], path, errors=False))
     
     def test_read_dict(self):
         path = self.root.make_file()
@@ -73,11 +88,11 @@ class UtilsTests(TestCase):
         path = self.root.make_file()
         write_dict(OrderedDict([('foo',1), ('bar',2)]), path, linesep=None)
         self.assertEqual(
-            list(iter_lines(path)),
+            list(read_lines(path)),
             ['foo=1','bar=2'])
     
     def test_tsv(self):
-        self.assertListEqual([], list(delimited_file_iter('foobar', errors=False)))
+        self.assertListEqual([], list(read_delimited('foobar', errors=False)))
         
         path = self.root.make_file()
         with open(path, 'wt') as o:
@@ -86,9 +101,9 @@ class UtilsTests(TestCase):
             o.write('4\t5\t6\n')
         
         with self.assertRaises(ValueError):
-            list(delimited_file_iter(path, header=False, converters='int'))
+            list(read_delimited(path, header=False, converters='int'))
         with self.assertRaises(ValueError):
-            list(delimited_file_iter(
+            list(read_delimited(
                 path, header=False, converters=int, row_type='dict',
                 yield_header=False))
         
@@ -98,7 +113,7 @@ class UtilsTests(TestCase):
                 [1, 2, 3],
                 [4, 5, 6]
             ],
-            list(delimited_file_iter(
+            list(read_delimited(
                 path, header=True, converters=int)))
         self.assertListEqual(
             [
@@ -106,7 +121,7 @@ class UtilsTests(TestCase):
                 (1, 2, 3),
                 (4, 5, 6)
             ],
-            list(delimited_file_iter(
+            list(read_delimited(
                 path, header=True, converters=int, row_type='tuple')))
         self.assertListEqual(
             [
@@ -114,14 +129,14 @@ class UtilsTests(TestCase):
                 (1, 2, 3),
                 (4, 5, 6)
             ],
-            list(delimited_file_iter(
+            list(read_delimited(
                 path, header=True, converters=int, row_type=tuple)))
         self.assertListEqual(
             [
                 dict(a=1, b=2, c=3),
                 dict(a=4, b=5, c=6)
             ],
-            list(delimited_file_iter(
+            list(read_delimited(
                 path, header=True, converters=int, row_type='dict',
                 yield_header=False)))
     
@@ -133,23 +148,23 @@ class UtilsTests(TestCase):
             o.write('row2\t4\t5\t6\n')
         
         with self.assertRaises(ValueError):
-            delimited_file_to_dict(path, key='id', header=False)
+            read_delimited_as_dict(path, key='id', header=False)
         with self.assertRaises(ValueError):
-            delimited_file_to_dict(path, key=None, header=False)
+            read_delimited_as_dict(path, key=None, header=False)
         
         self.assertDictEqual(
             dict(
                 row1=['row1',1,2,3],
                 row2=['row2',4,5,6]
             ),
-            delimited_file_to_dict(
+            read_delimited_as_dict(
                 path, key=0, header=True, converters=(str,int,int,int)))
         self.assertDictEqual(
             dict(
                 row1=['row1',1,2,3],
                 row2=['row2',4,5,6]
             ),
-            delimited_file_to_dict(
+            read_delimited_as_dict(
                 path, key='id', header=True, converters=(str,int,int,int)))
         
         with open(path, 'wt') as o:
@@ -162,7 +177,7 @@ class UtilsTests(TestCase):
                 row1=[1,2,3],
                 row4=[4,5,6]
             ),
-            delimited_file_to_dict(
+            read_delimited_as_dict(
                 path, key=lambda row: 'row{}'.format(row[0]),
                 header=True, converters=int))
         
@@ -174,7 +189,7 @@ class UtilsTests(TestCase):
             o.write('row1\t4\t5\t6\n')
         
         with self.assertRaises(Exception):
-            delimited_file_to_dict(
+            read_delimited_as_dict(
                 path, key='id', header=True, converters=(str,int,int,int))
     
     def test_compress_file_no_dest(self):
@@ -502,3 +517,13 @@ class UtilsTests(TestCase):
             self.assertEqual('foo\nbar\nbing\n', i.read())
         with open(file2, 'rt') as i:
             self.assertEqual('baz\nblorf\n', i.read())
+    
+    def test_rolling_file_output(self):
+        path = self.root.make_file()
+        with RollingFileOutput(path + '{0}.txt', n=3) as out:
+            for i in range(6):
+                out.writeline(str(i))
+        with open(path + '0.txt', 'rt') as infile:
+            self.assertEqual('0\n1\n2\n', infile.read())
+        with open(path + '1.txt', 'rt') as infile:
+            self.assertEqual('3\n4\n5\n', infile.read())

@@ -21,7 +21,7 @@ from xphyle.paths import *
 
 ## Raw data
 
-def iter_lines(path : 'str|file', convert : 'callable' = None,
+def read_lines(path : 'str|file', convert : 'callable' = None,
                strip_linesep : 'bool' = True, **kwargs) -> 'generator':
     """Iterate over lines in a file.
     
@@ -45,8 +45,8 @@ def iter_lines(path : 'str|file', convert : 'callable' = None,
         for line in itr:
             yield line
 
-def chunked_iter(path : 'str|file', chunksize : 'int,>0' = 1024,
-                 **kwargs) -> 'generator':
+def read_bytes(path : 'str|file', chunksize : 'int,>0' = 1024,
+               **kwargs) -> 'generator':
     """Iterate over a file in chunks. The mode will always be overridden
     to 'rb'.
     
@@ -55,8 +55,9 @@ def chunked_iter(path : 'str|file', chunksize : 'int,>0' = 1024,
         chunksize: Number of bytes to read at a time
         kwargs: Additional arguments to pass top ``open_``
     
-    Returns:
-        Generator that reads a binary file in chunks of ``chunksize``.
+    Yields:
+        Chunks of the input file as bytes. Each chunk except the last should
+        be of size ``chunksize``.
     """
     kwargs['mode'] = 'rb'
     with open_(path, **kwargs) as f:
@@ -65,9 +66,9 @@ def chunked_iter(path : 'str|file', chunksize : 'int,>0' = 1024,
         for chunk in iter_file_chunked(f, chunksize):
             yield chunk
 
-def write_iterable(iterable : 'iterable', path : 'str|file',
-                   linesep : 'str' = '\n', convert : 'callable' = str,
-                   **kwargs):
+def write_lines(iterable : 'iterable', path : 'str|file',
+                linesep : 'str' = '\n', convert : 'callable' = str,
+                **kwargs) -> 'int':
     """Write delimiter-separated strings to a file.
     
     Args:
@@ -85,12 +86,58 @@ def write_iterable(iterable : 'iterable', path : 'str|file',
     if linesep is None:
         linesep = os.linesep
     if 'mode' not in kwargs:
-        kwargs['mode'] = 'w'
+        kwargs['mode'] = 'wt'
     written = 0
     with open_(path, **kwargs) as f:
         if f is None:
             return -1
-        written += f.write(linesep.join(convert(s) for s in iterable))
+        for s in iterable:
+            if written > 0:
+                written += f.write(linesep)
+            written += f.write(convert(s))
+    return written
+
+def to_bytes(x, encoding='utf-8'):
+    """Convert an arbitrary value to bytes.
+    
+    Args:
+        x: Some value
+        encoding: The byte encoding to use
+    
+    Returns:
+        x converted to a string and then encoded as bytes
+    """
+    if isinstance(x, bytes):
+        return(x)
+    return str(x).encode(encoding)
+
+def write_bytes(iterable : 'iterable', path : 'str|file', sep : 'bytes' = b'',
+                convert : 'callable' = to_bytes, **kwargs) -> 'int':
+    """Write an iterable of bytes to a file.
+    
+    Args:
+        iterable: An iterable
+        path: Path to the file, or a file-like object
+        sep: Separator between items
+        convert: Function that converts a value to bytes
+        kwargs: Additional arguments to pass top ``open_``
+    
+    Returns:
+        Total number of bytes written, or -1 if ``errors=False`` and there was
+        a problem opening the file.
+    """
+    if sep is None:
+        sep = convert(os.linesep)
+    if 'mode' not in kwargs:
+        kwargs['mode'] = 'wb'
+    written = 0
+    with open_(path, **kwargs) as f:
+        if f is None:
+            return -1
+        for b in iterable:
+            if written > 0:
+                written += f.write(sep)
+            written += f.write(convert(b))
     return written
 
 # key=value files
@@ -115,7 +162,7 @@ def read_dict(path: 'str|file', sep : 'str' = '=', convert : 'callable' = None,
         if len(line) == 0 or line[0] == "#":
             return None
         return line.split(sep)
-    lines = filter(None, iter_lines(path, convert=parse_line, **kwargs))
+    lines = filter(None, read_lines(path, convert=parse_line, **kwargs))
     if convert:
         lines = ((k, convert(v)) for k, v in lines)
     return OrderedDict(lines) if ordered else dict(lines)
@@ -134,18 +181,18 @@ def write_dict(d : 'dict', path : 'str', sep : 'str' = '=',
     """
     if linesep is None:
         linesep = os.linesep
-    write_iterable(
+    write_lines(
         ("{}{}{}".format(k, sep, convert(v)) for k, v in d.items()),
         path, linesep=linesep, **kwargs)
 
 ## Other delimited files
 
-def delimited_file_iter(path : 'str', sep : 'str' = '\t',
-                        header : 'bool|iterable' = False,
-                        converters : 'callable|iterable' = None,
-                        yield_header : 'bool' = True,
-                        row_type : 'str|callable' = 'list',
-                        **kwargs) -> 'generator':
+def read_delimited(path : 'str', sep : 'str' = '\t',
+                   header : 'bool|iterable' = False,
+                   converters : 'callable|iterable' = None,
+                   yield_header : 'bool' = True,
+                   row_type : 'str|callable' = 'list',
+                   **kwargs) -> 'generator':
     """Iterate over rows in a delimited file.
     
     Args:
@@ -200,7 +247,7 @@ def delimited_file_iter(path : 'str', sep : 'str' = '\t',
         for row in reader:
             yield row
 
-def delimited_file_to_dict(path : 'str', sep : 'str' = '\t',
+def read_delimited_as_dict(path : 'str', sep : 'str' = '\t',
                            header : 'bool|iterable' = False,
                            key : 'int,>=0|callable' = 0, **kwargs) -> 'dict':
     """Parse rows in a delimited file and add rows to a dict based on a a
@@ -212,7 +259,7 @@ def delimited_file_to_dict(path : 'str', sep : 'str' = '\t',
         key: The column to use as a dict key, or a function to extract the key
           from the row. If a string value, header must be specified. All values
           must be unique, or an exception is raised.
-        kwargs: Additional arguments to pass to ``delimited_file_iter``
+        kwargs: Additional arguments to pass to ``read_delimited``
     
     Returns:
         A dict with as many element as rows in the file
@@ -228,7 +275,7 @@ def delimited_file_to_dict(path : 'str', sep : 'str' = '\t',
                 "'header' must be specified if 'key' is a column name")
         if header is True:
             kwargs['yield_header'] = True
-            itr = delimited_file_iter(path, sep, True, **kwargs)
+            itr = read_delimited(path, sep, True, **kwargs)
             header = next(itr)
         key = header.index(key)
     
@@ -241,7 +288,7 @@ def delimited_file_to_dict(path : 'str', sep : 'str' = '\t',
     
     if itr is None:
         kwargs['yield_header'] = False
-        itr = delimited_file_iter(path, sep, header, **kwargs)
+        itr = read_delimited(path, sep, header, **kwargs)
     
     d = {}
     for row in itr:
@@ -614,6 +661,24 @@ class FileInput(FileManager):
         except StopIteration:
             return b'' if self._is_binary else ''
 
+def fileinput(files=None, mode='t', encoding='utf-8'):
+    """Convenience method that creates a new ``FileInput``.
+    
+    Args:
+        files: The files to open. If None, files passed on the command line are
+            used, or STDIN if there are no command line arguments.
+        mode: The default read mode ('t' for text or 'b' for binary)
+        encoding: The default character encoding
+    
+    Returns:
+        A FileInput instance
+    """
+    if not files:
+        files = sys.argv[1:] or (STDIN,)
+    elif isinstance(files, str):
+        files = (files,)
+    return FileInput(files, mode, encoding)
+
 class FileOutput(FileManager):
     """Base class for file manager that writes to multiple files.
     """
@@ -725,24 +790,6 @@ class NCycleFileOutput(FileOutput):
         self._write_to_file(self.get(self._cur_file_idx), line, sep)
         self._cur_line_idx += 1
 
-def fileinput(files=None, mode='t', encoding='utf-8'):
-    """Convenience method that creates a new ``FileInput``.
-    
-    Args:
-        files: The files to open. If None, files passed on the command line are
-            used, or STDIN if there are no command line arguments.
-        mode: The default read mode ('t' for text or 'b' for binary)
-        encoding: The default character encoding
-    
-    Returns:
-        A FileInput instance
-    """
-    if not files:
-        files = sys.argv[1:] or (STDIN,)
-    elif isinstance(files, str):
-        files = (files,)
-    return FileInput(files, mode, encoding)
-
 def fileoutput(files=None, mode='t', linesep=os.linesep, encoding='utf-8',
                file_output_type=TeeFileOutput, **kwargs):
     """Convenience function to create a fileoutput.
@@ -753,7 +800,7 @@ def fileoutput(files=None, mode='t', linesep=os.linesep, encoding='utf-8',
         linesep: The separator to use when writing lines
         encoding: The default file encoding to use
         file_output_type: The specific subclass of FileOutput to create
-        kwargs: additional arguments to pass to the FileOutput constructo
+        kwargs: additional arguments to pass to the FileOutput constructor
     
     Returns:
         A FileOutput instance
@@ -764,6 +811,31 @@ def fileoutput(files=None, mode='t', linesep=os.linesep, encoding='utf-8',
         files = (files,)
     return file_output_type(files, mode=mode, linesep=linesep,
                             encoding=encoding, **kwargs)
+
+class RollingFileOutput(FileOutput):
+    """Write up to ``n`` lines to a file before opening the next file. File
+    names are created from a pattern.
+    
+    Args:
+    """
+    def __init__(self, filename_pattern, mode='t', n=1, **kwargs):
+        super(RollingFileOutput, self).__init__(mode=mode, **kwargs)
+        self.filename_pattern = filename_pattern
+        self.n = n
+        self._cur_line_idx = 0
+        self._cur_file_idx = 0
+    
+    def _writeline(self, line=None, sep=None):
+        if self._cur_line_idx >= self.n:
+            self._cur_line_idx = 0
+            self._cur_file_idx += 1
+        if self._cur_file_idx >= len(self):
+            self._open_next_file()
+        self._write_to_file(self.get(self._cur_file_idx), line, sep)
+        self._cur_line_idx += 1
+    
+    def _open_next_file(self):
+        self.add(self.filename_pattern.format(self._cur_file_idx))
 
 # Misc
 

@@ -218,7 +218,9 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
                 guess = guess_format_from_buffer(fh)
                 # The following code is never used, unless there is some
                 # scenario in which the file type cannot be guessed from
-                # the header bytes.
+                # the header bytes. I'll leave this here for now but keep
+                # it commented out until someone provides an example of
+                # why it's necessary.
                 # if guess is None and guess_format:
                 #     # Check if the MIME type indicates that the file is
                 #     # compressed
