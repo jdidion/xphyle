@@ -83,7 +83,7 @@ class SystemReader:
     def flush(self): pass
     
     def close(self):
-        self.close = True
+        self.closed = True
         retcode = self.process.poll()
         if retcode is None:
             # still running
@@ -286,7 +286,10 @@ def guess_format_from_header_bytes(b : 'bytes') -> 'str':
     return None
 
 def get_format_for_mime_type(mime_type : 'str') -> 'str':
-    pass
+    """Returns the file format associated with a MIME type, or None if no
+    format is associated with the mime type.
+    """
+    return mime_types.get(mime_type, None)
 
 class CompressionFormat(FileFormat):
     """Base class for classes that provide access to system-level and
@@ -476,6 +479,10 @@ class CompressionFormat(FileFormat):
             source_path = source
         else:
             source_path = source.name
+            try: # pragma: no cover
+                source.fileno()
+            except:
+                use_system = False
         
         in_place = False
         if dest is None:
@@ -556,7 +563,14 @@ class CompressionFormat(FileFormat):
         dest_is_path = isinstance(dest, str)
         if dest_is_path:
             check_writeable_file(dest)
-        dest_file = open(dest, 'wb') if dest_is_path else dest
+        if dest_is_path:
+            dest_file = open(dest, 'wb')
+        else:
+            dest_file = dest
+            try: # pragma: no cover
+                dest_file.fileno()
+            except:
+                use_system = False
         
         try:
             if use_system and self.can_use_system_uncompression:

@@ -15,6 +15,7 @@ class MockProgress(object):
 class ProgressTests(TestCase):
     def setUp(self):
         self.root = TempDir()
+        xphyle.configure(False, False)
     
     def tearDown(self):
         self.root.close()

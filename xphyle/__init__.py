@@ -184,17 +184,20 @@ def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
             fh = sys.stderr
         else:
             fh = sys.stdin if 'r' in mode else sys.stdout
+        wrapped = True
         if compression is not False:
             fh = fh.buffer
+            wrapped = False
         if 'r' in mode and (validate or guess_format):
             if not hasattr(fh, 'peek'):
                 fh = io.BufferedReader(fh)
+                wrapped = True
             guess = guess_format_from_buffer(fh)
         else:
             validate = False
         if not (compression or guess):
             is_stream = True
-            if 'b' in mode:
+            if 'b' in mode and wrapped:
                 fh = fh.buffer
     
     else:
