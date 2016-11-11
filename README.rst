@@ -68,12 +68,7 @@ for full usage information.
 Roadmap
 =======
 
-1.0
----
-
--  User documentation
-
-Beyond 1.0, releases will be mapped using `GitHub
+Future releases are mapped out using `GitHub
 Projects <https://github.com/jdidion/xphyle/projects>`__.
 
 .. |https://pypi.python.org/pypi/xphyle| image:: https://img.shields.io/pypi/v/xphyle.svg?branch=master

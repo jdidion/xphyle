@@ -62,8 +62,4 @@ See the [Documentation](http://xphyle.readthedocs.io/en/latest/?badge=latest) fo
 
 # Roadmap
 
-## 1.0
-
-* User documentation
-
-Beyond 1.0, releases will be mapped using [GitHub Projects](https://github.com/jdidion/xphyle/projects).
+Future releases are mapped out using [GitHub Projects](https://github.com/jdidion/xphyle/projects).
