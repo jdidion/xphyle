@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# atropos documentation build configuration file, created by
+# xphyle documentation build configuration file, created by
 # sphinx-quickstart on Fri Sep 12 09:11:16 2014.
 #
 # This file is execfile()d with the current directory set to its
