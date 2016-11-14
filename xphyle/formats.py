@@ -118,7 +118,7 @@ class SystemReader:
     def __enter__(self):
         return self
 
-    def __exit__(self, *exc_info):
+    def __exit__(self, exception_type, exception_value, traceback):
         self.close()
 
 class SystemWriter:
@@ -179,7 +179,7 @@ class SystemWriter:
     def __enter__(self):
         return self
 
-    def __exit__(self, *exc_info):
+    def __exit__(self, exception_type, exception_value, traceback):
         self.close()
 
 # Supported compression formats
