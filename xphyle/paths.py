@@ -253,11 +253,16 @@ def find(root : 'str', pattern : 'str|regexp', types : 'str' = 'f',
     found = []
     for root, dirs, files in os.walk(root):
         if types != "f":
-            for d in filter(lambda x: pattern.match(x), dirs):
-                found.append(os.path.join(root, d))
+            found.extend(
+                os.path.join(root, d)
+                for d in dirs
+                if pattern.match(d))
         if types != "d":
-            for f in filter(lambda x: pattern.match(x), files):
-                found.append(os.path.join(root, f))
+            found.extend(
+                os.path.join(root, f)
+                for f in files
+                if pattern.match(f))
+    
     return found
 
 executable_paths = copy.copy(os.get_exec_path())
