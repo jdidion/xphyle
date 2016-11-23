@@ -7,14 +7,14 @@ from xphyle.paths import TempDir, get_executable_path
 from . import *
 
 def get_format(ext):
-    return get_compression_format(guess_compression_format(ext))
+    return FORMATS.get_compression_format(FORMATS.guess_compression_format(ext))
 
-def write_file(fmt, path, ext, use_system, content, mode='wt'):
-    with fmt.open_file(path, mode=mode, ext=ext, use_system=use_system) as f:
+def write_file(fmt, path, use_system, content, mode='wt'):
+    with fmt.open_file(path, mode=mode, use_system=use_system) as f:
         f.write(content)
 
-def read_file(fmt, path, ext, use_system, mode='rt'):
-    with fmt.open_file(path, mode=mode, ext=ext, use_system=use_system) as f:
+def read_file(fmt, path, use_system, mode='rt'):
+    with fmt.open_file(path, mode=mode, use_system=use_system) as f:
         return f.read()
 
 gz_path = get_format('gz').executable_path
@@ -26,20 +26,20 @@ class CompressionTests(TestCase):
     def test_list_formats(self):
         self.assertSetEqual(
             set(('gzip','bz2','lzma')),
-            set(list_compression_formats()))
+            set(FORMATS.list_compression_formats()))
         self.assertSetEqual(
             set(('gzip','gz','pigz')),
             set(get_format('gzip').aliases))
     
     def test_guess_format(self):
-        self.assertEqual('gzip', guess_compression_format('gz'))
-        self.assertEqual('gzip', guess_compression_format('.gz'))
-        self.assertEqual('gzip', guess_compression_format('foo.gz'))
+        self.assertEqual('gzip', FORMATS.guess_compression_format('gz'))
+        self.assertEqual('gzip', FORMATS.guess_compression_format('.gz'))
+        self.assertEqual('gzip', FORMATS.guess_compression_format('foo.gz'))
     
     def test_invalid_format(self):
-        self.assertIsNone(guess_compression_format('foo'))
+        self.assertIsNone(FORMATS.guess_compression_format('foo'))
         with self.assertRaises(ValueError):
-            get_compression_format('foo')
+            FORMATS.get_compression_format('foo')
     
     def test_gzip(self):
         gz = get_format('gz')
@@ -59,7 +59,7 @@ class CompressionTests(TestCase):
     
     @skipIf(no_pigz, "'pigz' not available")
     def test_pigz(self):
-        xphyle.formats.threads = 2
+        xphyle.formats.set_threads(2)
         gz = get_format('gz')
         self.assertEqual(gz.default_ext, 'gz')
         self.assertEqual(
@@ -125,8 +125,8 @@ class FileTests(TestCase):
                 content = b''.join(c.encode() for c in content)
         path = self.root.make_file(suffix=ext)
         fmt = get_format(ext)
-        write_file(fmt, path, ext, use_system, content, 'w' + mode)
-        in_text = read_file(fmt, path, ext, use_system, 'r' + mode)
+        write_file(fmt, path, use_system, content, 'w' + mode)
+        in_text = read_file(fmt, path, use_system, 'r' + mode)
         self.assertEqual(content, in_text)
     
     def test_write_read_bytes_python(self):

@@ -14,8 +14,9 @@ import shutil
 import sys
 
 from xphyle import *
-from xphyle.formats import *
+from xphyle.formats import FORMATS
 from xphyle.paths import *
+from xphyle.progress import iter_file_chunked
 
 # Reading data from/writing data to files
 
@@ -324,13 +325,13 @@ def compress_file(source_file: 'str|file', compressed_file: 'str|file' = None,
     """
     if not isinstance(compression, str):
         if compressed_file:
-            compression = guess_compression_format(compressed_file
+            compression = FORMATS.guess_compression_format(compressed_file
                 if isinstance(compressed_file, str) else compressed_file.name)
         else:
             raise ValueError(
                 "'compressed_file' or 'compression' must be specified")
     
-    fmt = get_compression_format(compression)
+    fmt = FORMATS.get_compression_format(compression)
     return fmt.compress_file(
         source_file, compressed_file, keep, compresslevel, use_system, **kwargs)
 
@@ -360,8 +361,8 @@ def uncompress_file(compressed_file: 'str|file', dest_file: 'str|file' = None,
         source_path = compressed_file
         if not isinstance(compressed_file, str):
             source_path = compressed_file.name
-        compression = guess_compression_format(source_path)
-    fmt = get_compression_format(compression)
+        compression = FORMATS.guess_compression_format(source_path)
+    fmt = FORMATS.get_compression_format(compression)
     return fmt.uncompress_file(
         compressed_file, dest_file, keep, use_system, **kwargs)
 

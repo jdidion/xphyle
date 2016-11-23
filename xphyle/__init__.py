@@ -7,14 +7,17 @@ import copy
 import os
 import sys
 
-from xphyle.formats import *
-from xphyle.urls import *
-from xphyle.paths import *
+import xphyle.formats
 import xphyle.progress
+import xphyle.paths
 
-from ._version import get_versions
-__version__ = get_versions()['version']
-del get_versions
+from xphyle.formats import FORMATS
+from xphyle.paths import *
+from xphyle.progress import wrap_iter
+from xphyle.urls import *
+
+import xphyle._version
+__version__ = xphyle._version.get_versions()['version']
 
 def configure(progress: 'bool|callable' = None,
               system_progress: 'bool|str|list' = None,
@@ -41,7 +44,7 @@ def configure(progress: 'bool|callable' = None,
     if system_progress is not None:
         xphyle.progress.set_system_wrapper(system_progress)
     if threads is not None:
-        xphyle.formats.threads = threads
+        xphyle.formats.set_threads(threads)
     if executable_path:
         xphyle.paths.add_executable_path(executable_path)
 
@@ -57,9 +60,9 @@ def guess_file_format(path: 'str') -> 'str':
     """
     if path in (STDOUT, STDERR):
         raise ValueError("Cannot guess format from {}".format(path))
-    fmt = guess_compression_format(path)
+    fmt = FORMATS.guess_compression_format(path)
     if fmt is None and safe_check_readable_file(path):
-        fmt = guess_format_from_file_header(path)
+        fmt = FORMATS.guess_format_from_file_header(path)
     return fmt
 
 @contextmanager
@@ -190,7 +193,7 @@ def xopen(path: 'str', mode: 'str' = 'r', compression: 'bool|str' = None,
             if not hasattr(fh, 'peek'):
                 fh = io.BufferedReader(fh)
                 wrapped = True
-            guess = guess_format_from_buffer(fh)
+            guess = FORMATS.guess_format_from_buffer(fh)
         else:
             validate = False
         if not (compression or guess):
@@ -215,7 +218,7 @@ def xopen(path: 'str', mode: 'str' = 'r', compression: 'bool|str' = None,
             
             # Get compression format if not specified
             if validate or guess_format:
-                guess = guess_format_from_buffer(fh)
+                guess = FORMATS.guess_format_from_buffer(fh)
                 # The following code is never used, unless there is some
                 # scenario in which the file type cannot be guessed from
                 # the header bytes. I'll leave this here for now but keep
@@ -236,11 +239,11 @@ def xopen(path: 'str', mode: 'str' = 'r', compression: 'bool|str' = None,
             if 'r' in mode:
                 path = check_readable_file(path)
                 if validate or guess_format:
-                    guess = guess_format_from_file_header(path)
+                    guess = FORMATS.guess_format_from_file_header(path)
             else:
                 path = check_writeable_file(path)
                 if validate or guess_format:
-                    guess = guess_compression_format(path)
+                    guess = FORMATS.guess_compression_format(path)
     
     if validate and guess != compression:
         raise ValueError("Acutal compression format {} does not match expected "
@@ -252,7 +255,7 @@ def xopen(path: 'str', mode: 'str' = 'r', compression: 'bool|str' = None,
             "Could not guess compression format from {}".format(path))
     
     if compression:
-        fmt = get_compression_format(compression)
+        fmt = FORMATS.get_compression_format(compression)
         compression = fmt.name
         fh = fmt.open_file(fh or path, mode, use_system=use_system, **kwargs)
     elif not fh:
@@ -290,7 +293,7 @@ class Wrapper(object):
     def __iter__(self):
         if not hasattr(self, '_iterator'):
             setattr(self, '_iterator',
-                    iter(xphyle.progress.wrap(self._fileobj, desc=self.name)))
+                    iter(wrap_iter(self._fileobj, desc=self.name)))
         return self._iterator
     
     def __enter__(self):

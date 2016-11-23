@@ -39,7 +39,7 @@ def set_wrapper(wrapper: 'bool|callable' = True):
     else:
         _wrapper = None
 
-def wrap(itr, desc=None, size=None):
+def wrap_iter(itr, desc=None, size=None):
     """Wrap an iterable in a progress bar.
     
     Args:
@@ -110,3 +110,22 @@ def wrap_subprocess(cmd, stdin, stdout, **kwargs): # pragma: no-cover
         proc2 = Popen(_system_wrapper, stdin=proc1.stdout, stdout=stdout)
     proc1.stdout.close()
     return proc2
+
+# Misc functions
+
+def iter_file_chunked(fh, chunksize: 'int,>0' = 1024):
+    """Returns a progress bar-wrapped iterator over a file that reads
+    fixed-size chunks.
+    """
+    def _itr():
+        while True:
+            data = fh.read(chunksize)
+            if data:
+                yield data
+            else:
+                break
+    try:
+        name = fh.name
+    except:
+        name = None
+    return wrap_iter(_itr(), desc=name)

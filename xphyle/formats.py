@@ -4,30 +4,44 @@ Magic numbers from: https://en.wikipedia.org/wiki/List_of_file_signatures
 """
 from importlib import import_module
 import io
-import logging
 import os
-import re
-import sys
 from subprocess import Popen, PIPE
-import tempfile
 
-from xphyle.paths import *
-from xphyle.progress import *
+from xphyle.paths import (
+    STDIN, get_executable_path, check_readable_file, check_writeable_file,
+    split_path)
+from xphyle.progress import iter_file_chunked, wrap_subprocess
 
 # Number of concurrent threads that can be used
 # by formats that support parallelization
-threads = 1
+_threads = 1 # pylint: disable=invalid-name
 
-def get_threads():
-    global threads
-    if threads == False:
-        threads = 1
+def set_threads(threads: 'bool|int' = True):
+    """Set the python progress wrapper.
+    
+    Args:
+        threads: True = use all available cores; False or None, or an int <= 1
+            means single-threaded; otherwise an integer number of threads
+    """
+    # pylint: disable=global-statement,redefined-variable-type,invalid-name
+    global _threads
+    if threads is False:
+        _threads = 1
     elif threads is True or not (isinstance(threads, int) and threads >= 1):
         import multiprocessing
-        threads = multiprocessing.cpu_count()
-    return threads
+        _threads = multiprocessing.cpu_count()
+    elif threads < 1:
+        _threads = 1
+    else:
+        _threads = threads
+
+def get_threads():
+    """Returns the currently set number of threads to use.
+    """
+    return _threads # pylint: disable=invalid-name
 
 # File formats
+# pylint: disable=no-member
 
 class FileFormat(object):
     """Base class for classes that wrap built-in python file format libraries.
@@ -59,30 +73,46 @@ class SystemReader:
     """Read from a compressed file using a system-level compression program.
     
     Args:
-        executable_path: The fully resolved path the the executable
-        filename: The compressed file to read
-        ext: The file extension; if ``filename`` already has an extension, this
-            must match (including the leading '.')
+        executable_path: The fully resolved path the the system executable
+        path: The compressed file to read
         command: Format string with two variables -- ``exe`` (the path to the
-          system executable), and ``filename``
+          system executable), and ``path``
         executable_name: The display name of the executable, or ``None`` to use
           the basename of ``executable_path``
     """
-    def __init__(self, executable_path: 'str', filename: 'str',
+    # pylint: disable=no-self-use
+    def __init__(self, executable_path: 'str', path: 'str',
                  command: 'str', executable_name: 'str' = None):
-        self.name = filename
+        self.name = path
         self.command = command
         self.executable_name = (
             executable_name or os.path.basename(executable_path))
         self.process = Popen(self.command, stdout=PIPE)
         self.closed = False
     
-    def readable(self): return True
-    def writable(self): return False
-    def seekable(self): return False
-    def flush(self): pass
+    def readable(self):
+        """Implementing file interface; returns True.
+        """
+        return True
+    
+    def writable(self):
+        """Implementing file interface; returns False.
+        """
+        return False
+    
+    def seekable(self):
+        """Implementing file interface; returns False.
+        """
+        return False
+    
+    def flush(self):
+        """Implementing file interface; no-op.
+        """
+        pass
     
     def close(self):
+        """Close the reader; terminates the underlying process.
+        """
         self.closed = True
         retcode = self.process.poll()
         if retcode is None:
@@ -105,9 +135,12 @@ class SystemReader:
             raise EOFError(
                 "{} process returned non-zero exit code {}. "
                 "Is the input file truncated or corrupt?".format(
-                self.executable_name, retcode))
-
+                    self.executable_name, retcode))
+    
     def read(self, *args):
+        """Read bytes from the stream. Arguments are passed through to the
+        subprocess ``read`` method.
+        """
         data = self.process.stdout.read(*args)
         if len(args) == 0 or args[0] <= 0:
             # wait for process to terminate until we check the exit code
@@ -125,24 +158,23 @@ class SystemWriter:
     """Write to a compressed file using a system-level compression program.
     
     Args:
-        executable_path: The fully resolved path the the executable
-        filename: The compressed file to read
-        ext: The file extension; if ``filename`` already has an extension, this
-            must match (including the leading '.')
+        executable_path: The fully resolved path the the system executable
+        path: The compressed file to read
         mode: The write mode (w/a/x)
         command: Format string with two variables -- ``exe`` (the path to the
-          system executable), and ``filename``
+          system executable), and ``path``
         executable_name: The display name of the executable, or ``None`` to use
           the basename of ``executable_path``
     """
-    def __init__(self, executable_path: 'str', filename: 'str',
+    # pylint: disable=no-self-use
+    def __init__(self, executable_path: 'str', path: 'str',
                  mode: 'str' = 'w', command: 'str' = "{exe}",
                  executable_name: 'str' = None):
-        self.name = filename
+        self.name = path
         self.command = command
         self.executable_name = (
             executable_name or os.path.basename(executable_path))
-        self.outfile = open(filename, mode)
+        self.outfile = open(path, mode)
         self.devnull = open(os.devnull, 'w')
         self.closed = False
         try:
@@ -151,22 +183,39 @@ class SystemWriter:
             self.process = Popen(
                 self.command, stdin=PIPE, stdout=self.outfile,
                 stderr=self.devnull, close_fds=True)
-        except IOError as e: # pragma: no-cover
+        except IOError: # pragma: no-cover
             self.outfile.close()
             self.devnull.close()
             raise
     
-    def readable(self): return False
-    def writable(self): return True
-    def seekable(self): return False
+    def readable(self):
+        """Implementing file interface; returns False.
+        """
+        return False
+    
+    def writable(self):
+        """Implementing file interface; returns True.
+        """
+        return True
+    
+    def seekable(self):
+        """Implementing file interface; returns False.
+        """
+        return False
     
     def write(self, arg):
+        """Write to stdin of the underlying process.
+        """
         self.process.stdin.write(arg)
     
     def flush(self):
+        """Flush stdin of the underlying process.
+        """
         self.process.stdin.flush()
     
     def close(self):
+        """Close the writer; terminates the underlying process.
+        """
         self.closed = True
         self.process.stdin.close()
         retcode = self.process.wait()
@@ -183,115 +232,121 @@ class SystemWriter:
         self.close()
 
 # Supported compression formats
-
-compression_formats = {}
-"""Dict of registered compression formats"""
-
-compression_format_aliases = {}
-"""Dict mapping aliases to cmopression format names."""
-
-magic_bytes = {}
-"""Dict mapping the first byte in a 'magic' sequence to a tuple of
-(format, rest_of_sequence)
-"""
-max_magic_bytes = 0
-"""Maximum number of bytes in a registered magic byte sequence"""
-
-mime_types = {}
-"""Dict mapping MIME types to file formats"""
-
-def register_compression_format(format_class: 'class'):
-    """Register a new compression format.
-    
-    Args:
-        ``format_class`` -- a subclass of CompressionFormat
+class Formats(object):
+    """Manages a set of compression formats.
     """
-    fmt = format_class()
-    compression_formats[fmt.name] = fmt
-    for alias in fmt.aliases:
-        # TODO: warn about overriding existing format?
-        compression_format_aliases[alias] = fmt.name
-    for magic in fmt.magic_bytes:
-        global max_magic_bytes
-        max_magic_bytes = max(max_magic_bytes, len(magic))
-        magic_bytes[magic[0]] = (fmt.name, magic[1:])
-    for mime in fmt.mime_types:
-        mime_types[mime] = fmt.name
+    def __init__(self):
+        self.compression_formats = {}
+        """Dict of registered compression formats"""
+        self.compression_format_aliases = {}
+        """Dict mapping aliases to compression format names."""
+        self.magic_bytes = {}
+        """Dict mapping the first byte in a 'magic' sequence to a tuple of
+        (format, rest_of_sequence)
+        """
+        self.max_magic_bytes = 0
+        """Maximum number of bytes in a registered magic byte sequence"""
+        self.mime_types = {}
+        """Dict mapping MIME types to file formats"""
 
-def list_compression_formats() -> 'tuple':
-    return tuple(compression_formats.keys())
+    def register_compression_format(self, format_class: 'class'):
+        """Register a new compression format.
+        
+        Args:
+            ``format_class`` -- a subclass of CompressionFormat
+        """
+        fmt = format_class()
+        self.compression_formats[fmt.name] = fmt
+        for alias in fmt.aliases:
+            # TODO: warn about overriding existing format?
+            self.compression_format_aliases[alias] = fmt.name
+        for magic in fmt.magic_bytes:
+            self.max_magic_bytes = max(self.max_magic_bytes, len(magic))
+            self.magic_bytes[magic[0]] = (fmt.name, magic[1:])
+        for mime in fmt.mime_types:
+            self.mime_types[mime] = fmt.name
 
-def get_compression_format(name: 'str') -> 'CompressionFormat':
-    """Returns the CompressionFormat associated with the given name, or raises
-    ValueError if that format is not supported.
-    """
-    if name in compression_format_aliases:
-        name = compression_format_aliases[name]
-        return compression_formats[name]
-    raise ValueError("Unsupported compression format: {}".format(name))
+    def list_compression_formats(self) -> 'tuple':
+        """Returns a list of all registered compression formats.
+        """
+        return tuple(self.compression_formats.keys())
 
-def guess_compression_format(name: 'str') -> 'str':
-    """Guess the compression format by name or file extension.
-    """
-    if name in compression_format_aliases:
-        return compression_format_aliases[name]
-    i = name.rfind(os.extsep)
-    if i >= 0:
-        ext = name[(i+1):]
-        if ext in compression_format_aliases:
-            return compression_format_aliases[ext]
-    return None
+    def get_compression_format(self, name: 'str') -> 'CompressionFormat':
+        """Returns the CompressionFormat associated with the given name, or raises
+        ValueError if that format is not supported.
+        """
+        if name in self.compression_format_aliases:
+            name = self.compression_format_aliases[name]
+            return self.compression_formats[name]
+        raise ValueError("Unsupported compression format: {}".format(name))
 
-def guess_format_from_file_header(path: 'str') -> 'str':
-    """Guess file format from 'magic bytes' at the beginning of the file.
-    
-    Note that ``path`` must be openable and readable. If it is a named pipe or
-    other pseudo-file type, the magic bytes will be destructively consumed and
-    thus will open correctly.
-    
-    Args:
-        path: Path to the file
-    
-    Returns:
-        The name of the format, or ``None`` if it could not be guessed.
-    """
-    with open(path, 'rb') as fh:
-        return guess_format_from_header_bytes(fh.read(max_magic_bytes))
+    def guess_compression_format(self, name: 'str') -> 'str':
+        """Guess the compression format by name or file extension.
+        """
+        if name in self.compression_format_aliases:
+            return self.compression_format_aliases[name]
+        i = name.rfind(os.extsep)
+        if i >= 0:
+            ext = name[(i+1):]
+            if ext in self.compression_format_aliases:
+                return self.compression_format_aliases[ext]
+        return None
 
-def guess_format_from_buffer(buffer: 'str') -> 'str':
-    """Guess file format from a byte buffer that provides a ``peek`` method.
-    
-    Args:
-        buffer: The buffer object
-    
-    Returns:
-        The name of the format, or ``None`` if it could not be guessed.
-    """
-    return guess_format_from_header_bytes(buffer.peek(max_magic_bytes))
+    def guess_format_from_file_header(self, path: 'str') -> 'str':
+        """Guess file format from 'magic bytes' at the beginning of the file.
+        
+        Note that ``path`` must be openable and readable. If it is a named pipe or
+        other pseudo-file type, the magic bytes will be destructively consumed and
+        thus will open correctly.
+        
+        Args:
+            path: Path to the file
+        
+        Returns:
+            The name of the format, or ``None`` if it could not be guessed.
+        """
+        with open(path, 'rb') as infile:
+            magic = infile.read(self.max_magic_bytes)
+        return self.guess_format_from_header_bytes(magic)
 
-def guess_format_from_header_bytes(b: 'bytes') -> 'str':
-    """Guess file format from a sequence of bytes from a file header.
-    
-    Args:
-        bytes: The bytes
-    
-    Returns:
-        The name of the format, or ``None`` if it could not be guessed.
-    """
-    num_bytes = len(b)
-    if num_bytes > 0:
-        if b[0] in magic_bytes:
-            fmt, tail = magic_bytes[b[0]]
-            if (num_bytes > len(tail) and
-                    tuple(b[i] for i in range(1, len(tail)+1)) == tail):
-                return fmt
-    return None
+    def guess_format_from_buffer(self, buffer: 'str') -> 'str':
+        """Guess file format from a byte buffer that provides a ``peek`` method.
+        
+        Args:
+            buffer: The buffer object
+        
+        Returns:
+            The name of the format, or ``None`` if it could not be guessed.
+        """
+        magic = buffer.peek(self.max_magic_bytes)
+        return self.guess_format_from_header_bytes(magic)
 
-def get_format_for_mime_type(mime_type: 'str') -> 'str':
-    """Returns the file format associated with a MIME type, or None if no
-    format is associated with the mime type.
-    """
-    return mime_types.get(mime_type, None)
+    def guess_format_from_header_bytes(self, header_bytes: 'bytes') -> 'str':
+        """Guess file format from a sequence of bytes from a file header.
+        
+        Args:
+            header_bytes: The bytes
+        
+        Returns:
+            The name of the format, or ``None`` if it could not be guessed.
+        """
+        num_bytes = len(header_bytes)
+        if num_bytes > 0:
+            if header_bytes[0] in self.magic_bytes.keys():
+                fmt, tail = self.magic_bytes[header_bytes[0]]
+                if (num_bytes > len(tail) and tuple(
+                        header_bytes[i]
+                        for i in range(1, len(tail)+1)) == tail):
+                    return fmt
+        return None
+
+    def get_format_for_mime_type(self, mime_type: 'str') -> 'str':
+        """Returns the file format associated with a MIME type, or None if no
+        format is associated with the mime type.
+        """
+        return self.mime_types.get(mime_type, None)
+
+FORMATS = Formats() # pylint: disable=invalid-name
 
 class CompressionFormat(FileFormat):
     """Base class for classes that provide access to system-level and
@@ -338,11 +393,11 @@ class CompressionFormat(FileFormat):
         """
         return self.uncompress_path is not None
     
-    def compress(self, bytes: 'bytes', **kwargs) -> 'bytes':
+    def compress(self, raw_bytes: 'bytes', **kwargs) -> 'bytes':
         """Compress bytes.
         
         Args:
-            bytes: The bytes to compress
+            raw_bytes: The bytes to compress
             kwargs: Additional arguments to compression function.
         
         Returns:
@@ -350,7 +405,7 @@ class CompressionFormat(FileFormat):
         """
         kwargs['compresslevel'] = self._get_compresslevel(
             kwargs.get('compresslevel', None))
-        return self.lib.compress(bytes, **kwargs)
+        return self.lib.compress(raw_bytes, **kwargs)
     
     def compress_string(self, text: 'str', encoding: 'str' = 'utf-8',
                         **kwargs) -> 'bytes':
@@ -364,7 +419,7 @@ class CompressionFormat(FileFormat):
         Returns:
             The compressed text, as bytes
         """
-        return self.compress(text.encode(encoding))
+        return self.compress(text.encode(encoding), **kwargs)
     
     def compress_iterable(self, strings: 'list', delimiter: 'bytes' = b'',
                           encoding: 'str' = 'utf-8', **kwargs) -> 'bytes':
@@ -383,34 +438,50 @@ class CompressionFormat(FileFormat):
             delimiter.join(s.encode(encoding) for s in strings),
             **kwargs)
     
-    def decompress(self, bytes, **kwargs) -> 'bytes':
+    def decompress(self, compressed_bytes, **kwargs) -> 'bytes':
         """Decompress bytes.
         
         Args:
-            bytes: The compressed data
+            compressed_bytes: The compressed data
             kwargs: Additional arguments to the decompression function
         
         Returns:
             The decompressed bytes
         """
-        return self.lib.decompress(bytes, **kwargs)
+        return self.lib.decompress(compressed_bytes, **kwargs)
     
-    def decompress_string(self, bytes: 'bytes', encoding: 'str' = 'utf-8',
-                          **kwargs) -> 'str':
+    def decompress_string(self, compressed_bytes: 'bytes',
+                          encoding: 'str' = 'utf-8', **kwargs) -> 'str':
         """Decompress bytes and return as a string.
         
         Args:
-            bytes: The compressed data
+            compressed_bytes: The compressed data
             encoding: The byte encoding to use
             kwargs: Additional arguments to the decompression function
         
         Returns:
             The decompressed data as a string
         """
-        return self.decompress(bytes, **kwargs).decode(encoding)
+        return self.decompress(compressed_bytes, **kwargs).decode(encoding)
     
-    def open_file(self, filename: 'str', mode: 'str',
-                  ext: 'str' = None, use_system: 'bool' = True, **kwargs):
+    def get_command(self, operation: 'str[(c,d)]', src=STDIN,
+                    stdout: 'bool' = True, compresslevel: 'int' = None):
+        """Build the command for the system executable.
+        
+        Args:
+            operation: 'c' = compress, 'd' = uncompress
+            src: The source file path, or STDIN if input should be read from
+                stdin
+            stdout: Whether output should go to stdout
+            compresslevel: Integer compression level; typically 1-9
+        
+        Returns:
+            List of command arguments
+        """
+        raise NotImplementedError()
+    
+    def open_file(self, path: 'str', mode: 'str', use_system: 'bool' = True,
+                  **kwargs):
         """Opens a compressed file for reading or writing.
         
         If ``use_system`` is True and the system provides an accessible
@@ -418,11 +489,8 @@ class CompressionFormat(FileFormat):
         to using the python implementation.
         
         Args:
-            filename: The file to open
+            path: The path of the file to open
             mode: The file open mode
-            ext: The file extension (including leading '.'); if None, the
-                extension is determined automatically, and if there is no
-                extension, the format's default extension is used instead.
             use_system: Whether to attempt to use system-level compression
             kwargs: Additional arguments to pass to the python-level open
                 method, if system-level compression isn't used.
@@ -431,34 +499,35 @@ class CompressionFormat(FileFormat):
             A file-like object
         """
         if use_system:
-            z = None
+            # pylint: disable=redefined-variable-type
+            gzfile = None
             if 'r' in mode and self.can_use_system_compression:
-                z = SystemReader(
+                gzfile = SystemReader(
                     self.compress_path,
-                    filename,
-                    self.get_command('d', src=filename),
+                    path,
+                    self.get_command('d', src=path),
                     self.compress_name)
             elif 'r' not in mode and self.can_use_system_uncompression:
-                for c in mode:
-                    if c in ('w', 'a', 'x'):
-                        bin_mode = c + 'b'
+                for access in mode:
+                    if access in ('w', 'a', 'x'):
+                        bin_mode = access + 'b'
                         break
                 else:
                     raise ValueError("Invalid mode: {}".format(mode))
-                z = SystemWriter(
+                gzfile = SystemWriter(
                     self.uncompress_path,
-                    filename,
+                    path,
                     bin_mode,
                     self.get_command('c'),
                     self.uncompress_name)
-            if z:
+            if gzfile:
                 if 't' in mode:
-                    z = io.TextIOWrapper(z)
-                return z
+                    gzfile = io.TextIOWrapper(gzfile)
+                return gzfile
         
-        return self.open_file_python(filename, mode, **kwargs)
+        return self.open_file_python(path, mode, **kwargs)
     
-    def open_file_python(self, f, mode: 'str', **kwargs):
+    def open_file_python(self, path_or_file, mode: 'str', **kwargs):
         """Open a file using the python library.
         
         Args:
@@ -469,11 +538,11 @@ class CompressionFormat(FileFormat):
         Returns:
             A file-like object
         """
-        return self.lib.open(f, mode, **kwargs)
+        return self.lib.open(path_or_file, mode, **kwargs)
     
     def compress_file(self, source, dest=None, keep: 'bool' = True,
-                      compresslevel: 'int' = None,
-                      use_system: 'bool' = True, **kwargs) -> 'str':
+                      compresslevel: 'int' = None, use_system: 'bool' = True,
+                      **kwargs) -> 'str':
         """Compress data from one file and write to another.
         
         Args:
@@ -497,12 +566,10 @@ class CompressionFormat(FileFormat):
             source_path = source.name
             try: # pragma: no cover
                 source.fileno()
-            except:
+            except OSError:
                 use_system = False
         
-        in_place = False
         if dest is None:
-            in_place = True
             dest = "{}.{}".format(source_path, self.default_ext)
         dest_is_path = isinstance(dest, str)
         if dest_is_path:
@@ -519,8 +586,8 @@ class CompressionFormat(FileFormat):
                 dest_file = open(dest, 'wb') if dest_is_path else dest
                 cmd = self.get_command(
                     'c', src=cmd_src, compresslevel=compresslevel)
-                p = wrap_subprocess(cmd, stdin=prc_src, stdout=dest_file)
-                p.communicate()
+                proc = wrap_subprocess(cmd, stdin=prc_src, stdout=dest_file)
+                proc.communicate()
             else:
                 source_file = open(source, 'rb') if source_is_path else source
                 dest_file = self.open_file_python(dest, 'wb', **kwargs)
@@ -567,9 +634,7 @@ class CompressionFormat(FileFormat):
             source_path = source.name
         source_parts = split_path(source_path)
         
-        in_place = False
         if dest is None:
-            in_place = True
             if len(source_parts) > 2:
                 dest = (
                     os.path.join(*source_parts[0:2]) +
@@ -585,7 +650,7 @@ class CompressionFormat(FileFormat):
             dest_file = dest
             try: # pragma: no cover
                 dest_file.fileno()
-            except:
+            except OSError:
                 use_system = False
         
         try:
@@ -593,8 +658,8 @@ class CompressionFormat(FileFormat):
                 src = source if source_is_path else STDIN
                 cmd = self.get_command('d', src=src)
                 psrc = None if source_is_path else source
-                p = wrap_subprocess(cmd, stdin=psrc, stdout=dest_file)
-                p.communicate()
+                proc = wrap_subprocess(cmd, stdin=psrc, stdout=dest_file)
+                proc.communicate()
             else:
                 source_file = self.open_file_python(source, 'rb', **kwargs)
                 try:
@@ -613,15 +678,21 @@ class CompressionFormat(FileFormat):
         finally:
             if dest_is_path:
                 dest_file.close()
-
+        
         return dest
 
-class SingleExeCompressionFormat(CompressionFormat):
+class SingleExeCompressionFormat(CompressionFormat): # pylint: disable=abstract-method
     """Base class form ``CompressionFormat``s that use the same executable for
     compressing and uncompressing.
     """
+    def __init__(self):
+        self._executable_path = None
+        self._executable_name = None
+    
     @property
     def executable_path(self) -> 'str':
+        """The path of the system executable.
+        """
         self._resolve_executable()
         return self._executable_path
     compress_path = executable_path
@@ -629,13 +700,15 @@ class SingleExeCompressionFormat(CompressionFormat):
     
     @property
     def executable_name(self) -> 'str':
+        """The name of the system executable.
+        """
         self._resolve_executable()
         return self._executable_name
     compress_name = executable_name
     uncompress_name = executable_name
     
     def _resolve_executable(self):
-        if not hasattr(self, '_executable_path'):
+        if self._executable_path is None:
             self._executable_path, self._executable_name = _resolve_exe(
                 self.system_commands)
 
@@ -656,36 +729,41 @@ class Gzip(SingleExeCompressionFormat):
     
     @property
     def compresslevel_range(self):
+        """The compression level; pigz allows 0-11 (har har) while
+        gzip allows 0-9.
+        """
         if self.executable_name == 'pigz':
             return (0, 11)
         else:
             return (1, 9)
     
-    def get_command(self, op, src=STDIN, stdout=True, compresslevel=None):
+    def get_command(self, operation, src=STDIN, stdout=True, compresslevel=None):
         cmd = [self.executable_path]
-        if op == 'c':
+        if operation == 'c':
             compresslevel = self._get_compresslevel(compresslevel)
             cmd.append('-{}'.format(compresslevel))
-        elif op == 'd':
+        elif operation == 'd':
             cmd.append('-d')
         if stdout:
             cmd.append('-c')
-        if self.executable_name == 'pigz' and get_threads() > 1:
+        threads = get_threads()
+        if self.executable_name == 'pigz' and threads > 1:
             cmd.extend(('-p', str(threads)))
         if src != STDIN:
             cmd.append(src)
         return cmd
     
-    def open_file_python(self, filename, mode, **kwargs):
-        z = self.lib.open(filename, mode, **kwargs)
+    def open_file_python(self, path, mode, **kwargs):
+        # pylint: disable=redefined-variable-type
+        compressed_file = self.lib.open(path, mode, **kwargs)
         if 'b' in mode:
             if 'r' in mode:
-                z = io.BufferedReader(z)
+                compressed_file = io.BufferedReader(compressed_file)
             else:
-                z = io.BufferedWriter(z)
-        return z
+                compressed_file = io.BufferedWriter(compressed_file)
+        return compressed_file
 
-register_compression_format(Gzip)
+FORMATS.register_compression_format(Gzip)
 
 class BZip2(SingleExeCompressionFormat):
     """Implementation of CompressionFormat for bzip2 files.
@@ -703,13 +781,13 @@ class BZip2(SingleExeCompressionFormat):
         'application/x-bzip2'
     )
     
-    def get_command(self, op, src=STDIN, stdout=True, compresslevel=6):
+    def get_command(self, operation, src=STDIN, stdout=True, compresslevel=6):
         cmd = [self.executable_path]
-        if op == 'c':
+        if operation == 'c':
             compresslevel = self._get_compresslevel(compresslevel)
             cmd.append('-{}'.format(compresslevel))
             cmd.append('-z')
-        elif op == 'd':
+        elif operation == 'd':
             cmd.append('-d')
         if stdout:
             cmd.append('-c')
@@ -717,15 +795,15 @@ class BZip2(SingleExeCompressionFormat):
             cmd.append(src)
         return cmd
     
-    def open_file_python(self, filename, mode, **kwargs):
+    def open_file_python(self, path, mode, **kwargs):
         if 't' in mode:
             mode = mode.replace('t','')
             return io.TextIOWrapper(
-                self.lib.BZ2File(filename, mode, **kwargs))
+                self.lib.BZ2File(path, mode, **kwargs))
         else:
-            return self.lib.BZ2File(filename, mode, **kwargs)
+            return self.lib.BZ2File(path, mode, **kwargs)
 
-register_compression_format(BZip2)
+FORMATS.register_compression_format(BZip2)
 
 class Lzma(SingleExeCompressionFormat):
     """Implementation of CompressionFormat for lzma (.xz) files.
@@ -749,29 +827,31 @@ class Lzma(SingleExeCompressionFormat):
         'application/x-7z-compressed'
     )
     
-    def get_command(self, op, src=STDIN, stdout=True, compresslevel=6):
+    def get_command(self, operation, src=STDIN, stdout=True, compresslevel=6):
         cmd = [self.executable_path]
-        if op == 'c':
+        if operation == 'c':
             compresslevel = self._get_compresslevel(compresslevel)
             cmd.append('-{}'.format(compresslevel))
             cmd.append('-z')
-        elif op == 'd':
+        elif operation == 'd':
             cmd.append('-d')
         if stdout:
             cmd.append('-c')
-        if get_threads() > 1:
+        threads = get_threads()
+        if threads > 1:
             cmd.extend(('-T', str(threads)))
         if src != STDIN:
             cmd.append(src)
         return cmd
     
-    def compress(self, bytes, **kwargs) -> 'bytes':
-        kwargs = dict((k, kwargs[k])
-            for k, v in kwargs.items()
-            if k in ('format','check','preset','filter'))
-        return self.lib.compress(bytes, **kwargs)
+    def compress(self, raw_bytes, **kwargs) -> 'bytes':
+        kwargs = dict(
+            (k, kwargs[k])
+            for k, v in kwargs.items() if k in (
+                'format','check','preset','filter'))
+        return self.lib.compress(raw_bytes, **kwargs)
 
-register_compression_format(Lzma)
+FORMATS.register_compression_format(Lzma)
 
 # class DualExeCompressionFormat(CompressionFormat):
 #     """CompressionFormat that uses the same executable for compressing and
@@ -814,9 +894,9 @@ register_compression_format(Lzma)
 #     compresslevel_range = (0, 7)
 #     default_compresslevel = 7
 #
-#     def get_command(self, op, src=STDIN, stdout=True, compresslevel=7):
+#     def get_command(self, operation, src=STDIN, stdout=True, compresslevel=7):
 #         compresslevel += 9
-#         if op == 'c':
+#         if operation == 'c':
 #             cmd = [self.compress_path]
 #             cmd.extend(('-b', compresslevel))
 #         else:
@@ -830,8 +910,8 @@ register_compression_format(Lzma)
 # register_compression_format(Lzw)
 
 def _resolve_exe(names):
-    path = None
-    name = None
+    path = ""
+    name = ""
     for cmd in names:
         exe = get_executable_path(cmd)
         if exe:
@@ -839,22 +919,3 @@ def _resolve_exe(names):
             name = cmd
             break
     return (path, name)
-
-# Misc functions
-
-def iter_file_chunked(fh, chunksize: 'int,>0' = 1024):
-    """Returns a progress bar-wrapped iterator over a file that reads
-    fixed-size chunks.
-    """
-    def _itr():
-        while True:
-            data = fh.read(chunksize)
-            if data:
-                yield data
-            else:
-                break
-    try:
-        name = fh.name
-    except:
-        name = None
-    return wrap(_itr(), desc=name)
