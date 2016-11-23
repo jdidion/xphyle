@@ -4,6 +4,7 @@
 from collections import defaultdict
 from contextlib import contextmanager
 import copy
+import io
 import os
 import sys
 
@@ -12,10 +13,13 @@ import xphyle.progress
 import xphyle.paths
 
 from xphyle.formats import FORMATS
-from xphyle.paths import *
+from xphyle.paths import (
+    STDIN, STDOUT, STDERR, check_readable_file, check_writeable_file,
+    safe_check_readable_file)
 from xphyle.progress import wrap_iter
-from xphyle.urls import *
+from xphyle.urls import parse_url, open_url, get_url_file_name
 
+# pylint: disable=protected-access
 import xphyle._version
 __version__ = xphyle._version.get_versions()['version']
 
@@ -66,12 +70,12 @@ def guess_file_format(path: 'str') -> 'str':
     return fmt
 
 @contextmanager
-def open_(f, mode: 'str' = 'r', errors: 'bool' = True, **kwargs):
+def open_(path_or_file, mode: 'str' = 'r', errors: 'bool' = True, **kwargs):
     """Context manager that frees you from checking if an argument is a path
     or a file object. Calls ``xopen`` to open files.
     
     Args:
-        f: A path or file-like object
+        path_or_file: A path or file-like object
         mode: The file open mode
         errors: Whether to raise an error if there is a problem opening the
             file. If False, yields None when there is an error.
@@ -85,24 +89,24 @@ def open_(f, mode: 'str' = 'r', errors: 'bool' = True, **kwargs):
         with open_('myfile') as infile:
             print(next(infile))
       
-        fh = open('myfile')
-        with open_(fh) as infile:
+        fileobj = open('myfile')
+        with open_(fileobj) as infile:
             print(next(infile))
     """
-    if isinstance(f, str):
+    if isinstance(path_or_file, str):
         kwargs['context_wrapper'] = True
         try:
-            with xopen(f, mode, **kwargs) as fp:
-                yield fp
+            with xopen(path_or_file, mode, **kwargs) as fileobj:
+                yield fileobj
         except IOError:
             if errors:
                 raise
             else:
                 yield None
-    elif f is None and errors:
-        raise ValueError("'f' cannot be None")
+    elif path_or_file is None and errors:
+        raise ValueError("'path_or_file' cannot be None")
     else:
-        yield f
+        yield path_or_file
 
 def xopen(path: 'str', mode: 'str' = 'r', compression: 'bool|str' = None,
           use_system: 'bool' = True, context_wrapper: 'bool' = True,
@@ -150,6 +154,7 @@ def xopen(path: 'str', mode: 'str' = 'r', compression: 'bool|str' = None,
                 acutal format of the file
             * the path or mode are invalid
     """
+    # pylint: disable=redefined-variable-type
     if not isinstance(path, str):
         raise ValueError("'path' must be a string")
     if not any(m in mode for m in ('r','w','a','x')):
@@ -165,7 +170,7 @@ def xopen(path: 'str', mode: 'str' = 'r', compression: 'bool|str' = None,
         raise ValueError("'mode' must contain one of (b,t)")
     
     # The file handle we will open
-    fh = None
+    fileobj = None
     # Whether to try and guess file format
     guess_format = compression in (None, True)
     # Whether to validate that the actually compression format matches expected
@@ -182,24 +187,24 @@ def xopen(path: 'str', mode: 'str' = 'r', compression: 'bool|str' = None,
         use_system = False
         if path == STDERR:
             assert 'r' not in mode
-            fh = sys.stderr
+            fileobj = sys.stderr
         else:
-            fh = sys.stdin if 'r' in mode else sys.stdout
+            fileobj = sys.stdin if 'r' in mode else sys.stdout
         wrapped = True
         if compression is not False:
-            fh = fh.buffer
+            fileobj = fileobj.buffer
             wrapped = False
         if 'r' in mode and (validate or guess_format):
-            if not hasattr(fh, 'peek'):
-                fh = io.BufferedReader(fh)
+            if not hasattr(fileobj, 'peek'):
+                fileobj = io.BufferedReader(fileobj)
                 wrapped = True
-            guess = FORMATS.guess_format_from_buffer(fh)
+            guess = FORMATS.guess_format_from_buffer(fileobj)
         else:
             validate = False
         if not (compression or guess):
             is_stream = True
             if 'b' in mode and wrapped:
-                fh = fh.buffer
+                fileobj = fileobj.buffer
     
     else:
         # URL handling
@@ -208,17 +213,17 @@ def xopen(path: 'str', mode: 'str' = 'r', compression: 'bool|str' = None,
             if 'r' not in mode:
                 raise ValueError("URLs can only be opened in read mode")
             
-            fh = open_url(path)
-            if not fh:
+            fileobj = open_url(path)
+            if not fileobj:
                 raise ValueError("Could not open URL {}".format(path))
             
             is_stream = True
-            name = get_url_file_name(fh, url_parts)
+            name = get_url_file_name(fileobj, url_parts)
             use_system = False
             
             # Get compression format if not specified
             if validate or guess_format:
-                guess = FORMATS.guess_format_from_buffer(fh)
+                guess = FORMATS.guess_format_from_buffer(fileobj)
                 # The following code is never used, unless there is some
                 # scenario in which the file type cannot be guessed from
                 # the header bytes. I'll leave this here for now but keep
@@ -227,7 +232,7 @@ def xopen(path: 'str', mode: 'str' = 'r', compression: 'bool|str' = None,
                 # if guess is None and guess_format:
                 #     # Check if the MIME type indicates that the file is
                 #     # compressed
-                #     mime = get_url_mime_type(fh)
+                #     mime = get_url_mime_type(fileobj)
                 #     if mime:
                 #         guess = get_format_for_mime_type(mime)
                 #     # Try to guess from the file name
@@ -257,17 +262,18 @@ def xopen(path: 'str', mode: 'str' = 'r', compression: 'bool|str' = None,
     if compression:
         fmt = FORMATS.get_compression_format(compression)
         compression = fmt.name
-        fh = fmt.open_file(fh or path, mode, use_system=use_system, **kwargs)
-    elif not fh:
-        fh = open(path, mode, **kwargs)
+        fileobj = fmt.open_file(
+            fileobj or path, mode, use_system=use_system, **kwargs)
+    elif not fileobj:
+        fileobj = open(path, mode, **kwargs)
     
     if context_wrapper:
         if is_stream:
-            fh = StreamWrapper(fh, name=name, compression=compression)
+            fileobj = StreamWrapper(fileobj, name=name, compression=compression)
         else:
-            fh = FileWrapper(fh, compression=compression)
+            fileobj = FileWrapper(fileobj, compression=compression)
     
-    return fh
+    return fileobj
 
 class Wrapper(object):
     """Base class for wrappers around file-like objects. Adds the following:
@@ -305,6 +311,9 @@ class Wrapper(object):
         self.close()
     
     def close(self):
+        """Close the file, close an open iterator, and fire 'close' events to
+        any listeners.
+        """
         self._close()
         if hasattr(self, '_iterator'):
             delattr(self, '_iterator')
@@ -345,8 +354,6 @@ class FileWrapper(Wrapper):
 class FileEventListener(object):
     """Base class for listener events that can be registered on a FileWrapper.
     
-    Subclasses must implement ``execute(self, file_wrapper, ...)``
-    
     Args:
         args: positional arguments to pass through to ``execute``
         kwargs: keyword arguments to pass through to ``execute``
@@ -357,6 +364,14 @@ class FileEventListener(object):
     
     def __call__(self, file_wrapper):
         self.execute(file_wrapper._path, *self.args, **self.kwargs)
+    
+    def execute(self, path, *args, **kwargs):
+        """Handle an event.
+        
+        Args:
+            file_wrapper: The file that generated the event
+        """
+        raise NotImplementedError()
 
 class StreamWrapper(Wrapper):
     """EventWrapper around a stream.
@@ -368,7 +383,7 @@ class StreamWrapper(Wrapper):
         if name is None:
             try:
                 name = self._stream.name
-            except:
+            except: # pylint: disable=bare-except
                 name = None
         super(StreamWrapper, self).__init__(stream, compression=compression)
         object.__setattr__(self, 'name', name)
@@ -376,4 +391,4 @@ class StreamWrapper(Wrapper):
     
     def _close(self):
         self._fileobj.flush()
-        self.closed = True
+        self.closed = True # pylint: disable=attribute-defined-outside-init

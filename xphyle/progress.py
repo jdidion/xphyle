@@ -113,19 +113,23 @@ def wrap_subprocess(cmd, stdin, stdout, **kwargs): # pragma: no-cover
 
 # Misc functions
 
-def iter_file_chunked(fh, chunksize: 'int,>0' = 1024):
+def iter_file_chunked(fileobj, chunksize: 'int,>0' = 1024):
     """Returns a progress bar-wrapped iterator over a file that reads
     fixed-size chunks.
+    
+    Args:
+        fileobj: A file-like object
+        chunksize: The maximum size in bytes of each chunk
     """
     def _itr():
         while True:
-            data = fh.read(chunksize)
+            data = fileobj.read(chunksize)
             if data:
                 yield data
             else:
                 break
     try:
-        name = fh.name
-    except:
+        name = fileobj.name
+    except: # pylint: disable=bare-except
         name = None
     return wrap_iter(_itr(), desc=name)

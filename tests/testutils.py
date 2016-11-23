@@ -5,6 +5,7 @@ import gzip
 import bz2
 import os
 import xphyle
+from xphyle import FileWrapper
 from xphyle.paths import TempDir
 from xphyle.utils import *
 
@@ -511,7 +512,7 @@ class UtilsTests(TestCase):
     def test_ncycle_file_output(self):
         file1 = self.root.make_file(suffix='.gz')
         file2 = self.root.make_file()
-        with fileoutput((file1,file2), n=2, file_output_type=NCycleFileOutput) as o:
+        with fileoutput((file1,file2), lines_per_file=2, file_output_type=NCycleFileOutput) as o:
             o.writelines(('foo','bar','baz','blorf','bing'))
         with gzip.open(file1, 'rt') as i:
             self.assertEqual('foo\nbar\nbing\n', i.read())
@@ -520,7 +521,7 @@ class UtilsTests(TestCase):
     
     def test_rolling_file_output(self):
         path = self.root.make_file()
-        with RollingFileOutput(path + '{0}.txt', n=3) as out:
+        with RollingFileOutput(path + '{0}.txt', lines_per_file=3) as out:
             for i in range(6):
                 out.writeline(str(i))
         with open(path + '0.txt', 'rt') as infile:
