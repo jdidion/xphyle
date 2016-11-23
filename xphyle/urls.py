@@ -48,7 +48,7 @@ def open_url(url, byte_range=None, headers=None, **kwargs):
         if response and not hasattr(response, 'peek'):
             response = io.BufferedReader(response)
         return response
-    except URLError:
+    except (URLError, ValueError):
         return None
 
 def get_url_mime_type(response):
