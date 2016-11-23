@@ -8,6 +8,7 @@ from xphyle.paths import TempDir, STDIN, STDOUT, STDERR
 class XphyleTests(TestCase):
     def setUp(self):
         self.root = TempDir()
+        configure(False, False, 1, None)
     
     def tearDown(self):
         self.root.close()
@@ -16,9 +17,11 @@ class XphyleTests(TestCase):
         import xphyle.progress
         import xphyle.formats
         import xphyle.paths
-        configure(progress=True, system_progress=True, threads=2, executable_path=['foo'])
-        self.assertTrue(xphyle.progress.wrapper)
-        self.assertTrue(xphyle.progress.system_wrapper)
+        def wrapper(a,b,c):
+            pass
+        configure(progress=wrapper, system_progress='foo', threads=2, executable_path=['foo'])
+        self.assertEqual(wrapper, xphyle.progress._wrapper)
+        self.assertEqual(['foo'], xphyle.progress._system_wrapper)
         self.assertEqual(2, xphyle.formats.get_threads())
         self.assertTrue('foo' in xphyle.paths.executable_paths)
         

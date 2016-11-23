@@ -7,18 +7,40 @@ import shlex
 from subprocess import Popen, PIPE
 from xphyle.paths import get_executable_path, check_path
 
-wrapper = False
-system_wrapper = False
+# pylint: disable=R0903
+# pylint: disable=C0103
 
-class TqdmWrapper(object): # pragma: no-cover
+class TqdmWrapper(object):
     """Default python progress bar wrapper.
     """
     def __init__(self):
         import tqdm
-        self.fn = tqdm.tqdm
+        self.wrapper_fn = tqdm.tqdm
     
     def __call__(self, itr, desc, size):
-        return self.fn(itr, desc=desc, total=size)
+        return self.wrapper_fn(itr, desc=desc, total=size)
+
+_wrapper = None
+
+def set_wrapper(wrapper: 'bool|callable' = True):
+    """Set the python progress wrapper.
+    
+    Args:
+        wrapper: True = use default progress wrapper; False or None means turn
+            off progress bars; otherwise a callable that takes three arguments,
+            itr, desc, size, and returns an iterable.
+    """
+    # pylint: disable=W0603,redefined-variable-type
+    global _wrapper
+    if wrapper is True:
+        try:
+            _wrapper = TqdmWrapper()
+        except ImportError:
+            _wrapper = None
+    elif callable(wrapper):
+        _wrapper = wrapper
+    else:
+        _wrapper = None
 
 def wrap(itr, desc=None, size=None):
     """Wrap an iterable in a progress bar.
@@ -27,15 +49,7 @@ def wrap(itr, desc=None, size=None):
         desc: Optional description
         size: Optional max value of the progress bar
     """
-    global wrapper
-    if wrapper is True:
-        try:
-            wrapper = TqdmWrapper()
-        except:
-            wrapper = False
-    if wrapper:
-        return wrapper(itr, desc, size)
-    return itr
+    return _wrapper(itr, desc, size) if _wrapper else itr
 
 def system_progress_command(exe, *args, require=False): # pragma: no-cover
     """Resolve the system-level progress bar command.
@@ -58,29 +72,44 @@ def system_progress_command(exe, *args, require=False): # pragma: no-cover
 def pv_command(require=False): # pragma: no-cover
     """Default system wrapper command.
     """
-    system_progress_command('pv', '-pre', require=require)
+    return system_progress_command('pv', '-pre', require=require)
+
+_system_wrapper = None
+
+def set_system_wrapper(wrapper : 'bool|callable' = True):
+    """Set the python system progress wrapper.
+    
+    Args:
+        wrapper: True = use default system progress wrapper; False or None means
+            turn off system progress bars; a string or list/tuple to provide the
+            system command; otherwise a callable that takes returns a command in
+            list form.
+    """
+    # pylint: disable=W0603,redefined-variable-type
+    global _system_wrapper
+    if wrapper is True:
+        try:
+            _system_wrapper = pv_command()
+        except ImportError:
+            _system_wrapper = None
+    elif wrapper in (False, None):
+        _system_wrapper = None
+    elif isinstance(wrapper, str):
+        _system_wrapper = shlex.split(wrapper)
+    else:
+        _system_wrapper = wrapper
 
 def wrap_subprocess(cmd, stdin, stdout, **kwargs): # pragma: no-cover
     """Pipe a system command through a progress bar program.
     """
-    global system_wrapper
-    if system_wrapper is True:
-        try:
-            system_wrapper = pv_command()
-        except:
-            system_wrapper = False
-    
-    if isinstance(system_wrapper, str):
-        system_wrapper = shlex.split(system_wrapper)
-    
-    if not system_wrapper or (stdin is None and stdout is None):
+    if not _system_wrapper or (stdin is None and stdout is None):
         return Popen(cmd, stdin=stdin, stdout=stdout, **kwargs)
     
     if stdin is not None:
-        p1 = Popen(system_wrapper, stdin=stdin, stdout=PIPE)
+        p1 = Popen(_system_wrapper, stdin=stdin, stdout=PIPE)
         p2 = Popen(cmd, stdin=p1.stdout, stdout=stdout)
     else:
         p1 = Popen(cmd, stdout=PIPE)
-        p2 = Popen(system_wrapper, stdin=p1.stdout, stdout=stdout)
+        p2 = Popen(_system_wrapper, stdin=p1.stdout, stdout=stdout)
     p1.stdout.close()
     return p2

@@ -37,9 +37,9 @@ def configure(progress: 'bool|callable' = None,
             executables. These will be searched before the default system path.
     """
     if progress is not None:
-        xphyle.progress.wrapper = progress
+        xphyle.progress.set_wrapper(progress)
     if system_progress is not None:
-        xphyle.progress.system_wrapper = system_progress
+        xphyle.progress.set_system_wrapper(system_progress)
     if threads is not None:
         xphyle.formats.threads = threads
     if executable_path:
