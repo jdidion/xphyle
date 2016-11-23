@@ -21,8 +21,8 @@ from xphyle.paths import *
 
 ## Raw data
 
-def read_lines(path : 'str|file', convert : 'callable' = None,
-               strip_linesep : 'bool' = True, **kwargs) -> 'generator':
+def read_lines(path: 'str|file', convert: 'callable' = None,
+               strip_linesep: 'bool' = True, **kwargs) -> 'generator':
     """Iterate over lines in a file.
     
     Args:
@@ -45,7 +45,7 @@ def read_lines(path : 'str|file', convert : 'callable' = None,
         for line in itr:
             yield line
 
-def read_bytes(path : 'str|file', chunksize : 'int,>0' = 1024,
+def read_bytes(path: 'str|file', chunksize: 'int,>0' = 1024,
                **kwargs) -> 'generator':
     """Iterate over a file in chunks. The mode will always be overridden
     to 'rb'.
@@ -66,8 +66,8 @@ def read_bytes(path : 'str|file', chunksize : 'int,>0' = 1024,
         for chunk in iter_file_chunked(f, chunksize):
             yield chunk
 
-def write_lines(iterable : 'iterable', path : 'str|file',
-                linesep : 'str' = '\n', convert : 'callable' = str,
+def write_lines(iterable: 'iterable', path: 'str|file',
+                linesep: 'str' = '\n', convert: 'callable' = str,
                 **kwargs) -> 'int':
     """Write delimiter-separated strings to a file.
     
@@ -111,8 +111,8 @@ def to_bytes(x, encoding='utf-8'):
         return(x)
     return str(x).encode(encoding)
 
-def write_bytes(iterable : 'iterable', path : 'str|file', sep : 'bytes' = b'',
-                convert : 'callable' = to_bytes, **kwargs) -> 'int':
+def write_bytes(iterable: 'iterable', path: 'str|file', sep: 'bytes' = b'',
+                convert: 'callable' = to_bytes, **kwargs) -> 'int':
     """Write an iterable of bytes to a file.
     
     Args:
@@ -142,8 +142,8 @@ def write_bytes(iterable : 'iterable', path : 'str|file', sep : 'bytes' = b'',
 
 # key=value files
 
-def read_dict(path: 'str|file', sep : 'str' = '=', convert : 'callable' = None,
-              ordered : 'bool' = False, **kwargs) -> 'dict':
+def read_dict(path: 'str|file', sep: 'str' = '=', convert: 'callable' = None,
+              ordered: 'bool' = False, **kwargs) -> 'dict':
     """Read lines from simple property file (key=value). Comment lines (starting
     with '#') are ignored.
     
@@ -167,8 +167,8 @@ def read_dict(path: 'str|file', sep : 'str' = '=', convert : 'callable' = None,
         lines = ((k, convert(v)) for k, v in lines)
     return OrderedDict(lines) if ordered else dict(lines)
 
-def write_dict(d : 'dict', path : 'str', sep : 'str' = '=',
-               linesep : 'str' = '\n', convert : 'callable' = str, **kwargs):
+def write_dict(d: 'dict', path: 'str', sep: 'str' = '=',
+               linesep: 'str' = '\n', convert: 'callable' = str, **kwargs):
     """Write a dict to a file as name=value lines.
     
     Args:
@@ -187,11 +187,11 @@ def write_dict(d : 'dict', path : 'str', sep : 'str' = '=',
 
 ## Other delimited files
 
-def read_delimited(path : 'str', sep : 'str' = '\t',
-                   header : 'bool|iterable' = False,
-                   converters : 'callable|iterable' = None,
-                   yield_header : 'bool' = True,
-                   row_type : 'str|callable' = 'list',
+def read_delimited(path: 'str', sep: 'str' = '\t',
+                   header: 'bool|iterable' = False,
+                   converters: 'callable|iterable' = None,
+                   yield_header: 'bool' = True,
+                   row_type: 'str|callable' = 'list',
                    **kwargs) -> 'generator':
     """Iterate over rows in a delimited file.
     
@@ -247,9 +247,9 @@ def read_delimited(path : 'str', sep : 'str' = '\t',
         for row in reader:
             yield row
 
-def read_delimited_as_dict(path : 'str', sep : 'str' = '\t',
-                           header : 'bool|iterable' = False,
-                           key : 'int,>=0|callable' = 0, **kwargs) -> 'dict':
+def read_delimited_as_dict(path: 'str', sep: 'str' = '\t',
+                           header: 'bool|iterable' = False,
+                           key: 'int,>=0|callable' = 0, **kwargs) -> 'dict':
     """Parse rows in a delimited file and add rows to a dict based on a a
     specified key index or function.
     
@@ -300,10 +300,10 @@ def read_delimited_as_dict(path : 'str', sep : 'str' = '\t',
 
 ## Compressed files
 
-def compress_file(source_file : 'str|file', compressed_file : 'str|file' = None,
-                  compression : 'bool|str' = None,
-                  keep : 'bool' = True, compresslevel : 'int' = None,
-                  use_system : 'bool' = True, **kwargs) -> 'str':
+def compress_file(source_file: 'str|file', compressed_file: 'str|file' = None,
+                  compression: 'bool|str' = None,
+                  keep: 'bool' = True, compresslevel: 'int' = None,
+                  use_system: 'bool' = True, **kwargs) -> 'str':
     """Compress an existing file, either in-place or to a separate file.
     
     Args:
@@ -334,9 +334,9 @@ def compress_file(source_file : 'str|file', compressed_file : 'str|file' = None,
     return fmt.compress_file(
         source_file, compressed_file, keep, compresslevel, use_system, **kwargs)
 
-def uncompress_file(compressed_file : 'str|file', dest_file : 'str|file' = None,
-                    compression : 'bool|str' = None,
-                    keep : 'bool' = True, use_system : 'bool' = True,
+def uncompress_file(compressed_file: 'str|file', dest_file: 'str|file' = None,
+                    compression: 'bool|str' = None,
+                    keep: 'bool' = True, use_system: 'bool' = True,
                     **kwargs) -> 'str':
     """Uncompress an existing file, either in-place or to a separate file.
     
@@ -365,12 +365,12 @@ def uncompress_file(compressed_file : 'str|file', dest_file : 'str|file' = None,
     return fmt.uncompress_file(
         compressed_file, dest_file, keep, use_system, **kwargs)
 
-def transcode_file(source_file : 'str|file', dest_file : 'str|file',
-                   source_compression : 'str|bool' = True,
-                   dest_compression : 'str|bool' = True,
-                   use_system : 'bool' = True,
-                   source_open_args : 'dict' = {},
-                   dest_open_args : 'dict' = {}):
+def transcode_file(source_file: 'str|file', dest_file: 'str|file',
+                   source_compression: 'str|bool' = True,
+                   dest_compression: 'str|bool' = True,
+                   use_system: 'bool' = True,
+                   source_open_args: 'dict' = {},
+                   dest_open_args: 'dict' = {}):
     """Convert from one file format to another.
     
     Args:
@@ -449,13 +449,13 @@ class FileManager(object):
     def __len__(self):
         return len(self._files)
     
-    def __getitem__(self, key : 'str|int'):
+    def __getitem__(self, key: 'str|int'):
         f = self.get(key)
         if not f:
             raise KeyError(key)
         return f
     
-    def __setitem__(self, key : 'str', f : 'str|file'):
+    def __setitem__(self, key: 'str', f: 'str|file'):
         """Add a file.
         
         Args:
@@ -465,10 +465,10 @@ class FileManager(object):
         """
         self.add(f, key)
     
-    def __contains__(self, key : 'str'):
+    def __contains__(self, key: 'str'):
         return key in self._files
         
-    def add(self, f, key : 'str' = None, **kwargs):
+    def add(self, f, key: 'str' = None, **kwargs):
         """Add a file.
         
         Args:
@@ -509,7 +509,7 @@ class FileManager(object):
                 else:
                     self.add(f[1], key=f[0], **kwargs)
     
-    def get(self, key : 'str|int'):
+    def get(self, key: 'str|int'):
         """Get the file object associated with a path. If the file is not
         already open, it is first opened with ``xopen``.
         """
@@ -526,7 +526,7 @@ class FileManager(object):
             self._files[key] = f
         return f
     
-    def get_path(self, key : 'str'):
+    def get_path(self, key: 'str'):
         """Returns the file path associated with a key.
         
         Args:
@@ -604,7 +604,7 @@ class FileInput(FileManager):
     def finished(self):
         return self.fileno >= len(self)
     
-    def add(self, f, key : 'str' = None):
+    def add(self, f, key: 'str' = None):
         """Overrides FileManager.add() to prevent file-specific open args.
         """
         # If we've already finished reading all the files,
@@ -700,7 +700,7 @@ class FileOutput(FileManager):
         if files:
             self.add_all(files)
     
-    def writelines(self, lines : 'iterable', newlines : 'bool' = True):
+    def writelines(self, lines: 'iterable', newlines: 'bool' = True):
         """Write an iterable of lines to the output(s).
         
         Args:
@@ -710,7 +710,7 @@ class FileOutput(FileManager):
         for line in lines:
             self.writeline(line, newline=newlines)
     
-    def writeline(self, line : 'str' = None, newline : 'bool' = True):
+    def writeline(self, line: 'str' = None, newline: 'bool' = True):
         """Write a line to the output(s).
         
         Args:
@@ -727,7 +727,7 @@ class FileOutput(FileManager):
             sep = self.linesep
         self._writeline(self._encode(line), sep)
     
-    def _writeline(self, line : 'str', sep : 'str'):
+    def _writeline(self, line: 'str', sep: 'str'):
         """Does the work of writing a line to the output(s). Must be implemented
         by subclasses.
         """
@@ -839,7 +839,7 @@ class RollingFileOutput(FileOutput):
 
 # Misc
 
-def linecount(f, linesep : 'str' = None, buffer_size : 'int' = 1024 * 1024,
+def linecount(f, linesep: 'str' = None, buffer_size: 'int' = 1024 * 1024,
               **kwargs) -> 'int':
     """Fastest pythonic way to count the lines in a file.
     

@@ -21,7 +21,7 @@ STDIN = STDOUT = '-'
 STDERR = '_'
 """Placeholder for ``sys.stderr``"""
 
-def get_access(mode : 'str') -> 'int':
+def get_access(mode: 'str') -> 'int':
     """Returns the access mode constant associated with given mode string.
     
     Args:
@@ -59,7 +59,7 @@ def set_access(path, mode):
     os.chmod(path, mode_flag)
     return mode_flag
 
-def check_access(path : 'str', access : 'int|str'):
+def check_access(path: 'str', access: 'int|str'):
     """Check that ``path`` is accessible.
     """
     if isinstance(access, str):
@@ -72,7 +72,7 @@ def check_access(path : 'str', access : 'int|str'):
     elif not os.access(path, access):
         raise IOError(errno.EACCES, "{} not accessable".format(path), path)
 
-def abspath(path : 'str') -> 'str':
+def abspath(path: 'str') -> 'str':
     """Returns the fully resolved path associated with ``path``.
     
     Args:
@@ -89,8 +89,8 @@ def abspath(path : 'str') -> 'str':
         return path
     return os.path.abspath(os.path.expanduser(path))
 
-def split_path(path : 'str', keep_seps : 'bool' = True,
-               resolve : 'bool' = True) -> 'tuple':
+def split_path(path: 'str', keep_seps: 'bool' = True,
+               resolve: 'bool' = True) -> 'tuple':
     """Splits a path into a (parent_dir, name, *ext) tuple.
     
     Args:
@@ -122,13 +122,13 @@ def split_path(path : 'str', keep_seps : 'bool' = True,
             seps = tuple('{}{}'.format(os.extsep, ext) for ext in file_parts[1:])
     return (parent, file_parts[0]) + seps
 
-def filename(path : 'str') -> 'str':
+def filename(path: 'str') -> 'str':
     """Returns just the filename part of ``path``. Equivalent to
     ``split_path(path)[1]``.
     """
     return split_path(path)[1]
 
-def resolve_path(path : 'str', parent : 'str' = None) -> 'str':
+def resolve_path(path: 'str', parent: 'str' = None) -> 'str':
     """Resolves the absolute path of the specified file and ensures that the
     file/directory exists.
     
@@ -152,8 +152,8 @@ def resolve_path(path : 'str', parent : 'str' = None) -> 'str':
         raise IOError(errno.ENOENT, "{} does not exist".format(path), path)
     return path
 
-def check_path(path : 'str', ptype : 'str' = None,
-               access : 'int|str' = None) -> 'str':
+def check_path(path: 'str', ptype: 'str' = None,
+               access: 'int|str' = None) -> 'str':
     """Resolves the path (using ``resolve_path``) and checks that the path is
     of the specified type and allows the specified access.
     
@@ -181,7 +181,7 @@ def check_path(path : 'str', ptype : 'str' = None,
         check_access(path, access)
     return path
 
-def check_readable_file(path : 'str') -> 'str':
+def check_readable_file(path: 'str') -> 'str':
     """Check that ``path`` exists and is readable.
     
     Args:
@@ -192,7 +192,7 @@ def check_readable_file(path : 'str') -> 'str':
     """
     return check_path(path, 'f', 'r')
 
-def check_writeable_file(path : 'str', mkdirs : 'bool' = True) -> 'str':
+def check_writeable_file(path: 'str', mkdirs: 'bool' = True) -> 'str':
     """If ``path`` exists, check that it is writeable, otherwise check that
     its parent directory exists and is writeable.
     
@@ -217,26 +217,26 @@ def check_writeable_file(path : 'str', mkdirs : 'bool' = True) -> 'str':
 ### "Safe" versions of the check methods, meaning they return None
 ### instead of throwing exceptions
 
-def safe_check_path(path : 'str', *args, **kwargs) -> 'str':
+def safe_check_path(path: 'str', *args, **kwargs) -> 'str':
     try:
         return check_path(path, *args, **kwargs)
     except IOError:
         return None
 
-def safe_check_readable_file(path : 'str') -> 'str':
+def safe_check_readable_file(path: 'str') -> 'str':
     try:
         return check_readable_file(path)
     except IOError:
         return None
 
-def safe_check_writeable_file(path : 'str') -> 'str':
+def safe_check_writeable_file(path: 'str') -> 'str':
     try:
         return check_writeable_file(path)
     except IOError:
         return None
 
-def find(root : 'str', pattern : 'str|regexp', types : 'str' = 'f',
-         recursive : 'bool' = True) -> 'list':
+def find(root: 'str', pattern: 'str|regexp', types: 'str' = 'f',
+         recursive: 'bool' = True) -> 'list':
     """Find all paths under ``root`` that match ``pattern``.
     
     Args:
@@ -283,7 +283,7 @@ def add_executable_path(paths):
 executable_cache = {}
 """Cache of full paths to executables"""
 
-def get_executable_path(executable : 'str') -> 'str':
+def get_executable_path(executable: 'str') -> 'str':
     """Get the full path of ``executable``.
     
     Args:

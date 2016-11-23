@@ -17,6 +17,14 @@ files. Most importantly, xphyle will use the appropriate program (e.g. 'gzip') t
 pip install xphyle
 ```
 
+# Building from source
+
+Clone this repository and run
+
+```
+make
+```
+
 # Example usages:
 
 ```python
@@ -63,3 +71,10 @@ See the [Documentation](http://xphyle.readthedocs.io/en/latest/?badge=latest) fo
 # Roadmap
 
 Future releases are mapped out using [GitHub Projects](https://github.com/jdidion/xphyle/projects).
+
+# Developers
+
+We welcome any contributions via pull requests. Style-wise, we try to adhere to the Google python style guidelines. We are currently working to add automated pylint checking to the build process, and to fix pylint rule violations. However, we deviate from pylint recommendations in the following ways:
+
+* Function annotations: pylint does not properly handle whitespace around function annotations (https://github.com/PyCQA/pylint/issues/238).
+* White space on empty lines: we use white space as a visual guide to the structure of the code. Each blank line should have whitespace matching the indent level of the next non-blank line.

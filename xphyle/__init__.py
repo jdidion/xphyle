@@ -16,10 +16,10 @@ from ._version import get_versions
 __version__ = get_versions()['version']
 del get_versions
 
-def configure(progress : 'bool|callable' = None,
-              system_progress : 'bool|str|list' = None,
-              threads : 'int|bool' = None,
-              executable_path : 'str|list' = None):
+def configure(progress: 'bool|callable' = None,
+              system_progress: 'bool|str|list' = None,
+              threads: 'int|bool' = None,
+              executable_path: 'str|list' = None):
     """Conifgure xphyle.
     
     Args:
@@ -45,7 +45,7 @@ def configure(progress : 'bool|callable' = None,
     if executable_path:
         xphyle.paths.add_executable_path(executable_path)
 
-def guess_file_format(path : 'str') -> 'str':
+def guess_file_format(path: 'str') -> 'str':
     """Try to guess the file format, first from the extension, and then
     from the header bytes.
     
@@ -63,7 +63,7 @@ def guess_file_format(path : 'str') -> 'str':
     return fmt
 
 @contextmanager
-def open_(f, mode : 'str' = 'r', errors : 'bool' = True, **kwargs):
+def open_(f, mode: 'str' = 'r', errors: 'bool' = True, **kwargs):
     """Context manager that frees you from checking if an argument is a path
     or a file object. Calls ``xopen`` to open files.
     
@@ -101,8 +101,8 @@ def open_(f, mode : 'str' = 'r', errors : 'bool' = True, **kwargs):
     else:
         yield f
 
-def xopen(path : 'str', mode : 'str' = 'r', compression : 'bool|str' = None,
-          use_system : 'bool' = True, context_wrapper : 'bool' = True,
+def xopen(path: 'str', mode: 'str' = 'r', compression: 'bool|str' = None,
+          use_system: 'bool' = True, context_wrapper: 'bool' = True,
           **kwargs) -> 'file':
     """
     Replacement for the `open` function that automatically handles
@@ -312,7 +312,7 @@ class Wrapper(object):
     def _close(self):
         self._fileobj.close()
 
-    def register_listener(self, event : 'str', listener):
+    def register_listener(self, event: 'str', listener):
         """Register an event listener.
         
         Args:

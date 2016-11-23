@@ -68,8 +68,8 @@ class SystemReader:
         executable_name: The display name of the executable, or ``None`` to use
           the basename of ``executable_path``
     """
-    def __init__(self, executable_path : 'str', filename : 'str',
-                 command : 'str', executable_name : 'str' = None):
+    def __init__(self, executable_path: 'str', filename: 'str',
+                 command: 'str', executable_name: 'str' = None):
         self.name = filename
         self.command = command
         self.executable_name = (
@@ -135,9 +135,9 @@ class SystemWriter:
         executable_name: The display name of the executable, or ``None`` to use
           the basename of ``executable_path``
     """
-    def __init__(self, executable_path : 'str', filename : 'str',
-                 mode : 'str' = 'w', command : 'str' = "{exe}",
-                 executable_name : 'str' = None):
+    def __init__(self, executable_path: 'str', filename: 'str',
+                 mode: 'str' = 'w', command: 'str' = "{exe}",
+                 executable_name: 'str' = None):
         self.name = filename
         self.command = command
         self.executable_name = (
@@ -200,7 +200,7 @@ max_magic_bytes = 0
 mime_types = {}
 """Dict mapping MIME types to file formats"""
 
-def register_compression_format(format_class : 'class'):
+def register_compression_format(format_class: 'class'):
     """Register a new compression format.
     
     Args:
@@ -221,7 +221,7 @@ def register_compression_format(format_class : 'class'):
 def list_compression_formats() -> 'tuple':
     return tuple(compression_formats.keys())
 
-def get_compression_format(name : 'str') -> 'CompressionFormat':
+def get_compression_format(name: 'str') -> 'CompressionFormat':
     """Returns the CompressionFormat associated with the given name, or raises
     ValueError if that format is not supported.
     """
@@ -230,7 +230,7 @@ def get_compression_format(name : 'str') -> 'CompressionFormat':
         return compression_formats[name]
     raise ValueError("Unsupported compression format: {}".format(name))
 
-def guess_compression_format(name : 'str') -> 'str':
+def guess_compression_format(name: 'str') -> 'str':
     """Guess the compression format by name or file extension.
     """
     if name in compression_format_aliases:
@@ -242,7 +242,7 @@ def guess_compression_format(name : 'str') -> 'str':
             return compression_format_aliases[ext]
     return None
 
-def guess_format_from_file_header(path : 'str') -> 'str':
+def guess_format_from_file_header(path: 'str') -> 'str':
     """Guess file format from 'magic bytes' at the beginning of the file.
     
     Note that ``path`` must be openable and readable. If it is a named pipe or
@@ -258,7 +258,7 @@ def guess_format_from_file_header(path : 'str') -> 'str':
     with open(path, 'rb') as fh:
         return guess_format_from_header_bytes(fh.read(max_magic_bytes))
 
-def guess_format_from_buffer(buffer : 'str') -> 'str':
+def guess_format_from_buffer(buffer: 'str') -> 'str':
     """Guess file format from a byte buffer that provides a ``peek`` method.
     
     Args:
@@ -269,7 +269,7 @@ def guess_format_from_buffer(buffer : 'str') -> 'str':
     """
     return guess_format_from_header_bytes(buffer.peek(max_magic_bytes))
 
-def guess_format_from_header_bytes(b : 'bytes') -> 'str':
+def guess_format_from_header_bytes(b: 'bytes') -> 'str':
     """Guess file format from a sequence of bytes from a file header.
     
     Args:
@@ -287,7 +287,7 @@ def guess_format_from_header_bytes(b : 'bytes') -> 'str':
                 return fmt
     return None
 
-def get_format_for_mime_type(mime_type : 'str') -> 'str':
+def get_format_for_mime_type(mime_type: 'str') -> 'str':
     """Returns the file format associated with a MIME type, or None if no
     format is associated with the mime type.
     """
@@ -338,7 +338,7 @@ class CompressionFormat(FileFormat):
         """
         return self.uncompress_path is not None
     
-    def compress(self, bytes : 'bytes', **kwargs) -> 'bytes':
+    def compress(self, bytes: 'bytes', **kwargs) -> 'bytes':
         """Compress bytes.
         
         Args:
@@ -352,7 +352,7 @@ class CompressionFormat(FileFormat):
             kwargs.get('compresslevel', None))
         return self.lib.compress(bytes, **kwargs)
     
-    def compress_string(self, text : 'str', encoding : 'str' = 'utf-8',
+    def compress_string(self, text: 'str', encoding: 'str' = 'utf-8',
                         **kwargs) -> 'bytes':
         """Compress a string.
         
@@ -366,8 +366,8 @@ class CompressionFormat(FileFormat):
         """
         return self.compress(text.encode(encoding))
     
-    def compress_iterable(self, strings : 'list', delimiter : 'bytes' = b'',
-                          encoding : 'str' = 'utf-8', **kwargs) -> 'bytes':
+    def compress_iterable(self, strings: 'list', delimiter: 'bytes' = b'',
+                          encoding: 'str' = 'utf-8', **kwargs) -> 'bytes':
         """Compress an iterable of strings using the python-level interface.
         
         Args:
@@ -395,7 +395,7 @@ class CompressionFormat(FileFormat):
         """
         return self.lib.decompress(bytes, **kwargs)
     
-    def decompress_string(self, bytes : 'bytes', encoding : 'str' = 'utf-8',
+    def decompress_string(self, bytes: 'bytes', encoding: 'str' = 'utf-8',
                           **kwargs) -> 'str':
         """Decompress bytes and return as a string.
         
@@ -409,8 +409,8 @@ class CompressionFormat(FileFormat):
         """
         return self.decompress(bytes, **kwargs).decode(encoding)
     
-    def open_file(self, filename : 'str', mode : 'str',
-                  ext : 'str' = None, use_system : 'bool' = True, **kwargs):
+    def open_file(self, filename: 'str', mode: 'str',
+                  ext: 'str' = None, use_system: 'bool' = True, **kwargs):
         """Opens a compressed file for reading or writing.
         
         If ``use_system`` is True and the system provides an accessible
@@ -458,7 +458,7 @@ class CompressionFormat(FileFormat):
         
         return self.open_file_python(filename, mode, **kwargs)
     
-    def open_file_python(self, f, mode : 'str', **kwargs):
+    def open_file_python(self, f, mode: 'str', **kwargs):
         """Open a file using the python library.
         
         Args:
@@ -471,9 +471,9 @@ class CompressionFormat(FileFormat):
         """
         return self.lib.open(f, mode, **kwargs)
     
-    def compress_file(self, source, dest=None, keep : 'bool' = True,
-                      compresslevel : 'int' = None,
-                      use_system : 'bool' = True, **kwargs) -> 'str':
+    def compress_file(self, source, dest=None, keep: 'bool' = True,
+                      compresslevel: 'int' = None,
+                      use_system: 'bool' = True, **kwargs) -> 'str':
         """Compress data from one file and write to another.
         
         Args:
@@ -543,8 +543,8 @@ class CompressionFormat(FileFormat):
         
         return dest
     
-    def uncompress_file(self, source, dest=None, keep : 'bool' = True,
-                        use_system : 'bool' = True, **kwargs) -> 'str':
+    def uncompress_file(self, source, dest=None, keep: 'bool' = True,
+                        use_system: 'bool' = True, **kwargs) -> 'str':
         """Uncompress data from one file and write to another.
         
         Args:
@@ -842,7 +842,7 @@ def _resolve_exe(names):
 
 # Misc functions
 
-def iter_file_chunked(fh, chunksize : 'int,>0' = 1024):
+def iter_file_chunked(fh, chunksize: 'int,>0' = 1024):
     """Returns a progress bar-wrapped iterator over a file that reads
     fixed-size chunks.
     """
