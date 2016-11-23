@@ -19,6 +19,15 @@ Installation
 
     pip install xphyle
 
+Building from source
+====================
+
+Clone this repository and run
+
+::
+
+    make
+
 Example usages:
 ===============
 
@@ -70,6 +79,23 @@ Roadmap
 
 Future releases are mapped out using `GitHub
 Projects <https://github.com/jdidion/xphyle/projects>`__.
+
+Developers
+==========
+
+We welcome any contributions via pull requests. Style-wise, we try to
+adhere to the Google python style guidelines. We run pylint as part of
+each build and strive to maintain a 10/10 score. However, we disable
+some pylint checks:
+
+-  Function annotations: pylint does not properly handle whitespace
+   around function annotations
+   (https://github.com/PyCQA/pylint/issues/238).
+-  White space on empty lines: we use white space as a visual guide to
+   the structure of the code. Each blank line should have whitespace
+   matching the indent level of the next non-blank line.
+-  Checks that are arbitrary/overly restrictive (e.g. 'too-many-xxx';
+   see .pylintrc for full list)
 
 .. |https://pypi.python.org/pypi/xphyle| image:: https://img.shields.io/pypi/v/xphyle.svg?branch=master
 .. |https://travis-ci.org/jdidion/xphyle| image:: https://travis-ci.org/jdidion/xphyle.svg?branch=master
