@@ -4,12 +4,13 @@
 import copy
 import io
 import re
-from urllib.request import urlopen, Request
+from urllib.error import URLError
 from urllib.parse import urlparse
+from urllib.request import urlopen, Request
 
 # URLs
 
-def parse_url(s):
+def parse_url(url_string):
     """Attempts to parse a URL.
     
     Args:
@@ -21,12 +22,12 @@ def parse_url(s):
         be valid and still not be openable (for example, if the scheme is
         recognized by urlopen).
     """
-    url = urlparse(s)
+    url = urlparse(url_string)
     if not (url.scheme and (url.netloc or url.path)):
         return None
     return url
 
-def open_url(url, byte_range=None, headers={}, **kwargs):
+def open_url(url, byte_range=None, headers=None, **kwargs):
     """Open a URL for reading.
     
     Args:
@@ -37,8 +38,8 @@ def open_url(url, byte_range=None, headers={}, **kwargs):
     Returns:
         A response object, or None if the URL is not valid or cannot be opened
     """
+    headers = copy.copy(headers) if headers else {}
     if byte_range:
-        headers = copy.copy(headers)
         headers['Range'] = 'bytes={}-{}'.format(*byte_range)
     try:
         request = Request(url, headers=headers, **kwargs)
@@ -47,7 +48,7 @@ def open_url(url, byte_range=None, headers={}, **kwargs):
         if response and not hasattr(response, 'peek'):
             response = io.BufferedReader(response)
         return response
-    except:
+    except URLError:
         return None
 
 def get_url_mime_type(response):
@@ -58,14 +59,14 @@ def get_url_mime_type(response):
         return response.headers['Content-Type']
     return None
 
-content_disposition_re = re.compile('filename=([^;]+)')
+CONTENT_DISPOSITION_RE = re.compile('filename=([^;]+)')
 
 def get_url_file_name(response, parsed_url=None):
     """If a response object has HTTP-like headers, extract the filename
     from the Content-Disposition header.
     """
     if hasattr(response, 'headers') and 'Content-Disposition' in response.headers:
-        match = content_disposition_re.search(
+        match = CONTENT_DISPOSITION_RE.search(
             response.headers['Content-Disposition'])
         if match:
             return match.groups(1)
