@@ -21,3 +21,6 @@ docs:
 
 readme:
 	pandoc --from=markdown --to=rst --output=README.rst README.md
+
+lint:
+	pylint xphyle
