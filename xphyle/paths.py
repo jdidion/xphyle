@@ -7,7 +7,6 @@ import os
 import re
 import shutil
 import stat
-import sys
 import tempfile
 
 ACCESS = dict(
@@ -36,9 +35,9 @@ def get_access(mode: 'str') -> 'int':
     Examples:
         a = get_access('rb') # -> os.R_OK
     """
-    for a, i in ACCESS.items():
-        if a in mode:
-            return i[0]
+    for access, ints in ACCESS.items():
+        if access in mode:
+            return ints[0]
     raise ValueError("{} does not contain a valid access mode".format(mode))
 
 def set_access(path, mode):
@@ -210,7 +209,7 @@ def check_writeable_file(path: 'str', mkdirs: 'bool' = True) -> 'str':
         dirpath = os.path.dirname(path)
         if os.path.exists(dirpath):
             check_path(dirpath, 'd', 'w')
-        else:
+        elif mkdirs:
             os.makedirs(dirpath)
         return path
 
@@ -218,18 +217,27 @@ def check_writeable_file(path: 'str', mkdirs: 'bool' = True) -> 'str':
 ### instead of throwing exceptions
 
 def safe_check_path(path: 'str', *args, **kwargs) -> 'str':
+    """Safe vesion of ``check_path``. Returns None rather than throw an
+    exception.
+    """
     try:
         return check_path(path, *args, **kwargs)
     except IOError:
         return None
 
 def safe_check_readable_file(path: 'str') -> 'str':
+    """Safe vesion of ``check_readable_file``. Returns None rather than throw an
+    exception.
+    """
     try:
         return check_readable_file(path)
     except IOError:
         return None
 
 def safe_check_writeable_file(path: 'str') -> 'str':
+    """Safe vesion of ``check_writeable_file``. Returns None rather than throw an
+    exception.
+    """
     try:
         return check_writeable_file(path)
     except IOError:
@@ -251,21 +259,23 @@ def find(root: 'str', pattern: 'str|regexp', types: 'str' = 'f',
     if isinstance(pattern, str):
         pattern = re.compile(pattern)
     found = []
-    for root, dirs, files in os.walk(root):
+    for parent, dirs, files in os.walk(root):
         if types != "f":
             found.extend(
-                os.path.join(root, d)
+                os.path.join(parent, d)
                 for d in dirs
                 if pattern.match(d))
         if types != "d":
             found.extend(
-                os.path.join(root, f)
+                os.path.join(parent, f)
                 for f in files
                 if pattern.match(f))
+        if not recursive:
+            break
     
     return found
 
-executable_paths = copy.copy(os.get_exec_path())
+executable_paths = copy.copy(os.get_exec_path()) # pylint: disable=invalid-name
 """List of paths that are searched for executables"""
 
 def add_executable_path(paths):
@@ -275,12 +285,13 @@ def add_executable_path(paths):
         paths: List of paths, or a string with directories separated by
             ``os.path.sep``
     """
+    # pylint: disable=global-statement,invalid-name
     global executable_paths
     if isinstance(paths, str):
         paths = paths.split(os.path.sep)
     executable_paths = list(paths) + executable_paths
 
-executable_cache = {}
+executable_cache = {} # pylint: disable=invalid-name
 """Cache of full paths to executables"""
 
 def get_executable_path(executable: 'str') -> 'str':
@@ -296,17 +307,12 @@ def get_executable_path(executable: 'str') -> 'str':
     if exe_name in executable_cache:
         return executable_cache[exe_name]
     
-    def check_executable(fpath):
-        try:
-            return check_path(fpath, 'f', 'x')
-        except:
-            return None
-    
-    exe_file = check_executable(executable)
+    exe_file = safe_check_path(executable, 'f', 'x')
     if not exe_file:
         for path in executable_paths:
-            exe_file = check_executable(
-                os.path.join(path.strip('"'), executable))
+            exe_file = safe_check_path(
+                os.path.join(path.strip('"'), executable),
+                'f', 'x')
             if exe_file:
                 break
     
@@ -316,10 +322,24 @@ def get_executable_path(executable: 'str') -> 'str':
 # Temporary files and directories
 
 class TempPath(object):
+    """Base class for temporary files/directories.
+    
+    Args:
+        parent: The parent directory
+        mode: The access mode
+        path_type: 'f' = file, 'd' = directory
+    """
     def __init__(self, parent=None, mode='rwx', path_type='d'):
         self.parent = parent
         self.path_type = path_type
         self._mode = mode
+    
+    @property
+    def exists(self):
+        """Whether the directory exists.
+        """
+        # pylint: disable=no-member
+        return os.path.exists(self.absolute_path)
     
     @property
     def mode(self):
@@ -343,6 +363,7 @@ class TempPath(object):
                 if ``mode == 'w'`` and ``self.mode == 'r'``, the new mode
                 is 'rw')
         """
+        # pylint: disable=no-member
         if not self.exists:
             return None
         if mode:
@@ -386,17 +407,17 @@ class TempPathDescriptor(TempPath):
         self._relpath = None
     
     @property
-    def exists(self):
-        return self._abspath is not None and os.path.exists(self._abspath)
-    
-    @property
     def absolute_path(self):
+        """The absolute path.
+        """
         if self._abspath is None:
             self._init_path()
         return self._abspath
     
     @property
     def relative_path(self):
+        """The relative path.
+        """
         if self._relpath is None:
             self._init_path()
         return self._relpath
@@ -408,6 +429,12 @@ class TempPathDescriptor(TempPath):
         self._abspath = os.path.join(self.parent.absolute_path, self.name)
     
     def create(self, apply_permissions=True):
+        """Create the file/directory.
+        
+        Args:
+            apply_permissions: Whether to set access permissions according to
+                ``self.mode
+        """
         if self.path_type not in ('d', 'dir'):
             if self.path_type == 'fifo':
                 if os.path.exists(self.absolute_path):
@@ -417,8 +444,8 @@ class TempPathDescriptor(TempPath):
             # this using a subprocess to pipe through a buffering program (such
             # as pv) to the FIFO instead
             if self.path_type != 'fifo':
-                with open(self.absolute_path, 'wt') as fh:
-                    fh.write(self.contents or '')
+                with open(self.absolute_path, 'wt') as outfile:
+                    outfile.write(self.contents or '')
             elif self.contents:
                 raise Exception("Currently, contents cannot be written to a FIFO")
         elif not os.path.exists(self.absolute_path):
@@ -461,10 +488,6 @@ class TempDir(TempPath):
     
     def __contains__(self, path):
         return path in self.paths
-    
-    @property
-    def exists(self):
-        return os.path.exists(self.absolute_path)
     
     def close(self):
         """Delete the temporary directory and all files/subdirectories within.
@@ -534,24 +557,30 @@ class TempDir(TempPath):
             for desc in path_descriptors]
         # Now apply permissions after all paths are created
         for desc in path_descriptors:
-            result = desc.set_access()
+            desc.set_access()
         return paths
     
     # Convenience methods
     
     def make_file(self, desc=None, apply_permissions=True, **kwargs):
+        """Convenience method; calls ``make_path`` with path_type='f'.
+        """
         kwargs['path_type'] = 'f'
         return self.make_path(desc, apply_permissions, **kwargs)
     
     def make_fifo(self, desc=None, apply_permissions=True, **kwargs):
+        """Convenience method; calls ``make_path`` with path_type='fifo'.
+        """
         kwargs['path_type'] = 'fifo'
         return self.make_path(desc, apply_permissions, **kwargs)
     
     def make_directory(self, desc=None, apply_permissions=True, **kwargs):
+        """Convenience method; calls ``make_path`` with path_type='d'.
+        """
         kwargs['path_type'] = 'd'
         return self.make_path(desc, apply_permissions, **kwargs)
     
-    def make_empty_files(self, n, **kwargs):
+    def make_empty_files(self, num_files, **kwargs):
         """Create randomly-named empty files.
         
         Args:
@@ -560,4 +589,4 @@ class TempDir(TempPath):
         """
         return list(
             self.make_path(TempPathDescriptor(**kwargs))
-            for i in range(n))
+            for i in range(num_files))

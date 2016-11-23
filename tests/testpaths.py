@@ -199,12 +199,21 @@ class PathTests(TestCase):
         level1 = self.root.make_directory()
         level2 = self.root.make_directory(prefix='foo', parent=level1)
         paths = self.root.make_empty_files(3, prefix='bar', parent=level2)
-        x = find(level1, 'foo.*', 'd')
+        
+        # recursive
+        x = find(level1, 'foo.*', 'd', recursive=True)
         self.assertEqual(1, len(x))
         self.assertEqual(level2, x[0])
-        y = find(level1, 'bar.*', 'f')
+        y = find(level1, 'bar.*', 'f', recursive=True)
         self.assertEqual(3, len(y))
         self.assertListEqual(sorted(paths), sorted(y))
+        
+        # non-recursive
+        x = find(level1, 'foo.*', 'd', recursive=False)
+        self.assertEqual(1, len(x))
+        self.assertEqual(level2, x[0])
+        y = find(level1, 'bar.*', 'f', recursive=False)
+        self.assertEqual(0, len(y))
     
     def test_get_executable_path(self):
         exe = self.root.make_file(suffix=".exe")

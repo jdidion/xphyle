@@ -7,9 +7,6 @@ import shlex
 from subprocess import Popen, PIPE
 from xphyle.paths import get_executable_path, check_path
 
-# pylint: disable=R0903
-# pylint: disable=C0103
-
 class TqdmWrapper(object):
     """Default python progress bar wrapper.
     """
@@ -20,7 +17,7 @@ class TqdmWrapper(object):
     def __call__(self, itr, desc, size):
         return self.wrapper_fn(itr, desc=desc, total=size)
 
-_wrapper = None
+_wrapper = None # pylint: disable=invalid-name
 
 def set_wrapper(wrapper: 'bool|callable' = True):
     """Set the python progress wrapper.
@@ -30,7 +27,7 @@ def set_wrapper(wrapper: 'bool|callable' = True):
             off progress bars; otherwise a callable that takes three arguments,
             itr, desc, size, and returns an iterable.
     """
-    # pylint: disable=W0603,redefined-variable-type
+    # pylint: disable=global-statement,redefined-variable-type,invalid-name
     global _wrapper
     if wrapper is True:
         try:
@@ -74,7 +71,7 @@ def pv_command(require=False): # pragma: no-cover
     """
     return system_progress_command('pv', '-pre', require=require)
 
-_system_wrapper = None
+_system_wrapper = None # pylint: disable=invalid-name
 
 def set_system_wrapper(wrapper : 'bool|callable' = True):
     """Set the python system progress wrapper.
@@ -85,7 +82,7 @@ def set_system_wrapper(wrapper : 'bool|callable' = True):
             system command; otherwise a callable that takes returns a command in
             list form.
     """
-    # pylint: disable=W0603,redefined-variable-type
+    # pylint: disable=global-statement,redefined-variable-type,invalid-name
     global _system_wrapper
     if wrapper is True:
         try:
@@ -106,10 +103,10 @@ def wrap_subprocess(cmd, stdin, stdout, **kwargs): # pragma: no-cover
         return Popen(cmd, stdin=stdin, stdout=stdout, **kwargs)
     
     if stdin is not None:
-        p1 = Popen(_system_wrapper, stdin=stdin, stdout=PIPE)
-        p2 = Popen(cmd, stdin=p1.stdout, stdout=stdout)
+        proc1 = Popen(_system_wrapper, stdin=stdin, stdout=PIPE)
+        proc2 = Popen(cmd, stdin=proc1.stdout, stdout=stdout)
     else:
-        p1 = Popen(cmd, stdout=PIPE)
-        p2 = Popen(_system_wrapper, stdin=p1.stdout, stdout=stdout)
-    p1.stdout.close()
-    return p2
+        proc1 = Popen(cmd, stdout=PIPE)
+        proc2 = Popen(_system_wrapper, stdin=proc1.stdout, stdout=stdout)
+    proc1.stdout.close()
+    return proc2

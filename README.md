@@ -78,3 +78,4 @@ We welcome any contributions via pull requests. Style-wise, we try to adhere to 
 
 * Function annotations: pylint does not properly handle whitespace around function annotations (https://github.com/PyCQA/pylint/issues/238).
 * White space on empty lines: we use white space as a visual guide to the structure of the code. Each blank line should have whitespace matching the indent level of the next non-blank line.
+* Checks that are arbitrary/overly restrictive (see .pylintrc for full list)
