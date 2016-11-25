@@ -3,15 +3,23 @@ from . import *
 import gzip
 from io import StringIO, BytesIO, TextIOWrapper
 from xphyle import *
-from xphyle.paths import TempDir, STDIN, STDOUT, STDERR
+from xphyle.paths import TempDir, STDIN, STDOUT, STDERR, EXECUTABLE_CACHE
+from xphyle.progress import ITERABLE_PROGRESS, PROCESS_PROGRESS
+from xphyle.formats import THREADS
 
 class XphyleTests(TestCase):
     def setUp(self):
         self.root = TempDir()
-        configure(False, False, 1, None)
     
     def tearDown(self):
         self.root.close()
+        ITERABLE_PROGRESS.enabled = False
+        ITERABLE_PROGRESS.wrapper = None
+        PROCESS_PROGRESS.enabled = False
+        PROCESS_PROGRESS.wrapper = None
+        THREADS.update(1)
+        EXECUTABLE_CACHE.reset_search_path()
+        EXECUTABLE_CACHE.cache = {}
     
     def test_configure(self):
         import xphyle.progress
@@ -19,18 +27,20 @@ class XphyleTests(TestCase):
         import xphyle.paths
         def wrapper(a,b,c):
             pass
-        configure(progress=wrapper, system_progress='foo', threads=2, executable_path=['foo'])
-        self.assertEqual(wrapper, xphyle.progress._wrapper)
-        self.assertEqual(['foo'], xphyle.progress._system_wrapper)
-        self.assertEqual(2, xphyle.formats.get_threads())
-        self.assertTrue('foo' in xphyle.paths.executable_paths)
+        configure(progress=True, progress_wrapper=wrapper,
+                  system_progress=True, system_progress_wrapper='foo',
+                  threads=2, executable_path=['foo'])
+        self.assertEqual(wrapper, ITERABLE_PROGRESS.wrapper)
+        self.assertEqual(('foo',), PROCESS_PROGRESS.wrapper)
+        self.assertEqual(2, THREADS.threads)
+        self.assertTrue('foo' in EXECUTABLE_CACHE.search_path)
         
         configure(threads=False)
-        self.assertEqual(1, xphyle.formats.get_threads())
+        self.assertEqual(1, THREADS.threads)
         
         import multiprocessing
         configure(threads=True)
-        self.assertEqual(multiprocessing.cpu_count(), xphyle.formats.get_threads())
+        self.assertEqual(multiprocessing.cpu_count(), THREADS.threads)
     
     def test_guess_format(self):
         with self.assertRaises(ValueError):

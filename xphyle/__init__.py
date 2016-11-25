@@ -7,35 +7,34 @@ import copy
 import io
 import os
 import sys
+from xphyle.types import (Callable, Iterable, Union, Sequence, FileLike,
+                          PathOrFile, Any)
 
-import xphyle.formats
-import xphyle.progress
-import xphyle.paths
-
-from xphyle.formats import FORMATS
+from xphyle.formats import FORMATS, THREADS
 from xphyle.paths import (
-    STDIN, STDOUT, STDERR, check_readable_file, check_writeable_file,
-    safe_check_readable_file)
-from xphyle.progress import wrap_iter
+    STDIN, STDOUT, STDERR, EXECUTABLE_CACHE,
+    check_readable_file, check_writeable_file, safe_check_readable_file)
+from xphyle.progress import ITERABLE_PROGRESS, PROCESS_PROGRESS
 from xphyle.urls import parse_url, open_url, get_url_file_name
 
 # pylint: disable=protected-access
-import xphyle._version
-__version__ = xphyle._version.get_versions()['version']
+from xphyle._version import get_versions
+__version__ = get_versions()['version']
+del get_versions
 
-def configure(progress: 'bool|callable' = None,
-              system_progress: 'bool|str|list' = None,
-              threads: 'int|bool' = None,
-              executable_path: 'str|list' = None):
+def configure(progress: bool = None,
+              progress_wrapper: Callable[..., Iterable] = None,
+              system_progress: bool = None,
+              system_progress_wrapper: Union[str, Sequence[str]] = None,
+              threads: Union[int, bool] = None,
+              executable_path: Union[str, Sequence[str]] = None) -> None:
     """Conifgure xphyle.
     
     Args:
-        progress: Whether to wrap long-running operations with a progress bar.
-            If this is callable, it will be called with an iterable argument to
-            obtain the wrapped iterable.
+        progress: Whether to wrap long-running operations with a progress bar
+        progres_wrapper: Specify a non-default progress wrapper
         system_progress: Whether to use progress bars for system-level
-            operations. If this is a string or tuple, it will be used as the
-            command for producing the progress bar; pv is used by default.
+        system_progress_wrapper: Specify a non-default system progress wrapper
         threads: The number of threads that can be used by compression formats
             that support parallel compression/decompression. Set to None or a
             number < 1 to automatically initalize to the number of cores on
@@ -44,15 +43,15 @@ def configure(progress: 'bool|callable' = None,
             executables. These will be searched before the default system path.
     """
     if progress is not None:
-        xphyle.progress.set_wrapper(progress)
+        ITERABLE_PROGRESS.update(progress, progress_wrapper)
     if system_progress is not None:
-        xphyle.progress.set_system_wrapper(system_progress)
+        PROCESS_PROGRESS.update(system_progress, system_progress_wrapper)
     if threads is not None:
-        xphyle.formats.set_threads(threads)
+        THREADS.update(threads)
     if executable_path:
-        xphyle.paths.add_executable_path(executable_path)
+        EXECUTABLE_CACHE.add_search_path(executable_path)
 
-def guess_file_format(path: 'str') -> 'str':
+def guess_file_format(path: str) -> str:
     """Try to guess the file format, first from the extension, and then
     from the header bytes.
     
@@ -70,7 +69,8 @@ def guess_file_format(path: 'str') -> 'str':
     return fmt
 
 @contextmanager
-def open_(path_or_file, mode: 'str' = 'r', errors: 'bool' = True, **kwargs):
+def open_(path_or_file, mode: str = 'r', errors: bool = True, **kwargs
+         ) -> FileLike:
     """Context manager that frees you from checking if an argument is a path
     or a file object. Calls ``xopen`` to open files.
     
@@ -108,9 +108,9 @@ def open_(path_or_file, mode: 'str' = 'r', errors: 'bool' = True, **kwargs):
     else:
         yield path_or_file
 
-def xopen(path: 'str', mode: 'str' = 'r', compression: 'bool|str' = None,
-          use_system: 'bool' = True, context_wrapper: 'bool' = True,
-          **kwargs) -> 'file':
+def xopen(path: str, mode: str = 'r', compression: Union[bool, str] = None,
+          use_system: bool = True, context_wrapper: bool = True,
+          **kwargs) -> FileLike:
     """
     Replacement for the `open` function that automatically handles
     compressed files. If `use_system==True` and the file is compressed,
@@ -275,6 +275,28 @@ def xopen(path: 'str', mode: 'str' = 'r', compression: 'bool|str' = None,
     
     return fileobj
 
+class FileEventListener(object):
+    """Base class for listener events that can be registered on a FileWrapper.
+    
+    Args:
+        args: positional arguments to pass through to ``execute``
+        kwargs: keyword arguments to pass through to ``execute``
+    """
+    def __init__(self, *args, **kwargs):
+        self.args = args
+        self.kwargs = kwargs
+    
+    def __call__(self, file_wrapper):
+        self.execute(file_wrapper._path, *self.args, **self.kwargs)
+    
+    def execute(self, path: str, *args, **kwargs) -> None:
+        """Handle an event.
+        
+        Args:
+            path: The path to the file that generated the event
+        """
+        raise NotImplementedError()
+
 class Wrapper(object):
     """Base class for wrappers around file-like objects. Adds the following:
     
@@ -285,12 +307,12 @@ class Wrapper(object):
     Args:
         fileobj: The file-like object to wrap
     """
-    def __init__(self, fileobj, compression=False):
+    def __init__(self, fileobj: FileLike, compression: bool = False):
         object.__setattr__(self, '_fileobj', fileobj)
         object.__setattr__(self, 'compression', compression)
         object.__setattr__(self, '_listeners', defaultdict(lambda: []))
     
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Any:
         return getattr(self._fileobj, name)
     
     def __next__(self):
@@ -298,8 +320,8 @@ class Wrapper(object):
     
     def __iter__(self):
         if not hasattr(self, '_iterator'):
-            setattr(self, '_iterator',
-                    iter(wrap_iter(self._fileobj, desc=self.name)))
+            itr = iter(ITERABLE_PROGRESS.wrap(self._fileobj, desc=self.name))
+            setattr(self, '_iterator', itr)
         return self._iterator
     
     def __enter__(self):
@@ -310,7 +332,7 @@ class Wrapper(object):
     def __exit__(self, exception_type, exception_value, traceback):
         self.close()
     
-    def close(self):
+    def close(self) -> None:
         """Close the file, close an open iterator, and fire 'close' events to
         any listeners.
         """
@@ -324,7 +346,8 @@ class Wrapper(object):
     def _close(self):
         self._fileobj.close()
 
-    def register_listener(self, event: 'str', listener):
+    def register_listener(self, event: str, listener: FileEventListener
+                         ) -> None:
         """Register an event listener.
         
         Args:
@@ -340,9 +363,11 @@ class FileWrapper(Wrapper):
     Args:
         source: Path or file object
         mode: File open mode
+        compression: Compression type
         kwargs: Additional arguments to pass to xopen
     """
-    def __init__(self, source, mode='w', compression=False, **kwargs):
+    def __init__(self, source: PathOrFile, mode: str = 'w',
+                 compression: Union[bool, str] = False, **kwargs):
         if isinstance(source, str):
             path = source
             source = xopen(source, mode=mode, compression=compression, **kwargs)
@@ -351,35 +376,16 @@ class FileWrapper(Wrapper):
         super(FileWrapper, self).__init__(source, compression=compression)
         object.__setattr__(self, '_path', path)
 
-class FileEventListener(object):
-    """Base class for listener events that can be registered on a FileWrapper.
-    
-    Args:
-        args: positional arguments to pass through to ``execute``
-        kwargs: keyword arguments to pass through to ``execute``
-    """
-    def __init__(self, *args, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
-    
-    def __call__(self, file_wrapper):
-        self.execute(file_wrapper._path, *self.args, **self.kwargs)
-    
-    def execute(self, path, *args, **kwargs):
-        """Handle an event.
-        
-        Args:
-            file_wrapper: The file that generated the event
-        """
-        raise NotImplementedError()
-
 class StreamWrapper(Wrapper):
     """EventWrapper around a stream.
     
     Args:
         stream: The stream to wrap
+        name: The name to give this stream
+        compression: Compression type
     """
-    def __init__(self, stream, name=None, compression=False):
+    def __init__(self, stream, name: str = None,
+                 compression: Union[bool, str] = False):
         if name is None:
             try:
                 name = self._stream.name

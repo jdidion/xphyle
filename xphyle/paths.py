@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """Convenience functions for working with file paths.
 """
-import copy
 import errno
 import os
 import re
 import shutil
 import stat
 import tempfile
+from xphyle.types import Sequence, Tuple, Union, Pattern, Iterable
 
 ACCESS = dict(
     r=(os.R_OK, stat.S_IREAD),
@@ -20,7 +20,7 @@ STDIN = STDOUT = '-'
 STDERR = '_'
 """Placeholder for ``sys.stderr``"""
 
-def get_access(mode: 'str') -> 'int':
+def get_access(mode: str) -> int:
     """Returns the access mode constant associated with given mode string.
     
     Args:
@@ -28,9 +28,6 @@ def get_access(mode: 'str') -> 'int':
     
     Returns:
         The access mode constant
-    
-    Raises:
-        ValueError, if ``mode`` does not contain a valid mode character.
     
     Examples:
         a = get_access('rb') # -> os.R_OK
@@ -40,7 +37,7 @@ def get_access(mode: 'str') -> 'int':
             return ints[0]
     raise ValueError("{} does not contain a valid access mode".format(mode))
 
-def set_access(path, mode):
+def set_access(path: str, mode: str) -> int:
     """Sets file access from a mode string.
     
     Args:
@@ -58,8 +55,15 @@ def set_access(path, mode):
     os.chmod(path, mode_flag)
     return mode_flag
 
-def check_access(path: 'str', access: 'int|str'):
+def check_access(path: str, access: Union[int, str]) -> None:
     """Check that ``path`` is accessible.
+    
+    Args:
+        path: The path to check
+        access: String or int access specifier
+    
+    Raises:
+        IOError if the path cannot be accessed according to ``access``
     """
     if isinstance(access, str):
         access = get_access(access)
@@ -71,7 +75,7 @@ def check_access(path: 'str', access: 'int|str'):
     elif not os.access(path, access):
         raise IOError(errno.EACCES, "{} not accessable".format(path), path)
 
-def abspath(path: 'str') -> 'str':
+def abspath(path: str) -> str:
     """Returns the fully resolved path associated with ``path``.
     
     Args:
@@ -88,8 +92,8 @@ def abspath(path: 'str') -> 'str':
         return path
     return os.path.abspath(os.path.expanduser(path))
 
-def split_path(path: 'str', keep_seps: 'bool' = True,
-               resolve: 'bool' = True) -> 'tuple':
+def split_path(path: str, keep_seps: bool = True, resolve: bool = True
+              ) -> Tuple:
     """Splits a path into a (parent_dir, name, *ext) tuple.
     
     Args:
@@ -105,9 +109,9 @@ def split_path(path: 'str', keep_seps: 'bool' = True,
     
     Examples:
         split_path('myfile.foo.txt', False)
-        -> ('/current/dir', 'myfile', 'foo', 'txt')
+        # -> ('/current/dir', 'myfile', 'foo', 'txt')
         split_path('/usr/local/foobar.gz', True)
-        -> ('/usr/local', 'foobar', '.gz')
+        # -> ('/usr/local', 'foobar', '.gz')
     """
     if resolve:
         path = abspath(path)
@@ -118,16 +122,23 @@ def split_path(path: 'str', keep_seps: 'bool' = True,
     else:
         seps = file_parts[1:]
         if keep_seps:
-            seps = tuple('{}{}'.format(os.extsep, ext) for ext in file_parts[1:])
+            seps = tuple(
+                '{}{}'.format(os.extsep, ext)
+                for ext in file_parts[1:])
     return (parent, file_parts[0]) + seps
 
-def filename(path: 'str') -> 'str':
-    """Returns just the filename part of ``path``. Equivalent to
-    ``split_path(path)[1]``.
+def filename(path: str) -> str:
+    """Equivalent to ``split_path(path)[1]``.
+    
+    Args:
+        The path
+    
+    Returns:
+        The filename part of ``path``
     """
     return split_path(path)[1]
 
-def resolve_path(path: 'str', parent: 'str' = None) -> 'str':
+def resolve_path(path: str, parent: str = None) -> str:
     """Resolves the absolute path of the specified file and ensures that the
     file/directory exists.
     
@@ -151,8 +162,8 @@ def resolve_path(path: 'str', parent: 'str' = None) -> 'str':
         raise IOError(errno.ENOENT, "{} does not exist".format(path), path)
     return path
 
-def check_path(path: 'str', ptype: 'str' = None,
-               access: 'int|str' = None) -> 'str':
+def check_path(path: str, ptype: str = None, access: Union[int, str] = None
+              ) -> str:
     """Resolves the path (using ``resolve_path``) and checks that the path is
     of the specified type and allows the specified access.
     
@@ -180,7 +191,7 @@ def check_path(path: 'str', ptype: 'str' = None,
         check_access(path, access)
     return path
 
-def check_readable_file(path: 'str') -> 'str':
+def check_readable_file(path: str) -> str:
     """Check that ``path`` exists and is readable.
     
     Args:
@@ -191,7 +202,7 @@ def check_readable_file(path: 'str') -> 'str':
     """
     return check_path(path, 'f', 'r')
 
-def check_writeable_file(path: 'str', mkdirs: 'bool' = True) -> 'str':
+def check_writeable_file(path: str, mkdirs: bool = True) -> str:
     """If ``path`` exists, check that it is writeable, otherwise check that
     its parent directory exists and is writeable.
     
@@ -213,10 +224,10 @@ def check_writeable_file(path: 'str', mkdirs: 'bool' = True) -> 'str':
             os.makedirs(dirpath)
         return path
 
-### "Safe" versions of the check methods, meaning they return None
-### instead of throwing exceptions
+# "Safe" versions of the check methods, meaning they return None
+# instead of throwing exceptions
 
-def safe_check_path(path: 'str', *args, **kwargs) -> 'str':
+def safe_check_path(path: str, *args, **kwargs) -> str:
     """Safe vesion of ``check_path``. Returns None rather than throw an
     exception.
     """
@@ -225,7 +236,7 @@ def safe_check_path(path: 'str', *args, **kwargs) -> 'str':
     except IOError:
         return None
 
-def safe_check_readable_file(path: 'str') -> 'str':
+def safe_check_readable_file(path: str) -> str:
     """Safe vesion of ``check_readable_file``. Returns None rather than throw an
     exception.
     """
@@ -234,17 +245,17 @@ def safe_check_readable_file(path: 'str') -> 'str':
     except IOError:
         return None
 
-def safe_check_writeable_file(path: 'str') -> 'str':
-    """Safe vesion of ``check_writeable_file``. Returns None rather than throw an
-    exception.
+def safe_check_writeable_file(path: str) -> str:
+    """Safe vesion of ``check_writeable_file``. Returns None rather than throw
+    an exception.
     """
     try:
         return check_writeable_file(path)
     except IOError:
         return None
 
-def find(root: 'str', pattern: 'str|regexp', types: 'str' = 'f',
-         recursive: 'bool' = True) -> 'list':
+def find(root: str, pattern: Union[str, Pattern], types: str = 'f',
+         recursive: bool = True) -> Sequence[str]:
     """Find all paths under ``root`` that match ``pattern``.
     
     Args:
@@ -275,49 +286,86 @@ def find(root: 'str', pattern: 'str|regexp', types: 'str' = 'f',
     
     return found
 
-executable_paths = copy.copy(os.get_exec_path()) # pylint: disable=invalid-name
-"""List of paths that are searched for executables"""
-
-def add_executable_path(paths):
-    """Add directories to the beginning of the executable search path.
+class ExecutableCache(object):
+    """Lookup and cache executable paths.
     
     Args:
-        paths: List of paths, or a string with directories separated by
-            ``os.path.sep``
+        default_path: The default executable path
     """
-    # pylint: disable=global-statement,invalid-name
-    global executable_paths
-    if isinstance(paths, str):
-        paths = paths.split(os.path.sep)
-    executable_paths = list(paths) + executable_paths
+    def __init__(self, default_path: Sequence[str] = os.get_exec_path()):
+        self.cache = {}
+        self.search_path = None
+        self.reset_search_path(default_path)
 
-executable_cache = {} # pylint: disable=invalid-name
-"""Cache of full paths to executables"""
+    def add_search_path(self, paths: Union[str, Sequence[str]]) -> None:
+        """Add directories to the beginning of the executable search path.
+        
+        Args:
+            paths: List of paths, or a string with directories separated by
+                ``os.path.sep``
+        """
+        # pylint: disable=global-statement,invalid-name
+        if isinstance(paths, str):
+            paths = paths.split(os.path.sep)
+        self.search_path = list(paths) + self.search_path
+    
+    def reset_search_path(self,
+                          default_path: Sequence[str] = os.get_exec_path()
+                         ) -> None:
+        """Reset the search path to ``default_path``.
+        
+        Args:
+            default_path: The default executable path
+        """
+        self.search_path = []
+        if default_path:
+            self.add_search_path(default_path)
+    
+    def get_path(self, executable: str) -> str:
+        """Get the full path of ``executable``.
+        
+        Args:
+            executable: A executable name
+        
+        Returns:
+            The full path of ``executable``, or None if the path cannot be
+            found.
+        """
+        exe_name = os.path.basename(executable)
+        if exe_name in self.cache:
+            return self.cache[exe_name]
+        
+        exe_file = safe_check_path(executable, 'f', 'x')
+        if not exe_file:
+            for path in self.search_path:
+                exe_file = safe_check_path(
+                    os.path.join(path.strip('"'), executable),
+                    'f', 'x')
+                if exe_file:
+                    break
+        
+        self.cache[exe_name] = exe_file
+        return exe_file
+    
+    def resolve_exe(self, names: Iterable[str]) -> Tuple:
+        """Given an iterable of command names, find the first that resolves to
+        an executable.
+        
+        Args:
+            names: An iterable of command names
+        
+        Returns:
+            A tuple (path, name) of the first command to resolve, or None if
+            none of the commands resolve
+        """
+        for cmd in names:
+            exe = self.get_path(cmd)
+            if exe:
+                return (exe, cmd)
+        return None
 
-def get_executable_path(executable: 'str') -> 'str':
-    """Get the full path of ``executable``.
-    
-    Args:
-        executable: A executable name
-    
-    Returns:
-        The full path of ``executable``, or None if the path cannot be found.
-    """
-    exe_name = os.path.basename(executable)
-    if exe_name in executable_cache:
-        return executable_cache[exe_name]
-    
-    exe_file = safe_check_path(executable, 'f', 'x')
-    if not exe_file:
-        for path in executable_paths:
-            exe_file = safe_check_path(
-                os.path.join(path.strip('"'), executable),
-                'f', 'x')
-            if exe_file:
-                break
-    
-    executable_cache[exe_name] = exe_file
-    return exe_file
+EXECUTABLE_CACHE = ExecutableCache()
+"""Singleton instance of ExecutableCache."""
 
 # Temporary files and directories
 
@@ -329,21 +377,22 @@ class TempPath(object):
         mode: The access mode
         path_type: 'f' = file, 'd' = directory
     """
-    def __init__(self, parent=None, mode='rwx', path_type='d'):
+    def __init__(self, parent: str = None, mode: str = 'rwx',
+                 path_type: str = 'd'):
         self.parent = parent
         self.path_type = path_type
         self._mode = mode
     
     @property
-    def exists(self):
+    def exists(self) -> bool:
         """Whether the directory exists.
         """
         # pylint: disable=no-member
         return os.path.exists(self.absolute_path)
     
     @property
-    def mode(self):
-        """Get the access mode of the path. Defaults to the parent's mode.
+    def mode(self) -> str:
+        """The access mode of the path. Defaults to the parent's mode.
         """
         if not self._mode:
             if self.parent:
@@ -352,7 +401,8 @@ class TempPath(object):
                 raise Exception("Cannot determine mode without 'parent'")
         return self._mode
     
-    def set_access(self, mode=None, set_parent=False, additive=False):
+    def set_access(self, mode: str = None, set_parent: bool = False,
+                   additive: bool = False) -> str:
         """Set the access mode for the path.
         
         Args:
@@ -362,6 +412,9 @@ class TempPath(object):
             additive: Whether permissions should be additive (e.g.
                 if ``mode == 'w'`` and ``self.mode == 'r'``, the new mode
                 is 'rw')
+        
+        Returns:
+            The mode that was set
         """
         # pylint: disable=no-member
         if not self.exists:
@@ -393,8 +446,9 @@ class TempPathDescriptor(TempPath):
         path_type: 'f' or 'file' (for file), 'd' or 'dir' (for directory),
             or 'fifo' (for FIFO)
     """
-    def __init__(self, name=None, parent=None, mode=None,
-                 suffix='', prefix='', contents='', path_type='f'):
+    def __init__(self, name: str = None, parent: TempPath = None,
+                 mode: str = None, suffix: str = '', prefix: str = '',
+                 contents: str = '', path_type: str = 'f'):
         if contents and path_type != 'f':
             raise ValueError("'contents' only valid for files")
         super(TempPathDescriptor, self).__init__(parent, mode, path_type)
@@ -407,7 +461,7 @@ class TempPathDescriptor(TempPath):
         self._relpath = None
     
     @property
-    def absolute_path(self):
+    def absolute_path(self) -> str:
         """The absolute path.
         """
         if self._abspath is None:
@@ -415,20 +469,20 @@ class TempPathDescriptor(TempPath):
         return self._abspath
     
     @property
-    def relative_path(self):
+    def relative_path(self) -> str:
         """The relative path.
         """
         if self._relpath is None:
             self._init_path()
         return self._relpath
     
-    def _init_path(self):
+    def _init_path(self) -> None:
         if self.parent is None:
             raise Exception("Cannot determine absolute path without 'root'")
         self._relpath = os.path.join(self.parent.relative_path, self.name)
         self._abspath = os.path.join(self.parent.absolute_path, self.name)
     
-    def create(self, apply_permissions=True):
+    def create(self, apply_permissions: bool = True) -> None:
         """Create the file/directory.
         
         Args:
@@ -468,7 +522,9 @@ class TempDir(TempPath):
     before permissions are set, enabling creation of a read-only temporary file
     system.
     """
-    def __init__(self, mode='rwx', path_descriptors=None, **kwargs):
+    def __init__(self, mode: str = 'rwx',
+                 path_descriptors: Iterable[TempPathDescriptor] = None,
+                 **kwargs):
         super(TempDir, self).__init__(mode=mode)
         self.absolute_path = abspath(tempfile.mkdtemp(**kwargs))
         self.relative_path = ''
@@ -483,13 +539,13 @@ class TempDir(TempPath):
     def __exit__(self, exception_type, exception_value, traceback):
         self.close()
     
-    def __getitem__(self, path):
+    def __getitem__(self, path: str) -> TempPathDescriptor:
         return self.paths[path]
     
-    def __contains__(self, path):
+    def __contains__(self, path: str) -> bool:
         return path in self.paths
     
-    def close(self):
+    def close(self) -> None:
         """Delete the temporary directory and all files/subdirectories within.
         """
         # First need to make all paths removable
@@ -499,7 +555,8 @@ class TempDir(TempPath):
             path.set_access('rwx', True)
         shutil.rmtree(self.absolute_path)
     
-    def make_path(self, desc=None, apply_permissions=True, **kwargs):
+    def make_path(self, desc: str = None, apply_permissions: bool = True,
+                  **kwargs) -> str:
         """Create a file or directory within the TempDir.
         
         Args:
@@ -540,7 +597,8 @@ class TempDir(TempPath):
         
         return desc.absolute_path
     
-    def make_paths(self, *path_descriptors):
+    def make_paths(self, *path_descriptors: Sequence[TempPathDescriptor]
+                  ) -> Sequence[str]:
         """Create multiple files/directories at once. The paths are created
         before permissions are set, enabling creation of a read-only temporary
         file system.
@@ -562,25 +620,28 @@ class TempDir(TempPath):
     
     # Convenience methods
     
-    def make_file(self, desc=None, apply_permissions=True, **kwargs):
+    def make_file(self, desc: str = None, apply_permissions: bool = True,
+                  **kwargs) -> Sequence[str]:
         """Convenience method; calls ``make_path`` with path_type='f'.
         """
         kwargs['path_type'] = 'f'
         return self.make_path(desc, apply_permissions, **kwargs)
     
-    def make_fifo(self, desc=None, apply_permissions=True, **kwargs):
+    def make_fifo(self, desc: str = None, apply_permissions: bool = True,
+                  **kwargs) -> Sequence[str]:
         """Convenience method; calls ``make_path`` with path_type='fifo'.
         """
         kwargs['path_type'] = 'fifo'
         return self.make_path(desc, apply_permissions, **kwargs)
     
-    def make_directory(self, desc=None, apply_permissions=True, **kwargs):
+    def make_directory(self, desc: str = None, apply_permissions: bool = True,
+                       **kwargs) -> Sequence[str]:
         """Convenience method; calls ``make_path`` with path_type='d'.
         """
         kwargs['path_type'] = 'd'
         return self.make_path(desc, apply_permissions, **kwargs)
     
-    def make_empty_files(self, num_files, **kwargs):
+    def make_empty_files(self, num_files: int, **kwargs) -> Sequence[str]:
         """Create randomly-named empty files.
         
         Args:

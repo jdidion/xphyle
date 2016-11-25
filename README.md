@@ -17,6 +17,8 @@ files. Most importantly, xphyle will use the appropriate program (e.g. 'gzip') t
 pip install xphyle
 ```
 
+If you are using python 3.3 or 3.4, this will install one dependency: [backports.typing](https://pypi.python.org/pypi/backports.typing).
+
 # Building from source
 
 Clone this repository and run
