@@ -217,8 +217,8 @@ class PathTests(TestCase):
     
     def test_get_executable_path(self):
         exe = self.root.make_file(suffix=".exe")
-        exe_path = get_executable_path(exe)
+        exe_path = EXECUTABLE_CACHE.get_path(exe)
         self.assertIsNotNone(exe_path)
-        self.assertEqual(exe_path, get_executable_path(os.path.basename(exe)))
+        self.assertEqual(exe_path, EXECUTABLE_CACHE.get_path(os.path.basename(exe)))
         # TODO: how to test this fully, since we can't be sure of what
         # executables will be available on the installed system?

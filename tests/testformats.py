@@ -3,7 +3,7 @@ import gzip
 import os
 import xphyle.formats
 from xphyle.formats import *
-from xphyle.paths import TempDir, get_executable_path
+from xphyle.paths import TempDir, EXECUTABLE_CACHE
 from . import *
 
 def get_format(ext):
@@ -23,6 +23,9 @@ bz_path = get_format('bz2').executable_path
 xz_path = get_format('xz').executable_path
 
 class CompressionTests(TestCase):
+    def tearDown(self):
+        EXECUTABLE_CACHE.cache = {}
+    
     def test_list_formats(self):
         self.assertSetEqual(
             set(('gzip','bz2','lzma')),
@@ -59,7 +62,7 @@ class CompressionTests(TestCase):
     
     @skipIf(no_pigz, "'pigz' not available")
     def test_pigz(self):
-        xphyle.formats.set_threads(2)
+        THREADS.update(2)
         gz = get_format('gz')
         self.assertEqual(gz.default_ext, 'gz')
         self.assertEqual(

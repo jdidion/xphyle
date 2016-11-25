@@ -2,9 +2,14 @@ from setuptools import setup
 import os
 import sys
 
+requirements = []
+
 if sys.version_info < (3, 3):
     sys.stdout.write("At least Python 3.3 is required.\n")
     sys.exit(1)
+elif sys.version_info < (3, 5):
+    # typing was added in 3.5, but a backport is avaialble for 3.3+
+    requirements.append('backports.typing')
 
 import versioneer
 
@@ -18,6 +23,7 @@ setup(
     author_email='john.didion@nih.gov',
     license='Public Domain',
     packages = ['xphyle'],
+    install_requires = requirements,
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',

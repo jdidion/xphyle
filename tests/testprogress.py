@@ -2,6 +2,7 @@ from unittest import TestCase
 from . import *
 import xphyle
 from xphyle.paths import TempDir, STDOUT
+from xphyle.progress import ITERABLE_PROGRESS, PROCESS_PROGRESS
 from xphyle.utils import *
 
 class MockProgress(object):
@@ -19,10 +20,14 @@ class ProgressTests(TestCase):
     
     def tearDown(self):
         self.root.close()
+        ITERABLE_PROGRESS.enabled = False
+        ITERABLE_PROGRESS.wrapper = None
+        PROCESS_PROGRESS.enabled = False
+        PROCESS_PROGRESS.wrapper = None
     
     def test_progress(self):
         progress = MockProgress()
-        xphyle.configure(progress)
+        xphyle.configure(progress=True, progress_wrapper=progress)
         path = self.root.make_file()
         with open(path, 'wt') as o:
             for i in range(100):
@@ -33,7 +38,7 @@ class ProgressTests(TestCase):
     
     def test_iter_stream(self):
         progress = MockProgress()
-        xphyle.configure(progress)
+        xphyle.configure(progress=True, progress_wrapper=progress)
         with intercept_stdin('foo\nbar\nbaz'):
             with xopen(STDIN, 'rt', context_wrapper=True, compression=False) as o:
                 lines = list(o)
