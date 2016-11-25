@@ -17,6 +17,8 @@ from xphyle.types import Union, Callable, Iterable, Tuple, PathOrFile, FileLike
 # by formats that support parallelization
 
 class ThreadsVar(object):
+    """Maintain ``threads`` variable.
+    """
     def __init__(self, default_value: int = 1):
         self.threads = default_value
         self.default_value = default_value
@@ -39,7 +41,7 @@ class ThreadsVar(object):
         elif threads < 1:
             self.threads = 1
         else:
-            self.threads = threads
+            self.threads = threads # pylint: disable=redefined-variable-type
 
 THREADS = ThreadsVar()
 

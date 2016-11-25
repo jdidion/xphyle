@@ -17,8 +17,8 @@ from xphyle.formats import FORMATS
 from xphyle.paths import STDIN, STDOUT
 from xphyle.progress import iter_file_chunked
 from xphyle.types import (Generator, PathOrFile, FileLike, Callable, Dict,
-                          Tuple, Any, Sequence, TypeVar, Generic, Optional,
-                          Iterable, Union)
+                          Tuple, Any, Sequence, Generic, Optional, FilesArg,
+                          Iterable, Union, CharMode, TextMode, BinMode)
 
 # Reading data from/writing data to files
 
@@ -193,10 +193,10 @@ def write_dict(dictobj: Dict[str, Any], path: str, sep: str = '=',
     """
     if linesep is None:
         linesep = os.linesep
-    write_lines((
-            "{}{}{}".format(key, sep, convert(val))
-            for key, val in dictobj.items()),
-        path, linesep=linesep, **kwargs)
+    lines = (
+        "{}{}{}".format(key, sep, convert(val))
+        for key, val in dictobj.items())
+    write_lines(lines, path, linesep=linesep, **kwargs)
 
 ## Other delimited files
 
@@ -448,8 +448,6 @@ class RemoveOnClose(FileEventListener):
 
 # Replacement for fileinput, plus fileoutput
 
-FilesArg = Iterable[Union[str, Tuple[Any, PathOrFile]]]
-
 class FileManager(object):
     """Dict-like container for files. Files are opened lazily (upon first
     request) using ``xopen``.
@@ -596,10 +594,6 @@ class FileManager(object):
             if fileobj and not (isinstance(fileobj, dict) or fileobj.closed):
                 fileobj.close()
 
-CharMode = TypeVar('CharMode', str, bytes)
-TextMode = 't'
-BinMode = b'b'
-
 class FileInput(FileManager, Generic[CharMode]):
     """Similar to python's ``fileinput`` that uses ``xopen`` to open files.
     Currently only support sequential line-oriented access via ``next`` or
@@ -738,7 +732,7 @@ class FileOutput(FileManager, Generic[CharMode]):
                  access: str = 'w', linesep: CharMode = os.linesep,
                  encoding: str = 'utf-8'):
         if access not in ('w', 'a', 'x'):
-            raise ValueException("Invalid access mode {}".format(access))
+            raise ValueError("Invalid access mode {}".format(access))
         super(FileOutput, self).__init__(
             mode=access + ('t' if mode == TextMode else 'b'))
         self.mode = mode
@@ -791,14 +785,14 @@ class FileOutput(FileManager, Generic[CharMode]):
     
     def _encode(self, line: Union[str, bytes]) -> CharMode:
         is_binary = isinstance(line, bytes)
-        if self.mode == BinMode and not is_binary:
+        if self.mode is BinMode and not is_binary:
             line = line.encode(self.encoding)
-        elif not self.mode == BinMode and is_binary:
+        elif self.mode is not BinMode and is_binary:
             line = line.decode(self.encoding)
         return line
     
-    def _write_to_file(self, fileobj: FileLike, line: CharMode, sep: CharMode
-                      ) -> None: # pylint: disable=no-self-use
+    def _write_to_file(self, fileobj: FileLike, line: CharMode, sep: CharMode # pylint: disable=no-self-use
+                      ) -> None:
         """Writes a line to a file, gracefully handling the (rare? nonexistant?)
         case where the file has a ``writelines`` but not a ``write`` method.
         """
