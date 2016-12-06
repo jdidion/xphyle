@@ -654,7 +654,7 @@ class BZip2(SingleExeCompressionFormat):
     """
     name = 'bz2'
     exts = ('bz2','bzip','bzip2')
-    system_commands = ('bzip2',)
+    system_commands = ('pbzip2','bzip2')
     compresslevel_range = (1, 9)
     default_compresslevel = 6
     magic_bytes = ((0x42, 0x5A, 0x68),)
@@ -675,6 +675,9 @@ class BZip2(SingleExeCompressionFormat):
             cmd.append('-d')
         if stdout:
             cmd.append('-c')
+        threads = THREADS.threads
+        if self.executable_name == 'pbzip2' and threads > 1:
+            cmd.append('-p{}'.format(threads))
         if src != STDIN:
             cmd.append(src)
         return cmd

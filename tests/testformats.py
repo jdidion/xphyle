@@ -20,6 +20,7 @@ def read_file(fmt, path, use_system, mode='rt'):
 gz_path = get_format('gz').executable_path
 no_pigz = gz_path is None or get_format('gz').executable_name != 'pigz'
 bz_path = get_format('bz2').executable_path
+no_pbzip2 = bz_path is None or get_format('bz2').executable_name != 'pbzip2'
 xz_path = get_format('xz').executable_path
 
 class CompressionTests(TestCase):
@@ -93,6 +94,24 @@ class CompressionTests(TestCase):
         self.assertEqual(
             bz.get_command('d', 'foo.bz2'),
             [bz_path, '-d', '-c', 'foo.bz2'])
+    
+    @skipIf(no_pbzip2, "'pbzip2' not available")
+    def test_pbzip2(self):
+        THREADS.update(2)
+        bz = get_format('bz2')
+        self.assertEqual(bz.default_ext, 'bz2')
+        self.assertEqual(
+            bz.get_command('c', compresslevel=5),
+            [bz_path, '-5', '-z', '-c', '-p2'])
+        self.assertEqual(
+            bz.get_command('c', 'foo.bar', compresslevel=5),
+            [bz_path, '-5', '-z', '-c', '-p2', 'foo.bar'])
+        self.assertEqual(
+            bz.get_command('d'),
+            [bz_path, '-d', '-c', '-p2'])
+        self.assertEqual(
+            bz.get_command('d', 'foo.bz2'),
+            [bz_path, '-d', '-c', '-p2', 'foo.bz2'])
     
     def test_lzma(self):
         xz = get_format('xz')
