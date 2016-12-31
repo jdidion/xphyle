@@ -401,7 +401,7 @@ class UtilsTests(TestCase):
             self.assertEqual(i.filename, file2)
             self.assertEqual(i.lineno, 3)
             self.assertEqual(i.filelineno, 1)
-        
+    
     def test_pending(self):
         file1 = self.root.make_file(suffix='.gz')
         with gzip.open(file1, 'wt') as o:
@@ -425,7 +425,7 @@ class UtilsTests(TestCase):
         self.assertTrue(f.finished)
         self.assertFalse(f._pending)
     
-    def test_file_input_stdin(self):
+    def test_file_input_defaults(self):
         path = self.root.make_file()
         with open(path, 'wt') as o:
             o.write('foo\nbar\n')
@@ -434,10 +434,14 @@ class UtilsTests(TestCase):
             ['foo\n','bar\n'],
             list(fileinput()))
         sys.argv = []
+        with intercept_stdin('foo\n'):
+            lines = list(fileinput([STDIN]))
+            self.assertEqual(1, len(lines))
+            self.assertEqual('foo\n', lines[0])
         with intercept_stdin(b'foo\nbar\n', is_bytes=True) as i:
             self.assertEqual(
             [b'foo\n',b'bar\n'],
-            list(fileinput()))
+            list(fileinput(mode=BinMode)))
     
     def test_tee_file_output(self):
         file1 = self.root.make_file(suffix='.gz')
@@ -497,8 +501,7 @@ class UtilsTests(TestCase):
         with open(path, 'rt') as i:
             self.assertEqual('foo\nbar\nbaz\n', i.read())
         sys.argv = []
-        outbuf = BytesIO()
-        with intercept_stdout(TextIOWrapper(outbuf)):
+        with intercept_stdout(True) as outbuf:
             with fileoutput(mode=BinMode) as o:
                 o.writelines((b'foo',b'bar',b'baz'))
             self.assertEqual(b'foo\nbar\nbaz\n', outbuf.getvalue())

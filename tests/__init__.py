@@ -6,46 +6,50 @@ import stat
 import sys
 import tempfile
 import shutil
+from unittest.mock import patch
 import urllib.request
 
 def random_text(n=1024):
     return ''.join(chr(random.randint(32, 126)) for i in range(n))
 
-@contextmanager
-def intercept_stdout(i):
-    try:
-        sys.stdout = i
-        yield
-    finally:
-        sys.stdout = sys.__stdout__
+class MockStdout(object):
+    def __init__(self, name, as_bytes):
+        self.bytes_io = BytesIO()
+        object.__setattr__(self.bytes_io, 'name', name)
+        self.wrapper = TextIOWrapper(self.bytes_io)
+        self.as_bytes = as_bytes
+    
+    def getvalue(self):
+        val = self.bytes_io.getvalue()
+        if not self.as_bytes:
+            val = val.decode()
+        return val
 
 @contextmanager
-def intercept_stderr(i):
-    try:
-        sys.stderr = i
-        yield
-    finally:
-        sys.stderr = sys.__stderr__
+def intercept_stdout(as_bytes=False):
+    i = MockStdout('<stdout>', as_bytes)
+    with patch('sys.stdout', i.wrapper):
+        yield i
+
+@contextmanager
+def intercept_stderr(as_bytes=False):
+    i = MockStdout('<stderr>', as_bytes)
+    with patch('sys.stderr', i.wrapper):
+        yield i
 
 @contextmanager
 def intercept_stdin(content, is_bytes=False):
-    if is_bytes:
-        i = BytesIO()
-    else:
-        i = StringIO()
-    i.write(content)
     if not is_bytes:
-        linesep = b'\n' if is_bytes else '\n'
-        if not content.endswith(linesep):
-            i.write(linesep)
+        content = content.encode()
+    i = BytesIO()
+    object.__setattr__(i, 'name', '<stdin>')
+    i.write(content)
+    if not (is_bytes or content.endswith(b'\n')):
+        i.write(b'\n')
     i.seek(0)
-    if is_bytes:
-        i = TextIOWrapper(i)
-    try:
-        sys.stdin = i
+    i = TextIOWrapper(i)
+    with patch('sys.stdin', i):
         yield
-    finally:
-        sys.stdin = sys.__stdin__
 
 def no_internet():
     """Test whether there's no internet connection available.

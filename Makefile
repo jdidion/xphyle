@@ -1,5 +1,6 @@
+test = tests
 build = python setup.py install && \
-		nose2 -C tests --coverage-report term-missing --coverage-config .coveragerc
+		nose2 -C $(test) --coverage-report term-missing --coverage-config .coveragerc
 
 install:
 	$(call build,)

@@ -101,28 +101,24 @@ class XphyleTests(TestCase):
                 content = i.read()
                 self.assertEqual(content, 'foo\n')
         # Try stdout
-        i = StringIO()
-        with intercept_stdout(i):
+        with intercept_stdout() as i:
             with xopen(STDOUT, 'w', context_wrapper=True, compression=False) as o:
                 o.write('foo')
             self.assertEqual(i.getvalue(), 'foo')
         # Try stderr
-        i = StringIO()
-        with intercept_stderr(i):
+        with intercept_stderr() as i:
             with xopen(STDERR, 'w', context_wrapper=True, compression=False) as o:
                 o.write('foo')
             self.assertEqual(i.getvalue(), 'foo')
         
         # Try binary
-        i = BytesIO()
-        with intercept_stdout(TextIOWrapper(i)):
+        with intercept_stdout(True) as i:
             with xopen(STDOUT, 'wb', context_wrapper=True, compression=False) as o:
                 o.write(b'foo')
             self.assertEqual(i.getvalue(), b'foo')
         
         # Try compressed
-        i = BytesIO()
-        with intercept_stdout(TextIOWrapper(i)):
+        with intercept_stdout(True) as i:
             with xopen(STDOUT, 'wt', compression='gz') as o:
                 self.assertEqual(o.compression, 'gzip')
                 o.write('foo')

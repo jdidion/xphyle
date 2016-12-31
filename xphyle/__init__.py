@@ -177,35 +177,28 @@ def xopen(path: str, mode: str = 'r', compression: Union[bool, str] = None,
     validate = compression and not guess_format
     # Guessed compression type, if compression in (None, True)
     guess = None
-    # Whether the file object is a stream (e.g. stdout or URL)
-    is_stream = False
+    # Whether the file object is stdin/stdout/stderr
+    is_std = path in (STDIN, STDOUT, STDERR)
     # The name to use for the file
     name = None
     
     # standard input and standard output handling
-    if path in (STDIN, STDOUT, STDERR):
+    if is_std:
         use_system = False
         if path == STDERR:
             assert 'r' not in mode
             fileobj = sys.stderr
         else:
             fileobj = sys.stdin if 'r' in mode else sys.stdout
-        wrapped = True
-        if compression is not False:
-            fileobj = fileobj.buffer
-            wrapped = False
+        # get the underlying binary stream
+        fileobj = fileobj.buffer
         if 'r' in mode and (validate or guess_format):
             if not hasattr(fileobj, 'peek'):
                 fileobj = io.BufferedReader(fileobj)
-                wrapped = True
             guess = FORMATS.guess_format_from_buffer(fileobj)
         else:
             validate = False
-        if not (compression or guess):
-            is_stream = True
-            if 'b' in mode and wrapped:
-                fileobj = fileobj.buffer
-    
+        
     else:
         # URL handling
         url_parts = parse_url(path)
@@ -217,9 +210,8 @@ def xopen(path: str, mode: str = 'r', compression: Union[bool, str] = None,
             if not fileobj:
                 raise ValueError("Could not open URL {}".format(path))
             
-            is_stream = True
-            name = get_url_file_name(fileobj, url_parts)
             use_system = False
+            name = get_url_file_name(fileobj, url_parts)
             
             # Get compression format if not specified
             if validate or guess_format:
@@ -264,14 +256,15 @@ def xopen(path: str, mode: str = 'r', compression: Union[bool, str] = None,
         compression = fmt.name
         fileobj = fmt.open_file(
             fileobj or path, mode, use_system=use_system, **kwargs)
+        is_std = False
     elif not fileobj:
         fileobj = open(path, mode, **kwargs)
+    elif is_std and 't' in mode:
+        fileobj = io.TextIOWrapper(fileobj)
     
     if context_wrapper:
-        if is_stream:
-            fileobj = StreamWrapper(fileobj, name=name, compression=compression)
-        else:
-            fileobj = FileWrapper(fileobj, compression=compression)
+        wrapper_class = StdWrapper if is_std else FileWrapper
+        fileobj = wrapper_class(fileobj, name=name, compression=compression)
     
     return fileobj
 
@@ -364,36 +357,38 @@ class FileWrapper(Wrapper):
         source: Path or file object
         mode: File open mode
         compression: Compression type
+        name: Use an alternative name for the file
         kwargs: Additional arguments to pass to xopen
     """
     def __init__(self, source: PathOrFile, mode: str = 'w',
-                 compression: Union[bool, str] = False, **kwargs):
+                 compression: Union[bool, str] = False,
+                 name: str = None, **kwargs):
         if isinstance(source, str):
             path = source
             source = xopen(source, mode=mode, compression=compression, **kwargs)
+        elif name and not hasattr(source, 'name'):
+            path = name
         else:
             path = source.name
         super(FileWrapper, self).__init__(source, compression=compression)
         object.__setattr__(self, '_path', path)
+        if name:
+            object.__setattr__(self, 'name', name)
 
-class StreamWrapper(Wrapper):
-    """EventWrapper around a stream.
+class StdWrapper(Wrapper):
+    """EventWrapper around stdin/stdout/stderr.
     
     Args:
         stream: The stream to wrap
-        name: The name to give this stream
         compression: Compression type
+        name: An alternative name to use for the stream
     """
-    def __init__(self, stream, name: str = None,
-                 compression: Union[bool, str] = False):
-        if name is None:
-            try:
-                name = self._stream.name
-            except: # pylint: disable=bare-except
-                name = None
-        super(StreamWrapper, self).__init__(stream, compression=compression)
-        object.__setattr__(self, 'name', name)
+    def __init__(self, stream, compression: Union[bool, str] = False,
+                 name: str = None):
+        super(StdWrapper, self).__init__(stream, compression=compression)
         object.__setattr__(self, 'closed', False)
+        if name:
+            object.__setattr__(self, 'name', name)
     
     def _close(self):
         self._fileobj.flush()
