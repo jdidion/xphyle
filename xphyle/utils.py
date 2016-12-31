@@ -46,8 +46,7 @@ def read_lines(path_or_file: PathOrFile, convert: Callable[[str], str] = None,
             itr = (line.rstrip() for line in itr)
         if convert:
             itr = (convert(line) for line in itr)
-        for line in itr:
-            yield line
+        yield from itr
 
 def read_bytes(path_or_file: PathOrFile, chunksize: int = 1024,
                **kwargs) -> Generator[bytes, None, Optional[Tuple]]:
@@ -67,8 +66,7 @@ def read_bytes(path_or_file: PathOrFile, chunksize: int = 1024,
     with open_(path_or_file, **kwargs) as fileobj:
         if fileobj is None:
             return ()
-        for chunk in iter_file_chunked(fileobj, chunksize):
-            yield chunk
+        yield from iter_file_chunked(fileobj, chunksize)
 
 def write_lines(iterable: Iterable[str], path_or_file: PathOrFile,
                 linesep: str = '\n', convert: Callable[[str], str] = str,
@@ -260,8 +258,7 @@ def read_delimited(path: str, sep: str = '\t',
         elif callable(row_type):
             reader = (row_type(row) for row in reader)
         
-        for row in reader:
-            yield row
+        yield from reader
 
 def read_delimited_as_dict(path: str, sep: str = '\t',
                            header: Union[bool, Sequence[str]] = False,
@@ -583,9 +580,7 @@ class FileManager(object):
     def iter_files(self) -> Generator[Tuple[Any, FileLike], None, None]:
         """Iterates over all (key, file) pairs in the order they were added.
         """
-        keys = list(self.keys)
-        for key in keys:
-            yield (key, self.get(key))
+        yield from ((key, self.get(key)) for key in list(self.keys))
     
     def close(self) -> None:
         """Close all files being tracked.

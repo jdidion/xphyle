@@ -122,8 +122,7 @@ class SystemReader:
         self._raise_if_error()
 
     def __iter__(self):
-        for line in self.process.stdout:
-            yield line
+        yield from self.process.stdout
         self.process.wait()
         self._raise_if_error()
 
