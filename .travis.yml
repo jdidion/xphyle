@@ -6,6 +6,7 @@ cache:
 python:
   - "3.4"
   - "3.5"
+  - "3.6"
 
 install:
   - pip install --upgrade pip wheel
