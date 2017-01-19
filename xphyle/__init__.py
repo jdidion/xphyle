@@ -349,6 +349,9 @@ class Wrapper(object):
         Returns: at most `size` bytes/characters. Unlike
         io.BufferedReader.peek(), will never return more than `size`
         bytes/characters.
+        
+        Note: if the file uses multi-byte encoding and N characters are desired,
+        it is up to the caller to request `size=2N`.
         """
         if 'r' not in self._fileobj.mode:
             raise IOError("Can only call peek() on a readable file")
