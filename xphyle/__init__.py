@@ -110,7 +110,7 @@ def open_(path_or_file, mode: str = 'r', errors: bool = True, **kwargs
 
 def xopen(path: str, mode: str = 'r', compression: Union[bool, str] = None,
           use_system: bool = True, context_wrapper: bool = True,
-          **kwargs) -> FileLike:
+          validate: bool = True, **kwargs) -> FileLike:
     """
     Replacement for the `open` function that automatically handles
     compressed files. If `use_system==True` and the file is compressed,
@@ -140,6 +140,8 @@ def xopen(path: str, mode: str = 'r', compression: Union[bool, str] = None,
         context_wrapper: If True and ``path`` == '-' or '_', returns
             a ContextManager (i.e. usable with ``with``) that wraps the
             system stream and is no-op on close.
+        validate: Ensure that the user-specified compression format matches the
+            format guessed from the file extension or magic bytes.
         kwargs: Additional keyword arguments to pass to ``open``.
     
     Returns:
@@ -174,7 +176,7 @@ def xopen(path: str, mode: str = 'r', compression: Union[bool, str] = None,
     # Whether to try and guess file format
     guess_format = compression in (None, True)
     # Whether to validate that the actually compression format matches expected
-    validate = compression and not guess_format
+    validate = validate and compression and not guess_format
     # Guessed compression type, if compression in (None, True)
     guess = None
     # Whether the file object is stdin/stdout/stderr

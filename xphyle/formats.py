@@ -934,7 +934,12 @@ class Formats(object):
         num_bytes = len(header_bytes)
         if num_bytes > 0:
             if header_bytes[0] in self.magic_bytes.keys():
-                for fmt, tail in self.magic_bytes[header_bytes[0]]:
+                # check candidates by decreasing header length
+                candidates = sorted(
+                    self.magic_bytes[header_bytes[0]],
+                    key=lambda x: len(x[1]),
+                    reverse=True)
+                for fmt, tail in candidates:
                     if (num_bytes > len(tail) and tuple(
                             header_bytes[i]
                             for i in range(1, len(tail)+1)) == tail):
