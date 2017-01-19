@@ -117,6 +117,19 @@ Another common pattern is to write functions that accept either a path or an ope
             for line in infile:
                 print(line)
 
+Supported file formats
+~~~~~~~~~~~~~~~~~~~~~~
+
+Currently, xphyle supports the most commonly used file formats: gzip, bzip2/7zip, and lzma/xz.
+
+Also supported is block-based gzip (bgzip), a format commonly used in bioinformatics. Somewhat confusingly, '.gz' is an acceptable extension for bgzip files, and gzip will decompress bgzip files. Thus, to specifically use bgzip, either use a '.bgz' file exteionsion or specify 'bgzip' as the compression format::
+
+    f = xopen('input.gz', 'rt', compression='bgzip')
+
+Additional compression formats may be added in the future. To get the most up-to-date list::
+    
+    from xphyle.formats import FORMATS
+    print(', '.join(FORMATS.list_compression_formats())
 
 Reading/writing data
 ~~~~~~~~~~~~~~~~~~~~
