@@ -155,3 +155,9 @@ class XphyleTests(TestCase):
         with open_(url, 'rt') as i:
             self.assertEqual('gzip', i.compression)
             self.assertEqual('foo\n', i.read())
+    
+    def test_peek(self):
+        path = self.root.make_file(contents='foo')
+        with open_(path, 'rt') as i:
+            self.assertEqual('f', i.peek(1)[0:1])
+            self.assertEqual('foo', next(i))

@@ -338,6 +338,25 @@ class Wrapper(object):
     def __exit__(self, exception_type, exception_value, traceback):
         self.close()
     
+    def peek(self, size=1):
+        """Return bytes/characters from the stream without advancing the
+        position. At most one single read on the raw stream is done to satisfy
+        the call. The number of bytes returned may be less or more than
+        requested.
+        """
+        if 'r' not in self._fileobj.mode:
+            raise IOError("Can only call peek() on a readable file")
+        if hasattr(self._fileobj, 'peek'):
+            b = self._fileobj.peek(size)
+        elif hasattr(self._fileobj, 'buffer'):
+            b = self._fileobj.buffer.peek(size)
+        if 't' in self._fileobj.mode:
+            if hasattr(self._fileobj, 'encoding'):
+                return b.decode(self._fileobj.encoding)
+            else:
+                return b.decode()
+        return b
+    
     def close(self) -> None:
         """Close the file, close an open iterator, and fire 'close' events to
         any listeners.
