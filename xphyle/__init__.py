@@ -110,7 +110,7 @@ def open_(path_or_file, mode: str = 'r', errors: bool = True, **kwargs
 
 def xopen(path: str, mode: str = 'r', compression: Union[bool, str] = None,
           use_system: bool = True, context_wrapper: bool = True,
-          validate: bool = True, **kwargs) -> FileLike:
+          file_type: str = None, validate: bool = True, **kwargs) -> FileLike:
     """
     Replacement for the `open` function that automatically handles
     compressed files. If `use_system==True` and the file is compressed,
@@ -140,6 +140,10 @@ def xopen(path: str, mode: str = 'r', compression: Union[bool, str] = None,
         context_wrapper: If True and ``path`` == '-' or '_', returns
             a ContextManager (i.e. usable with ``with``) that wraps the
             system stream and is no-op on close.
+        file_type: Explicitly specify the file type, one of
+            ('local', 'url', 'std'). By default the file type is detected,
+            but auto-detection might make mistakes, e.g. a local file contains
+            a colon (':') in the name.
         validate: Ensure that the user-specified compression format matches the
             format guessed from the file extension or magic bytes.
         kwargs: Additional keyword arguments to pass to ``open``.
@@ -152,24 +156,26 @@ def xopen(path: str, mode: str = 'r', compression: Union[bool, str] = None,
             * ``compression==True`` and compression format cannot be
             determined
             * the specified compression format is invalid
-            * ``validate==True`` and the specified compression format is not the
-                acutal format of the file
+            * ``validate==True`` and the specified compression format is not
+                the acutal format of the file
             * the path or mode are invalid
     """
     # pylint: disable=redefined-variable-type
     if not isinstance(path, str):
         raise ValueError("'path' must be a string")
-    if not any(m in mode for m in ('r','w','a','x')):
+    if not any(m in mode for m in ('r', 'w', 'a', 'x')):
         raise ValueError("'mode' must contain one of (r,w,a,x)")
     if 'U' in mode:
         if 'newline' in kwargs and kwargs['newline'] is not None:
-            raise ValueError("newline={} not compatible with universal newlines "
-                             "('U') mode".format(kwargs['newline']))
-        mode = mode.replace('U','')
+            raise ValueError("newline={} not compatible with universal "
+                             "newlines ('U') mode".format(kwargs['newline']))
+        mode = mode.replace('U', '')
     if len(mode) == 1:
         mode += 't'
     elif not any(f in mode for f in ('b', 't')):
         raise ValueError("'mode' must contain one of (b,t)")
+    if file_type not in ('local', 'url', 'std', None):
+        raise ValueError("Invalid file_type {}".format(file_type))
     
     # The file handle we will open
     fileobj = None
@@ -181,6 +187,8 @@ def xopen(path: str, mode: str = 'r', compression: Union[bool, str] = None,
     guess = None
     # Whether the file object is stdin/stdout/stderr
     is_std = path in (STDIN, STDOUT, STDERR)
+    if file_type == 'std' and not is_std:
+        raise ValueError("file_type = 'std' but path was not in ('-', '_')")
     # The name to use for the file
     name = None
     
@@ -204,7 +212,7 @@ def xopen(path: str, mode: str = 'r', compression: Union[bool, str] = None,
     else:
         # URL handling
         url_parts = parse_url(path)
-        if url_parts:
+        if file_type in ('url', None) and url_parts:
             if 'r' not in mode:
                 raise ValueError("URLs can only be opened in read mode")
             
@@ -234,7 +242,7 @@ def xopen(path: str, mode: str = 'r', compression: Union[bool, str] = None,
                 #         guess = guess_file_format(name)
         
         # Local file handling
-        else:
+        elif file_type in ('local', None):
             if 'r' in mode:
                 path = check_readable_file(path)
                 if validate or guess_format:
@@ -243,10 +251,13 @@ def xopen(path: str, mode: str = 'r', compression: Union[bool, str] = None,
                 path = check_writeable_file(path)
                 if validate or guess_format:
                     guess = FORMATS.guess_compression_format(path)
+        
+        else:
+            raise ValueError("file is not of type {}".format(file_type))
     
     if validate and guess != compression:
-        raise ValueError("Acutal compression format {} does not match expected "
-                         "format {}".format(guess, compression))
+        raise ValueError("Acutal compression format {} does not match "
+                         "expected format {}".format(guess, compression))
     elif guess:
         compression = guess
     elif compression is True:
