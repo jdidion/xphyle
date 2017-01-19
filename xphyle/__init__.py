@@ -355,22 +355,28 @@ class Wrapper(object):
         """
         if 'r' not in self._fileobj.mode:
             raise IOError("Can only call peek() on a readable file")
+        
         if hasattr(self._fileobj, 'peek'):
-            peek_bytes = self._fileobj.peek(size)
-        elif hasattr(self._fileobj, 'buffer'):
-            peek_bytes = self._fileobj.buffer.peek(size)
-        if 't' in self._fileobj.mode:
-            if hasattr(self._fileobj, 'encoding'):
-                peek_str = peek_bytes.decode(self._fileobj.encoding)
-            else:
-                peek_str = peek_bytes.decode()
-            if len(peek_str) > size:
-                peek_str = peek_str[:size]
-            return peek_str
+            # The underlying file has a peek() method
+            peek = self._fileobj.peek(size)
+            if 't' in self._fileobj.mode:
+                if isinstance(peek, 'bytes'):
+                    if hasattr(self._fileobj, 'encoding'):
+                        peek = peek_bytes.decode(self._fileobj.encoding)
+                    else:
+                        peek = peek_bytes.decode()
+            if len(peek) > size:
+                peek = peek[:size]
+        elif hasattr(self._fileobj, 'seek'):
+            # The underlying file has a seek() method
+            curpos = self._fileobj.tell()
+            try:
+                peek = self._fileobj.read(size)
+            finally:
+                self._fileobj.seek(curpos)
         else:
-            if len(peek_bytes) > size:
-                peek_bytes = peek_bytes[:size]
-            return peek_bytes
+            raise IOError("Unpeekable file: {}".format(self.name))
+        return peek
     
     def close(self) -> None:
         """Close the file, close an open iterator, and fire 'close' events to
