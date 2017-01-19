@@ -19,6 +19,8 @@ def read_file(fmt, path, use_system, mode='rt'):
 
 gz_path = get_format('gz').executable_path
 no_pigz = gz_path is None or get_format('gz').executable_name != 'pigz'
+bgz_path = get_format('bgz').executable_path
+no_bgzip = gz_path is None or get_format('bgz').executable_name != 'bgzip'
 bz_path = get_format('bz2').executable_path
 no_pbzip2 = bz_path is None or get_format('bz2').executable_name != 'pbzip2'
 xz_path = get_format('xz').executable_path
@@ -26,10 +28,11 @@ xz_path = get_format('xz').executable_path
 class CompressionTests(TestCase):
     def tearDown(self):
         EXECUTABLE_CACHE.cache = {}
+        THREADS.update(1)
     
     def test_list_formats(self):
         self.assertSetEqual(
-            set(('gzip','bz2','lzma')),
+            set(('gzip','bgzip','bz2','lzma')),
             set(FORMATS.list_compression_formats()))
         self.assertSetEqual(
             set(('gzip','gz','pigz')),
@@ -78,6 +81,24 @@ class CompressionTests(TestCase):
         self.assertEqual(
             gz.get_command('d', 'foo.gz'),
             [gz_path, '-d', '-c', '-p', '2', 'foo.gz'])
+    
+    @skipIf(no_bgzip, "'bgzip' not available")
+    def test_bgzip(self):
+        THREADS.update(2)
+        bgz = get_format('bgz')
+        self.assertEqual(bgz.default_ext, 'bgz')
+        self.assertEqual(
+            bgz.get_command('c'),
+            [bgz_path, '-c', '-@', '2'])
+        self.assertEqual(
+            bgz.get_command('c', 'foo.bar', compresslevel=5),
+            [bgz_path, '-c', '-@', '2', 'foo.bar'])
+        self.assertEqual(
+            bgz.get_command('d'),
+            [bgz_path, '-d', '-c', '-@', '2'])
+        self.assertEqual(
+            bgz.get_command('d', 'foo.gz'),
+            [bgz_path, '-d', '-c', '-@', '2', 'foo.gz'])
     
     def test_bzip2(self):
         bz = get_format('bz2')

@@ -2,6 +2,7 @@
 """Interfaces to compression file formats.
 Magic numbers from: https://en.wikipedia.org/wiki/List_of_file_signatures
 """
+from collections import defaultdict
 from importlib import import_module
 import io
 import os
@@ -597,7 +598,21 @@ class SingleExeCompressionFormat(CompressionFormat): # pylint: disable=abstract-
             exe = EXECUTABLE_CACHE.resolve_exe(self.system_commands)
             self._executable_path, self._executable_name = exe if exe else ('','')
 
-class Gzip(SingleExeCompressionFormat):
+class GzipBase(SingleExeCompressionFormat):
+    """Base class for gzip and bgzip files.
+    """
+    def open_file_python(self, path, mode, **kwargs):
+        # pylint: disable=redefined-variable-type
+        compressed_file = self.lib.open(path, mode, **kwargs)
+        if 'b' in mode:
+            if 'r' in mode:
+                compressed_file = io.BufferedReader(compressed_file)
+            else:
+                compressed_file = io.BufferedWriter(compressed_file)
+        return compressed_file
+
+
+class Gzip(GzipBase):
     """Implementation of CompressionFormat for gzip files.
     """
     name = 'gzip'
@@ -637,16 +652,38 @@ class Gzip(SingleExeCompressionFormat):
         if src != STDIN:
             cmd.append(src)
         return cmd
+
+
+class BGzip(GzipBase):
+    """bgzip is block gzip. bgzip files are compatible with gzip. Typically,
+    this format is only used when specifically requested, or when a bgzip
+    file specifically has a .bgz (rather than .gz) extension.
+    """
+    name = 'bgzip'
+    exts = ('bgz',)
+    system_commands = ('bgzip',)
+    default_compresslevel = None
+    magic_bytes = [(0x1f, 0x8b, 0x08, 0x04)]
+    mime_types = (
+        'application/bgz',
+        'application/bgzip',
+        'application/x-bgz',
+        'application/x-bgzip'
+    )
     
-    def open_file_python(self, path, mode, **kwargs):
-        # pylint: disable=redefined-variable-type
-        compressed_file = self.lib.open(path, mode, **kwargs)
-        if 'b' in mode:
-            if 'r' in mode:
-                compressed_file = io.BufferedReader(compressed_file)
-            else:
-                compressed_file = io.BufferedWriter(compressed_file)
-        return compressed_file
+    def get_command(self, operation, src=STDIN, stdout=True, compresslevel=None):
+        cmd = [self.executable_path]
+        if operation == 'd':
+            cmd.append('-d')
+        if stdout:
+            cmd.append('-c')
+        threads = THREADS.threads
+        if threads > 1:
+            cmd.extend(('-@', str(threads)))
+        if src != STDIN:
+            cmd.append(src)
+        return cmd
+
 
 class BZip2(SingleExeCompressionFormat):
     """Implementation of CompressionFormat for bzip2 files.
@@ -800,7 +837,7 @@ class Formats(object):
         """Dict of registered compression formats"""
         self.compression_format_aliases = {}
         """Dict mapping aliases to compression format names."""
-        self.magic_bytes = {}
+        self.magic_bytes = defaultdict(lambda: [])
         """Dict mapping the first byte in a 'magic' sequence to a tuple of
         (format, rest_of_sequence)
         """
@@ -824,7 +861,7 @@ class Formats(object):
             self.compression_format_aliases[alias] = fmt.name
         for magic in fmt.magic_bytes:
             self.max_magic_bytes = max(self.max_magic_bytes, len(magic))
-            self.magic_bytes[magic[0]] = (fmt.name, magic[1:])
+            self.magic_bytes[magic[0]].append((fmt.name, magic[1:]))
         for mime in fmt.mime_types:
             self.mime_types[mime] = fmt.name
 
@@ -897,11 +934,11 @@ class Formats(object):
         num_bytes = len(header_bytes)
         if num_bytes > 0:
             if header_bytes[0] in self.magic_bytes.keys():
-                fmt, tail = self.magic_bytes[header_bytes[0]]
-                if (num_bytes > len(tail) and tuple(
-                        header_bytes[i]
-                        for i in range(1, len(tail)+1)) == tail):
-                    return fmt
+                for fmt, tail in self.magic_bytes[header_bytes[0]]:
+                    if (num_bytes > len(tail) and tuple(
+                            header_bytes[i]
+                            for i in range(1, len(tail)+1)) == tail):
+                        return fmt
         return None
 
     def get_format_for_mime_type(self, mime_type: str) -> str:
@@ -912,5 +949,6 @@ class Formats(object):
 
 FORMATS = Formats()
 FORMATS.register_compression_format(Gzip)
+FORMATS.register_compression_format(BGzip)
 FORMATS.register_compression_format(BZip2)
 FORMATS.register_compression_format(Lzma)
