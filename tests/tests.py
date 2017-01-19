@@ -159,5 +159,5 @@ class XphyleTests(TestCase):
     def test_peek(self):
         path = self.root.make_file(contents='foo')
         with open_(path, 'rt') as i:
-            self.assertEqual('f', i.peek(1)[0:1])
+            self.assertEqual('f', i.peek(1))
             self.assertEqual('foo', next(i))
