@@ -3,11 +3,13 @@
 """
 import errno
 import os
+import pathlib
 import re
 import shutil
 import stat
+import sys
 import tempfile
-from xphyle.types import Sequence, Tuple, Union, Pattern, Iterable
+from xphyle.types import Sequence, Tuple, Union, Iterable, Pattern, Match, Any
 
 ACCESS = dict(
     r=(os.R_OK, stat.S_IREAD),
@@ -19,6 +21,15 @@ STDIN = STDOUT = '-'
 """Placeholder for ``sys.stdin`` or ``sys.stdout`` (depending on access mode)"""
 STDERR = '_'
 """Placeholder for ``sys.stderr``"""
+
+if sys.version_info >= (3, 6):
+    PathLike = Union[str, os.PathLike]
+else:
+    PathLike = Union[str, pathlib.PurePath]
+"""Type representing either a string path or a path-like object. In
+python >= 3.6, path-like means is a subclass of os.PathLike, otherwise means
+is a subclass of pathlib.PurePath.
+"""
 
 def get_access(mode: str) -> int:
     """Returns the access mode constant associated with given mode string.
@@ -91,6 +102,22 @@ def abspath(path: str) -> str:
     if path in (STDOUT, STDERR):
         return path
     return os.path.abspath(os.path.expanduser(path))
+
+def get_root(path: [str, PathLike] = None) -> str:
+    """Get the root directory.
+    
+    Args:
+        str: A path, or '.' to get the root of the working directory, or None
+            to get the root of the path to the script.
+    
+    Returns:
+        A path to the root directory.
+    """
+    path = str(path) if path else sys.executable
+    root = os.path.splitdrive(abspath(path))[0]
+    if root == '':
+        root = os.sep
+    return root
 
 def split_path(path: str, keep_seps: bool = True, resolve: bool = True
               ) -> Tuple:
@@ -255,7 +282,8 @@ def safe_check_writeable_file(path: str) -> str:
         return None
 
 def find(root: str, pattern: Union[str, Pattern], types: str = 'f',
-         recursive: bool = True) -> Sequence[str]:
+         recursive: bool = True, return_matches: bool = False
+        ) -> Sequence[Union[str, Tuple[str, Match]]]:
     """Find all paths under ``root`` that match ``pattern``.
     
     Args:
@@ -263,24 +291,38 @@ def find(root: str, pattern: Union[str, Pattern], types: str = 'f',
         pattern: File name pattern to match (string or re object)
         types: Types to return -- files ("f"), directories ("d") or both ("fd")
         recursive: Whether to search directories recursively
+        return_matches: Whether to return regular expression match for each file
     
     Returns:
-        List of matching paths
+        List of matching paths. If `return_matches` is True, each item will be
+        a (path, Match) tuple.
     """
     if isinstance(pattern, str):
         pattern = re.compile(pattern)
+    
+    # Whether we need to match the full path or just the filename
+    fullmatch = os.sep in pattern.pattern
+    
+    def get_matching(names, parent):
+        if fullmatch:
+            names = (os.path.join(parent, name) for name in names)
+        matching = []
+        for name in names:
+            match = pattern.fullmatch(name)
+            if match:
+                path = name if fullmatch else os.path.join(parent, name)
+                if return_matches:
+                    matching.append((path, match))
+                else:
+                    matching.append(path)
+        return matching
+    
     found = []
     for parent, dirs, files in os.walk(root):
         if types != "f":
-            found.extend(
-                os.path.join(parent, d)
-                for d in dirs
-                if pattern.match(d))
+            found.extend(get_matching(dirs, parent))
         if types != "d":
-            found.extend(
-                os.path.join(parent, f)
-                for f in files
-                if pattern.match(f))
+            found.extend(get_matching(files, parent))
         if not recursive:
             break
     
@@ -555,8 +597,8 @@ class TempDir(TempPath):
             path.set_access('rwx', True)
         shutil.rmtree(self.absolute_path)
     
-    def make_path(self, desc: str = None, apply_permissions: bool = True,
-                  **kwargs) -> str:
+    def make_path(self, desc: TempPathDescriptor = None,
+                  apply_permissions: bool = True, **kwargs) -> str:
         """Create a file or directory within the TempDir.
         
         Args:
@@ -621,14 +663,14 @@ class TempDir(TempPath):
     # Convenience methods
     
     def make_file(self, desc: str = None, apply_permissions: bool = True,
-                  **kwargs) -> Sequence[str]:
+                  **kwargs) -> str:
         """Convenience method; calls ``make_path`` with path_type='f'.
         """
         kwargs['path_type'] = 'f'
         return self.make_path(desc, apply_permissions, **kwargs)
     
     def make_fifo(self, desc: str = None, apply_permissions: bool = True,
-                  **kwargs) -> Sequence[str]:
+                  **kwargs) -> str:
         """Convenience method; calls ``make_path`` with path_type='fifo'.
         """
         kwargs['path_type'] = 'fifo'
@@ -651,3 +693,216 @@ class TempDir(TempPath):
         return list(
             self.make_path(TempPathDescriptor(**kwargs))
             for i in range(num_files))
+
+# User-defined path specifications
+
+class PathInstMixin(object):
+    def __getitem__(self, name) -> Any:
+        return self.values[name]
+    
+    def __eq__(self, other):
+        return (
+            isinstance(other, PathInst) and
+            super(PathInst, self).__eq__(other) and
+            self.values == other.values)
+
+path_class = pathlib.WindowsPath if os.name == 'nt' else pathlib.PosixPath
+PathInst = type(
+    'PathInst',
+    (path_class, PathInstMixin),
+    dict(path_class.__dict__))
+"""Subclass of pathlib.Path that also contains a dict of PathVar values."""
+
+def path_inst(path: PathLike, values: dict) -> PathInst:
+    p = PathInst(path)
+    p.values = values
+    return p
+
+class PathVar(object):
+    """Describes part of a path, used in PathSpec.
+    
+    Args:
+        name: Path variable name
+        optional: Whether this part of the path is optional
+        default: A default value for this path variable
+        pattern: A pattern that the value must match
+        valid: Iterable of valid values
+        invalid: Iterable of invalid values
+    
+    If `valid` is specified, `invalid` and `pattern` are ignored. Otherwise,
+    values are first checked against `pattern` (if one is specified), then
+    checked against `invalid` (if specified).
+    """
+    def __init__(self, name: str, optional: bool = False, default: Any = None,
+                 pattern: Union[str, Pattern] = None,
+                 valid: Iterable[Any] = None, invalid: Iterable[Any] = None):
+        self.name = name
+        self.optional = optional
+        self.default = default
+        self.valid = self.invalid = self.pattern = None
+        if valid:
+            self.valid = set(valid)
+        else:
+            if invalid:
+                self.invalid = set(valid)
+            if pattern and isinstance(pattern, str):
+                pattern = re.compile(pattern)
+            self.pattern = pattern
+    
+    def __call__(self, value: str = None) -> Any:
+        """Validate a value.
+        
+        Args:
+            The value to validate. If None, the default value is used.
+        
+        Raises:
+            ValueError if any validations fail
+        """
+        if value is None:
+            if self.default:
+                value = default
+            elif self.optional:
+                return ''
+            else:
+                raise ValueError("{} is required".format(self.name))
+        if self.valid:
+            if value not in self.valid:
+                raise ValueError("{} is not in list of valid values".format(
+                    value))
+        else:
+            if self.pattern and not self.pattern.fullmatch(str(value)):
+                raise ValueError("{} does not match pattern {}".format(
+                    value, self.pattern))
+            if self.invalid and value in self.invalid:
+                raise ValueError("{} is in list of invalid values".format(
+                    value))
+        return value
+    
+    def as_pattern(self) -> str:
+        """Format this variable as a regular expression capture group.
+        """
+        return "(?P<{name}>{pattern}){optional}".format(
+            name=self.name, pattern=self.pattern.pattern,
+            optional='?' if self.optional else '')
+    
+    def __str__(self):
+        return "PathVar<{}, optional={}, default={}>".format(
+            self.name, self.optional, self.default)
+
+class PathSpec(object):
+    """Specifies a path in terms of a template with named components ("path
+    variables").
+    
+    Args:
+        path_vars: Named variables with which to associate parts of a path
+        template: Format string for creating paths from variables
+        pattern: Regular expression for identifying matching paths
+        absolute: Whether this PathSpec represents an absolute path
+    
+    Examples:
+        spec = PathSpec(
+            PathVar('id', pattern='[A-Z0-9_]+'),
+            PathVar('ext', pattern='[^\.]+'),
+            template='{id}.{ext}')
+        
+        # get a single file
+        path = spec('~', id='ABC123', ext='txt') # => PathInst('~/ABC123.txt')
+        print(path['id']) # => 'ABC123'
+        
+        # get the variable values for a path
+        path = spec.parse('/home/fubar/ABC123.txt')
+        print(path['id']) # => 'ABC123'
+        
+        # find all files that match a PathSpec
+        all_paths = spec.find('~') # => [PathInst...]
+    """
+    def __init__(self, *path_vars: Iterable[PathVar], template: str,
+                 pattern: Pattern = None, absolute: bool = False):
+        self.path_vars = dict((v.name, v) for v in path_vars)
+        self.template = template
+        if pattern is None:
+            pattern_args = dict(
+                (name, var.as_pattern())
+                for name, var in self.path_vars.items())
+            pattern = re.compile(template.format(**pattern_args))
+        self.pattern = pattern
+        self.absolute = absolute
+    
+    def __call__(self, root: Union[str, PathLike] = None, **kwargs) -> PathInst:
+        """Create a new PathInst from this PathSpec using values in `kwargs`.
+        
+        Args:
+            root: Optionally specify a root director to be prepended to the
+                path.
+            kwargs: Specify values for path variables.
+        
+        Returns: a PathInst
+        """
+        values = dict(
+            (name, var(kwargs.get(name, None)))
+            for name, var in self.path_vars.items())
+        path = self.template.format(**values)
+        if root:
+            path = os.path.join(str(root), path)
+        return path_inst(path, values)
+    
+    def parse(self, path: Union[str, PathLike]) -> PathInst:
+        """Extract PathVar values from `path` and create a new PathInst.
+        
+        Args:
+            path: The path to parse
+        
+        Returns: a PathInst
+        """
+        path = str(path)
+        if self.absolute:
+            path = abspath(path)
+            match = self.pattern.fullmatch(path)
+        else:
+            match = self.pattern.search(path)
+        if not match:
+            raise ValueError("{} does not match PathSpec {}".format(path, self))
+        return path_inst(path, self._match_to_dict(match))
+    
+    def find(self, root: Union[str, PathLike] = None, types: str = 'f',
+             recursive: bool = False) -> Sequence[PathInst]:
+        """Find all files in `root` matching this PathSpec.
+        
+        Args:
+            root: Directory in which to begin the search
+            types: Types to return -- files ("f"), directories ("d") or both
+                ("fd")
+            recursive: Whether to search recursively
+        
+        Returns:
+            A sequence of PathInst
+        """
+        if self.absolute:
+            pattern_str = self.pattern.pattern
+            i1 = pattern_str.index('(')
+            i2 = pattern_str.rindex(os.sep, i1)
+            root = pattern_str[0:i2] if i2 > 0 else get_root(root)
+        elif root is None:
+            raise ValueError("'root' must be given for a non-absolute PathSpec")
+        files = find(root, self.pattern, types=types, recursive=recursive,
+                     return_matches=True)
+        return [
+            path_inst(path, self._match_to_dict(match))
+            for path, match in files]
+    
+    def _match_to_dict(self, match: Match):
+        """Convert a regular expression Match to a dict of (name, value) for
+        all PathVars.
+        
+        Raises:
+            ValueError if any values fail validation
+        """
+        match_groups = match.groupdict()
+        return dict(
+            (name, var(match_groups.get(name, None)))
+            for name, var in self.path_vars.items())
+    
+    def __str__(self):
+        return "PathSpec<{}, template={}, pattern={}>".format(
+            ','.join(str(var) for var in self.path_vars.values()),
+            self.template, self.pattern)

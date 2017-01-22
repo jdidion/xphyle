@@ -119,6 +119,16 @@ class PathTests(TestCase):
         cwd = os.getcwd()
         self.assertEqual(abspath('foo'), os.path.join(cwd, 'foo'))
     
+    def test_get_root(self):
+        # Need to do a different test for posix vs windows
+        if os.sep == '/':
+            self.assertEquals('/', get_root())
+            self.assertEquals('/', get_root('/foo/bar/baz'))
+        else:
+            script_drive = os.path.splitdrive(sys.executable)[0]
+            self.assertEquals(script_drive, get_root())
+            self.assertEquals('C:\\', get_root('C:\\foo\\bar\\baz'))
+    
     def test_split_path(self):
         parent = self.root.make_directory()
         self.assertTupleEqual(
@@ -214,6 +224,20 @@ class PathTests(TestCase):
         self.assertEqual(level2, x[0])
         y = find(level1, 'bar.*', 'f', recursive=False)
         self.assertEqual(0, len(y))
+        
+        # absolute match
+        x = find(level1, os.path.join(level1, 'foo.*', 'bar.*'), 'f', recursive=True)
+        self.assertEqual(3, len(x))
+        self.assertListEqual(sorted(paths), sorted(x))
+    
+    def test_find_with_matches(self):
+        level1 = self.root.make_directory()
+        level2 = self.root.make_directory(prefix='foo', parent=level1)
+        path = self.root.make_path(name='bar123', parent=level2)
+        result = find(level1, 'bar(.*)', 'f', recursive=True, return_matches=True)
+        self.assertEqual(1, len(result))
+        self.assertEqual(path, result[0][0])
+        self.assertEqual('123', result[0][1].group(1))
     
     def test_get_executable_path(self):
         exe = self.root.make_file(suffix=".exe")
@@ -222,3 +246,26 @@ class PathTests(TestCase):
         self.assertEqual(exe_path, EXECUTABLE_CACHE.get_path(os.path.basename(exe)))
         # TODO: how to test this fully, since we can't be sure of what
         # executables will be available on the installed system?
+    
+    def test_pathspec(self):
+        path = self.root.make_file(name='ABC123.txt')
+        
+        spec = PathSpec(
+            PathVar('id', pattern='[A-Z0-9_]+'),
+            PathVar('ext', pattern='[^\.]+'),
+            template='{id}.{ext}')
+        
+        # get a single file
+        pathinst = spec(self.root.absolute_path, id='ABC123', ext='txt')
+        self.assertEquals(path_inst(path, dict(id='ABC123', ext='txt')), pathinst)
+        
+        # get the variable values for a path
+        pathinst = spec.parse(path)
+        self.assertEquals(path_inst(path, dict(id='ABC123', ext='txt')), pathinst)
+        
+        # find all files that match a PathSpec
+        all_paths = spec.find(self.root.absolute_path)
+        self.assertEquals(1, len(all_paths))
+        self.assertEquals(
+            path_inst(path, dict(id='ABC123', ext='txt')),
+            all_paths[0])
