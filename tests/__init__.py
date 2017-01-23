@@ -17,6 +17,7 @@ class MockStdout(object):
         self.bytes_io = BytesIO()
         object.__setattr__(self.bytes_io, 'name', name)
         self.wrapper = TextIOWrapper(self.bytes_io)
+        self.wrapper.mode = 'w'
         self.as_bytes = as_bytes
     
     def getvalue(self):
@@ -48,6 +49,7 @@ def intercept_stdin(content, is_bytes=False):
         i.write(b'\n')
     i.seek(0)
     i = TextIOWrapper(i)
+    i.mode = 'r'
     with patch('sys.stdin', i):
         yield
 

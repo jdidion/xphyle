@@ -25,6 +25,21 @@ bz_path = get_format('bz2').executable_path
 no_pbzip2 = bz_path is None or get_format('bz2').executable_name != 'pbzip2'
 xz_path = get_format('xz').executable_path
 
+class ThreadsTests(TestCase):
+    def test_threads(self):
+        threads = ThreadsVar(default_value=2)
+        threads.update(None)
+        self.assertEquals(2, threads.threads)
+        threads.update(False)
+        self.assertEquals(1, threads.threads)
+        threads.update(0)
+        self.assertEquals(1, threads.threads)
+        import multiprocessing
+        threads.update(True)
+        self.assertEquals(multiprocessing.cpu_count(), threads.threads)
+        threads.update(4)
+        self.assertEquals(4, threads.threads)
+
 class CompressionTests(TestCase):
     def tearDown(self):
         EXECUTABLE_CACHE.cache = {}
@@ -48,8 +63,25 @@ class CompressionTests(TestCase):
         with self.assertRaises(ValueError):
             FORMATS.get_compression_format('foo')
     
+    def test_get_format_from_mime_type(self):
+        self.assertEqual(
+            'gzip', FORMATS.get_format_for_mime_type('application/gz'))
+        self.assertEqual(
+            'bz2', FORMATS.get_format_for_mime_type('application/bz2'))
+        self.assertEqual(
+            'lzma', FORMATS.get_format_for_mime_type('application/lzma'))
+    
+    # TODO: need a way to force selection of a specific executable to properly
+    # test all possible scenarios
+    
+    def _test_format(self, fmt):
+        self.assertEqual(fmt.default_compresslevel, fmt._get_compresslevel(None))
+        self.assertEqual(fmt.compresslevel_range[0], fmt._get_compresslevel(-1))
+        self.assertEqual(fmt.compresslevel_range[1], fmt._get_compresslevel(100))
+            
     def test_gzip(self):
         gz = get_format('gz')
+        self._test_format(gz)
         self.assertEqual(gz.default_ext, 'gz')
         self.assertEqual(
             gz.get_command('c', compresslevel=5),
@@ -102,6 +134,7 @@ class CompressionTests(TestCase):
     
     def test_bzip2(self):
         bz = get_format('bz2')
+        self._test_format(bz)
         self.assertEqual(bz.default_ext, 'bz2')
         self.assertEqual(
             bz.get_command('c', compresslevel=5),
@@ -136,6 +169,7 @@ class CompressionTests(TestCase):
     
     def test_lzma(self):
         xz = get_format('xz')
+        self._test_format(xz)
         self.assertEqual(xz.default_ext, 'xz')
         self.assertEqual(
             xz.get_command('c', compresslevel=5),
@@ -149,6 +183,17 @@ class CompressionTests(TestCase):
         self.assertEqual(
             xz.get_command('d', 'foo.xz'),
             [xz_path, '-d', '-c', 'foo.xz'])
+        # Test with threads
+        THREADS.update(2)
+        self.assertEqual(
+            xz.get_command('c', compresslevel=5),
+            [xz_path, '-5', '-z', '-c', '-T', '2'])
+        self.assertEqual(
+            xz.get_command('c', 'foo.bar', compresslevel=5),
+            [xz_path, '-5', '-z', '-c', '-T', '2', 'foo.bar'])
+        self.assertEqual(
+            xz.get_command('d'),
+            [xz_path, '-d', '-c', '-T', '2'])
 
 class FileTests(TestCase):
     def setUp(self):
@@ -321,6 +366,17 @@ class FileTests(TestCase):
                 self.assertTrue(os.path.exists(path))
                 self.assertTrue(os.path.exists(gzfile))
                 with open(path, 'rt') as i:
+                    self.assertEqual(i.read(), 'foo')
+                
+                with gzip.open(gzfile, 'wt') as o:
+                    o.write('foo')
+                dest = self.root.make_file()
+                with open(gzfile, 'rb') as i, open(dest, 'wb') as o:
+                    fmt = get_format('.gz')
+                    fmt.uncompress_file(source=i, dest=o, use_system=use_system)
+                self.assertTrue(os.path.exists(dest))
+                self.assertTrue(os.path.exists(gzfile))
+                with open(dest, 'rt') as i:
                     self.assertEqual(i.read(), 'foo')
                 
                 path = self.root.make_file()

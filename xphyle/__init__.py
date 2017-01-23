@@ -185,15 +185,17 @@ def xopen(path: str, mode: str = 'r', compression: Union[bool, str] = None,
     validate = validate and compression and not guess_format
     # Guessed compression type, if compression in (None, True)
     guess = None
-    # Whether the file object is stdin/stdout/stderr
-    is_std = path in (STDIN, STDOUT, STDERR)
-    if file_type == 'std' and not is_std:
-        raise ValueError("file_type = 'std' but path was not in ('-', '_')")
     # The name to use for the file
     name = None
     
+    # Whether the file object is stdin/stdout/stderr
+    is_std = path in (STDIN, STDOUT, STDERR)
+    if file_type is not None and (is_std != (file_type == 'std')):
+        raise ValueError("file_type = {} does not match path {}".format(
+            file_type, path))
+    
     # standard input and standard output handling
-    if is_std:
+    if file_type in ('std', None) and is_std:
         use_system = False
         if path == STDERR:
             assert 'r' not in mode
@@ -251,9 +253,6 @@ def xopen(path: str, mode: str = 'r', compression: Union[bool, str] = None,
                 path = check_writeable_file(path)
                 if validate or guess_format:
                     guess = FORMATS.guess_compression_format(path)
-        
-        else:
-            raise ValueError("file is not of type {}".format(file_type))
     
     if validate and guess != compression:
         raise ValueError("Acutal compression format {} does not match "
@@ -274,10 +273,13 @@ def xopen(path: str, mode: str = 'r', compression: Union[bool, str] = None,
         fileobj = open(path, mode, **kwargs)
     elif is_std and 't' in mode:
         fileobj = io.TextIOWrapper(fileobj)
+        fileobj.mode = mode
     
     if context_wrapper:
-        wrapper_class = StdWrapper if is_std else FileWrapper
-        fileobj = wrapper_class(fileobj, name=name, compression=compression)
+        if is_std:
+            fileobj = StdWrapper(fileobj, compression=compression)
+        else:
+            fileobj = FileWrapper(fileobj, name=name, compression=compression)
     
     return fileobj
 
@@ -359,12 +361,13 @@ class Wrapper(object):
         if hasattr(self._fileobj, 'peek'):
             # The underlying file has a peek() method
             peek = self._fileobj.peek(size)
-            if 't' in self._fileobj.mode:
-                if isinstance(peek, 'bytes'):
-                    if hasattr(self._fileobj, 'encoding'):
-                        peek = peek_bytes.decode(self._fileobj.encoding)
-                    else:
-                        peek = peek_bytes.decode()
+            # I don't think the following is a valid state
+            # if 't' in self._fileobj.mode:
+            #     if isinstance(peek, 'bytes'):
+            #         if hasattr(self._fileobj, 'encoding'):
+            #             peek = peek_bytes.decode(self._fileobj.encoding)
+            #         else:
+            #             peek = peek_bytes.decode()
             if len(peek) > size:
                 peek = peek[:size]
         elif hasattr(self._fileobj, 'seek'):
@@ -374,7 +377,8 @@ class Wrapper(object):
                 peek = self._fileobj.read(size)
             finally:
                 self._fileobj.seek(curpos)
-        else:
+        else: # pragma: no-cover
+            # I don't think it's possible to get here, but leaving for now
             raise IOError("Unpeekable file: {}".format(self.name))
         return peek
     
@@ -419,7 +423,7 @@ class FileWrapper(Wrapper):
         if isinstance(source, str):
             path = source
             source = xopen(source, mode=mode, compression=compression, **kwargs)
-        elif name and not hasattr(source, 'name'):
+        elif name or not hasattr(source, 'name'):
             path = name
         else:
             path = source.name
@@ -436,12 +440,9 @@ class StdWrapper(Wrapper):
         compression: Compression type
         name: An alternative name to use for the stream
     """
-    def __init__(self, stream, compression: Union[bool, str] = False,
-                 name: str = None):
+    def __init__(self, stream, compression: Union[bool, str] = False):
         super(StdWrapper, self).__init__(stream, compression=compression)
         object.__setattr__(self, 'closed', False)
-        if name:
-            object.__setattr__(self, 'name', name)
     
     def _close(self):
         self._fileobj.flush()

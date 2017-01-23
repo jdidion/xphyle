@@ -344,11 +344,11 @@ class ExecutableCache(object):
         
         Args:
             paths: List of paths, or a string with directories separated by
-                ``os.path.sep``
+                ``os.pathsep``
         """
         # pylint: disable=global-statement,invalid-name
         if isinstance(paths, str):
-            paths = paths.split(os.path.sep)
+            paths = paths.split(os.pathsep)
         self.search_path = list(paths) + self.search_path
     
     def reset_search_path(self,
@@ -448,7 +448,7 @@ class TempPath(object):
         """Set the access mode for the path.
         
         Args:
-            mode: The new mode to set. If node, the existing mode is used
+            mode: The new mode to set. If None, the existing mode is used
             set_parent: Whether to recursively set the mode of all parents.
                 This is done additively.
             additive: Whether permissions should be additive (e.g.

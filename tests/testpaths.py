@@ -94,7 +94,7 @@ class PathTests(TestCase):
         check_access(path, 'w')
         check_access(path, 'x')
     
-    def set_access(self):
+    def test_set_access(self):
         path = self.root.make_file()
         with self.assertRaises(ValueError):
             set_access(path, 'z')
@@ -164,23 +164,25 @@ class PathTests(TestCase):
             resolve_path('foo')
     
     def test_check_readable_file(self):
-        path = self.root.make_file(mode='r')
-        check_readable_file(path)
+        readable = self.root.make_file(mode='r')
+        non_readable = self.root.make_file(mode='w')
+        directory = self.root.make_directory()
+        check_readable_file(readable)
         with self.assertRaises(IOError):
-            path = self.root.make_file(mode='w')
-            check_readable_file(path)
+            check_readable_file(non_readable)
         with self.assertRaises(IOError):
             check_readable_file('foo')
         with self.assertRaises(IOError):
-            path = self.root.make_directory()
-            check_readable_file(path)
+            check_readable_file(directory)
+        self.assertTrue(safe_check_readable_file(readable))
+        self.assertIsNone(safe_check_readable_file(non_readable))
     
     def test_check_writeable_file(self):
-        path = self.root.make_file(mode='w')
-        check_writeable_file(path)
+        writeable = self.root.make_file(mode='w')
+        non_writeable = self.root.make_file(mode='r')
+        check_writeable_file(writeable)
         with self.assertRaises(IOError):
-            path = self.root.make_file(mode='r')
-            check_writeable_file(path)
+            check_writeable_file(non_writeable)
         parent = self.root.make_directory()
         check_writeable_file(os.path.join(parent, 'foo'))
         subdir_path = os.path.join(parent, 'bar', 'foo')
@@ -189,6 +191,8 @@ class PathTests(TestCase):
         with self.assertRaises(IOError):
             parent = self.root.make_directory(mode='r')
             check_writeable_file(os.path.join(parent, 'foo'))
+        self.assertTrue(safe_check_writeable_file(writeable))
+        self.assertIsNone(safe_check_writeable_file(non_writeable))
     
     def test_check_path_std(self):
         check_path(STDOUT, 'f', 'r')
@@ -202,8 +206,6 @@ class PathTests(TestCase):
         self.assertTrue(safe_check_path(path, 'f', 'r'))
         self.assertFalse(safe_check_path(path, 'd', 'r'))
         self.assertFalse(safe_check_path(path, 'f', 'w'))
-        self.assertTrue(safe_check_readable_file(path))
-        self.assertFalse(safe_check_writeable_file(path))
     
     def test_find(self):
         level1 = self.root.make_directory()
@@ -243,6 +245,9 @@ class PathTests(TestCase):
         exe = self.root.make_file(suffix=".exe")
         exe_path = EXECUTABLE_CACHE.get_path(exe)
         self.assertIsNotNone(exe_path)
+        self.assertEqual(exe_path, EXECUTABLE_CACHE.get_path(os.path.basename(exe)))
+        EXECUTABLE_CACHE.cache.clear()
+        EXECUTABLE_CACHE.add_search_path(os.path.dirname(exe))
         self.assertEqual(exe_path, EXECUTABLE_CACHE.get_path(os.path.basename(exe)))
         # TODO: how to test this fully, since we can't be sure of what
         # executables will be available on the installed system?

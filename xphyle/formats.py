@@ -448,7 +448,8 @@ class CompressionFormat(FileFormat):
             source_path = source
         else:
             source_path = source.name
-            try: # pragma: no cover
+            # pragma: no cover
+            try:
                 source.fileno()
             except OSError:
                 use_system = False
@@ -529,12 +530,12 @@ class CompressionFormat(FileFormat):
                 raise Exception("Cannot determine path for uncompressed file")
         dest_is_path = isinstance(dest, str)
         if dest_is_path:
-            check_writeable_file(dest)
-        if dest_is_path:
+            dest = check_writeable_file(dest)
             dest_file = open(dest, 'wb')
         else:
             dest_file = dest
-            try: # pragma: no cover
+            # pragma: no cover
+            try:
                 dest_file.fileno()
             except OSError:
                 use_system = False

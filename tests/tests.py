@@ -93,6 +93,19 @@ class XphyleTests(TestCase):
             xopen(STDOUT, 'w', compression=True)
         with self.assertRaises(ValueError):
             xopen('foo.bar', 'w', compression=True)
+        with self.assertRaises(ValueError):
+            xopen('foo', file_type='std')
+        with self.assertRaises(ValueError):
+            xopen(STDOUT, file_type='local')
+        with self.assertRaises(ValueError):
+            xopen('foo', file_type='bar')
+        with self.assertRaises(IOError):
+            xopen('http://foo.com', file_type='local')
+        path = self.root.make_file(contents='foo')
+        f = xopen(path)
+        f.close()
+        with self.assertRaises(IOError):
+            with f: pass
     
     def test_xopen_std(self):
         # Try stdin
@@ -135,6 +148,8 @@ class XphyleTests(TestCase):
         with self.assertRaises(IOError):
             xopen('foobar', 'r')
         path = self.root.make_file(suffix='.gz')
+        with xopen(path, 'rU') as i:
+            self.assertEquals('rt', i.mode)
         with xopen(path, 'w', compression=True) as o:
             self.assertEqual(o.compression, 'gzip')
             o.write('foo')
@@ -157,7 +172,18 @@ class XphyleTests(TestCase):
             self.assertEqual('foo\n', i.read())
     
     def test_peek(self):
+        path = self.root.make_file()
+        with self.assertRaises(IOError):
+            with open_(path, 'w') as o:
+                o.peek()
         path = self.root.make_file(contents='foo')
+        with open_(path, 'rb') as i:
+            self.assertEqual(b'f', i.peek(1))
+            self.assertEqual(b'foo', next(i))
         with open_(path, 'rt') as i:
             self.assertEqual('f', i.peek(1))
             self.assertEqual('foo', next(i))
+        with intercept_stdin('foo'):
+            with open_(STDIN, validate=False, compression=False) as i:
+                self.assertEqual('f', i.peek(1))
+                self.assertEqual('foo\n', next(i))
