@@ -8,6 +8,8 @@ class TempDirTests(TestCase):
     def test_descriptor(self):
         with self.assertRaises(ValueError):
             TempPathDescriptor(path_type='d', contents='foo')
+        with self.assertRaises(IOError):
+            TempPathDescriptor().absolute_path
         with TempDir(mode='rwx') as temp:
             f = temp.make_file(name='foo', mode=None)
             self.assertTrue('foo' in temp)
@@ -34,6 +36,8 @@ class TempDirTests(TestCase):
         self.assertTrue(os.path.exists(os.path.join(temp.absolute_path, 'foo', 'bar')))
         temp.close()
         self.assertFalse(os.path.exists(temp.absolute_path))
+        # make sure trying to close again doesn't raise error
+        temp.close()
     
     def test_tree(self):
         temp = TempDir()
@@ -45,6 +49,9 @@ class TempDirTests(TestCase):
         self.assertFalse(os.path.exists(f))
     
     def test_mode(self):
+        with self.assertRaises(IOError):
+            with TempDir(mode=None) as temp:
+                temp.mode
         with TempDir('r') as temp:
             # Raises error because the tempdir is read-only
             with self.assertRaises(PermissionError):
@@ -72,6 +79,7 @@ class PathTests(TestCase):
     
     def tearDown(self):
         self.root.close()
+        EXECUTABLE_CACHE.cache.clear()
 
     def test_invalid_access(self):
         with self.assertRaises(ValueError):
@@ -252,25 +260,125 @@ class PathTests(TestCase):
         # TODO: how to test this fully, since we can't be sure of what
         # executables will be available on the installed system?
     
-    def test_pathspec(self):
+    def test_resolve_exe(self):
+        exe = self.root.make_file(suffix=".exe")
+        exe_name = os.path.basename(exe)
+        path = EXECUTABLE_CACHE.resolve_exe([exe_name])
+        self.assertIsNone(path)
+        EXECUTABLE_CACHE.cache.clear()
+        EXECUTABLE_CACHE.add_search_path(os.path.dirname(exe))
+        path = EXECUTABLE_CACHE.resolve_exe([exe_name])
+        self.assertIsNotNone(path)
+        self.assertEquals(exe, path[0])
+    
+    def test_pathvar(self):
+        pv = PathVar('id', pattern='[A-Z0-9_]+', default='ABC123')
+        self.assertEquals('ABC123', pv(None))
+        
+        pv = PathVar('id', pattern='[A-Z0-9_]+', optional=True)
+        self.assertEquals('', pv(None))
+        
+        pv = PathVar('id', pattern='[A-Z0-9_]+')
+        with self.assertRaises(ValueError):
+            pv(None)
+    
+    def test_filespec(self):
+        path = self.root.make_file(name='ABC123.txt')
+        base = os.path.basename(path)
+        
+        spec = FileSpec(
+            PathVar('id', pattern='[A-Z0-9_]+', invalid=('XYZ999',)),
+            PathVar('ext', pattern='[^\.]+', valid=('txt', 'exe')),
+            template='{id}.{ext}')
+        
+        # get a single file
+        pathinst = spec(id='ABC123', ext='txt')
+        self.assertEquals(
+            path_inst(base, dict(id='ABC123', ext='txt')),
+            pathinst)
+        self.assertEquals('ABC123', pathinst['id'])
+        self.assertEquals('txt', pathinst['ext'])
+        
+        with self.assertRaises(ValueError):
+            spec(id='abc123', ext='txt')
+        
+        with self.assertRaises(ValueError):
+            spec(id='ABC123', ext='foo')
+        
+        with self.assertRaises(ValueError):
+            spec(id='XYZ999', ext='txt')
+    
+    def test_filespec_parse(self):
         path = self.root.make_file(name='ABC123.txt')
         
-        spec = PathSpec(
+        spec = FileSpec(
             PathVar('id', pattern='[A-Z0-9_]+'),
             PathVar('ext', pattern='[^\.]+'),
             template='{id}.{ext}')
         
-        # get a single file
-        pathinst = spec(self.root.absolute_path, id='ABC123', ext='txt')
-        self.assertEquals(path_inst(path, dict(id='ABC123', ext='txt')), pathinst)
-        
-        # get the variable values for a path
         pathinst = spec.parse(path)
-        self.assertEquals(path_inst(path, dict(id='ABC123', ext='txt')), pathinst)
+        self.assertEquals(
+            path_inst(path, dict(id='ABC123', ext='txt')),
+            pathinst)
         
-        # find all files that match a PathSpec
+        path2 = self.root.make_file(name='abc123.txt')
+        with self.assertRaises(ValueError):
+            spec.parse(path2)
+    
+    def test_filespec_find(self):
+        path = self.root.make_file(name='ABC123.txt')
+        
+        spec = FileSpec(
+            PathVar('id', pattern='[A-Z0-9_]+'),
+            PathVar('ext', pattern='[^\.]+'),
+            template='{id}.{ext}')
+        
         all_paths = spec.find(self.root.absolute_path)
         self.assertEquals(1, len(all_paths))
         self.assertEquals(
             path_inst(path, dict(id='ABC123', ext='txt')),
             all_paths[0])
+    
+    def test_dirspec(self):
+        level1 = self.root.make_directory(name='ABC123')
+        level2 = self.root.make_directory(parent=level1, name='AAA')
+        base = os.path.dirname(level1)
+        
+        spec = FileSpec(
+            PathVar('root'),
+            PathVar('subdir', pattern='[A-Z0-9_]+', invalid=('XYZ999',)),
+            PathVar('leaf', pattern='[^_]+', valid=('AAA', 'BBB')),
+            template=os.path.join('{root}', '{subdir}', '{leaf}'))
+        
+        # get a single dir
+        pathinst = spec(root=base, subdir='ABC123', leaf='AAA')
+        self.assertEquals(
+            path_inst(level2, dict(root=base, subdir='ABC123', leaf='AAA')),
+            pathinst)
+        self.assertEquals(base, pathinst['root'])
+        self.assertEquals('ABC123', pathinst['subdir'])
+        self.assertEquals('AAA', pathinst['leaf'])
+        
+        with self.assertRaises(ValueError):
+            spec(root=base, subdir='abc123', leaf='AAA')
+        
+        with self.assertRaises(ValueError):
+            spec(root=base, subdir='ABC123', leaf='CCC')
+        
+        with self.assertRaises(ValueError):
+            spec(root=base, subdir='XYZ999', leaf='AAA')
+    
+    def test_dirspec_parse(self):
+        pass
+    
+    def test_dirspec_find(self):
+        pass
+    
+    def test_pathspec(self):
+        pass
+    
+    def test_pathspec_parse(self):
+        pass
+    
+    def test_pathspec_find(self):
+        pass
