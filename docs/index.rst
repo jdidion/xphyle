@@ -292,6 +292,33 @@ The ``xphyle.paths`` module provides methods for working with file paths. The `A
         # within directory 'tempdir/foo'
         gzfile = temp[foo].make_file(suffix='.gz')
 
+Another useful set of classes is `FileSpec <api/modules.html#xphyle.paths.FileSpec>`_, `DirSpec <api/modules.html#xphyle.paths.DirSpec>`_, and `PathSpec <api/modules.html#xphyle.paths.PathSpec>`_. These classes help with the common problem of working files that match a specific pattern, especially when you need to then extract some pieces of information from the file names. For example, you may need to find all the files starting with 'foo' within any subdirectory of '/bar', and then performing different operations depending on the extension. You could use a PathSpec for this::
+    
+    spec = PathSpec(
+        DirSpec(PathVar('subdir'), template=os.path.join('/bar', '{subdir}')),
+        FileSpec(
+            PathVar('name', pattern='foo.*'),
+            PathVar('ext'),
+            template='{name}.{ext}'))
+    files = spec.find(recursive=True)
+    for f in files:
+        if f['ext'] == 'txt':
+            process_text_file(f)
+        else:
+            process_binary_file(f)
+
+A FileSpec or DirSpec has two related fields: a template, which is a python `fstring<https://www.python.org/dev/peps/pep-0498>`_ and is used for constructing filenames from component pieces; and a pattern, which is a regular expression and is used for matching to path strings. The named components of the template correspond to path variables (instances of the `PathVar<api/modules.html#xphyle.paths.PathVar>`_ class). Each PathVar can provide its own pattern, as well as lists of valid or invalid values. If a pattern is not specified during FileSpec/DirSpec creation, the pattern is automatically created by simply substituting the PathVar patterns for the corresponding components in the template string ('.*' by default).
+
+Note that a DirSpec is only able to construct/match directory paths, and a FileSpec is only able to construct/match file names. A PathSpec is simply a composite type of a DirSpec and a FileSpec that can be used to construct/match full paths.
+
+Each of the *Spec classes has three methods:
+
+* construct: Given values for all of the path vars, construct a new path. Note that __call__ is an alias for construct.
+* parse: Match a path against the *Spec's pattern. If the path matches, the component's are extracted (through the use of named capture groups), otherwise an exception is raised.
+* find: Find all directories/files/paths that match the *Spec's pattern.
+
+All of these methods return a PathInst, which is a subclass of pathlib.Path (specifically, a subclass of pathlib.WindowsPath when code is run on Windows, otherwise a PosixPath) that has an additional slot, 'values', that is a dictionary of the component name, value pairs, and overrides a few methods.
+
 Extending xphyle
 ----------------
 
