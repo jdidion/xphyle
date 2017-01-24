@@ -283,6 +283,10 @@ class PathTests(TestCase):
             pv(None)
     
     def test_filespec(self):
+        null = FileSpec()
+        self.assertEquals('{file}', null.template)
+        self.assertTrue('file' in null.path_vars)
+        
         path = self.root.make_file(name='ABC123.txt')
         base = os.path.basename(path)
         
@@ -307,16 +311,8 @@ class PathTests(TestCase):
         
         with self.assertRaises(ValueError):
             spec(id='XYZ999', ext='txt')
-    
-    def test_filespec_parse(self):
-        path = self.root.make_file(name='ABC123.txt')
         
-        spec = FileSpec(
-            PathVar('id', pattern='[A-Z0-9_]+'),
-            PathVar('ext', pattern='[^\.]+'),
-            template='{id}.{ext}')
-        
-        pathinst = spec.parse(path)
+        pathinst = spec.parse(path, fullpath=True)
         self.assertEquals(
             path_inst(path, dict(id='ABC123', ext='txt')),
             pathinst)
@@ -324,14 +320,6 @@ class PathTests(TestCase):
         path2 = self.root.make_file(name='abc123.txt')
         with self.assertRaises(ValueError):
             spec.parse(path2)
-    
-    def test_filespec_find(self):
-        path = self.root.make_file(name='ABC123.txt')
-        
-        spec = FileSpec(
-            PathVar('id', pattern='[A-Z0-9_]+'),
-            PathVar('ext', pattern='[^\.]+'),
-            template='{id}.{ext}')
         
         all_paths = spec.find(self.root.absolute_path)
         self.assertEquals(1, len(all_paths))
@@ -340,11 +328,15 @@ class PathTests(TestCase):
             all_paths[0])
     
     def test_dirspec(self):
+        null = DirSpec()
+        self.assertEquals('{dir}', null.template)
+        self.assertTrue('dir' in null.path_vars)
+                
         level1 = self.root.make_directory(name='ABC123')
         level2 = self.root.make_directory(parent=level1, name='AAA')
         base = os.path.dirname(level1)
         
-        spec = FileSpec(
+        spec = DirSpec(
             PathVar('root'),
             PathVar('subdir', pattern='[A-Z0-9_]+', invalid=('XYZ999',)),
             PathVar('leaf', pattern='[^_]+', valid=('AAA', 'BBB')),
@@ -367,18 +359,92 @@ class PathTests(TestCase):
         
         with self.assertRaises(ValueError):
             spec(root=base, subdir='XYZ999', leaf='AAA')
+        
+        pathinst = spec.parse(level2)
+        self.assertEquals(
+            path_inst(level2, dict(root=base, subdir='ABC123', leaf='AAA')),
+            pathinst)
+        
+        path2 = self.root.make_directory(name='abc123')
+        with self.assertRaises(ValueError):
+            spec.parse(path2)
     
-    def test_dirspec_parse(self):
-        pass
-    
-    def test_dirspec_find(self):
-        pass
+        all_paths = spec.find(base, recursive=True)
+        self.assertEquals(1, len(all_paths))
+        self.assertEquals(
+            path_inst(level2, dict(root=base, subdir='ABC123', leaf='AAA')),
+            all_paths[0])
     
     def test_pathspec(self):
+        level1 = self.root.make_directory(name='ABC123')
+        level2 = self.root.make_directory(parent=level1, name='AAA')
+        path = self.root.make_file(parent=level2, name='FFF555.txt')
+        base = os.path.dirname(level1)
+        
+        spec = PathSpec(
+            DirSpec(
+                PathVar('root'),
+                PathVar('subdir', pattern='[A-Z0-9_]+', invalid=('XYZ999',)),
+                PathVar('leaf', pattern='[^_]+', valid=('AAA', 'BBB')),
+                template=os.path.join('{root}', '{subdir}', '{leaf}')),
+            FileSpec(
+                PathVar('id', pattern='[A-Z0-9_]+', invalid=('ABC123',)),
+                PathVar('ext', pattern='[^\.]+', valid=('txt', 'exe')),
+                template='{id}.{ext}'))
+        
+        # get a single file
+        path_var_values = dict(root=base, subdir='ABC123', leaf='AAA',
+                               id='FFF555', ext='txt')
+        pathinst = spec(**path_var_values)
+        self.assertEquals(path_inst(path, path_var_values), pathinst)
+        self.assertEquals(base, pathinst['root'])
+        self.assertEquals('ABC123', pathinst['subdir'])
+        self.assertEquals('AAA', pathinst['leaf'])
+        self.assertEquals('FFF555', pathinst['id'])
+        self.assertEquals('txt', pathinst['ext'])
+        
+        fail1 = dict(path_var_values)
+        fail1['id'] = 'abc123'
+        with self.assertRaises(ValueError):
+            spec(**fail1)
+        
+        fail2 = dict(path_var_values)
+        fail2['ext'] = 'foo'
+        with self.assertRaises(ValueError):
+            spec(**fail2)
+        
+        fail3 = dict(path_var_values)
+        fail3['id'] = 'ABC123'
+        with self.assertRaises(ValueError):
+            spec(**fail3)
+        
+        pathinst = spec.parse(path)
+        self.assertEquals(path_inst(path, path_var_values), pathinst)
+        
+        path2 = self.root.make_file(parent=level2, name='fff555.txt')
+        with self.assertRaises(ValueError):
+            spec.parse(path2)
+        
+        all_paths = spec.find(base, recursive=True)
+        self.assertEquals(1, len(all_paths))
+        self.assertEquals(path_inst(path, path_var_values), all_paths[0])
+    
+    def test_default_search(self):
         pass
     
-    def test_pathspec_parse(self):
-        pass
-    
-    def test_pathspec_find(self):
-        pass
+    def test_pathspec_default_search(self):
+        path = self.root.make_file(name='FFF555.txt')
+        base = os.path.dirname(path)
+        
+        spec = PathSpec(
+            base,
+            FileSpec(
+                PathVar('id', pattern='[A-Z0-9_]+', invalid=('ABC123',)),
+                PathVar('ext', pattern='[^\.]+', valid=('txt', 'exe')),
+                template='{id}.{ext}'))
+        
+        all_paths = spec.find()
+        self.assertEquals(1, len(all_paths))
+        self.assertEquals(
+            path_inst(path, dict(id='FFF555', ext='txt')),
+            all_paths[0])
