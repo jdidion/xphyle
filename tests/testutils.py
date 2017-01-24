@@ -216,6 +216,34 @@ class UtilsTests(TestCase):
         with gzip.open(gzfile, 'rt') as i:
             self.assertEqual(i.read(), 'foo')
     
+    def test_compress_fileobj(self):
+        path = self.root.make_file()
+        with open(path, 'wt') as o:
+            o.write('foo')
+        
+        f = open(path, 'rb')
+        try:
+            gzfile = compress_file(f, compression='gz')
+            self.assertEqual(gzfile, path + '.gz')
+            self.assertTrue(os.path.exists(path))
+            self.assertTrue(os.path.exists(gzfile))
+            with gzip.open(gzfile, 'rt') as i:
+                self.assertEqual(i.read(), 'foo')
+        finally:
+            f.close()
+        
+        gzpath = path + '.gz'
+        gzfile = gzip.open(gzpath, 'w')
+        try:
+            self.assertEquals(
+                gzfile, compress_file(path, gzfile, compression=True))
+        finally:
+            gzfile.close()
+        self.assertTrue(os.path.exists(path))
+        self.assertTrue(os.path.exists(gzpath))
+        with gzip.open(gzpath, 'rt') as i:
+            self.assertEqual(i.read(), 'foo')
+    
     def test_compress_file_no_compression(self):
         path = self.root.make_file()
         with open(path, 'wt') as o:
@@ -443,9 +471,19 @@ class UtilsTests(TestCase):
             [b'foo\n',b'bar\n'],
             list(fileinput(mode=BinMode)))
     
+    def test_single_file_output(self):
+        file1 = self.root.make_file(suffix='.gz')
+        file2 = self.root.make_file()
+        with fileoutput(file1) as o:
+            o.writelines(('foo','bar','baz'))
+        with gzip.open(file1, 'rt') as i:
+            self.assertEqual('foo\nbar\nbaz\n', i.read())
+    
     def test_tee_file_output(self):
         file1 = self.root.make_file(suffix='.gz')
         file2 = self.root.make_file()
+        with self.assertRaises(ValueError):
+            fileoutput((file1,file2), access='z')
         with fileoutput((file1,file2)) as o:
             o.writelines(('foo','bar','baz'))
         with gzip.open(file1, 'rt') as i:

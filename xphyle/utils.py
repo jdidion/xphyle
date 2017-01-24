@@ -14,7 +14,7 @@ import sys
 
 from xphyle import open_, xopen, FileEventListener
 from xphyle.formats import FORMATS
-from xphyle.paths import STDIN, STDOUT
+from xphyle.paths import STDIN, STDOUT, check_file_mode
 from xphyle.progress import iter_file_chunked
 from xphyle.types import (Generator, PathOrFile, FileLike, Callable, Dict,
                           Tuple, Any, Sequence, Generic, Optional, FilesArg,
@@ -458,6 +458,8 @@ class FileManager(object):
         self._files = collections.OrderedDict()
         self._paths = {}
         self.default_open_args = kwargs
+        if 'mode' in kwargs:
+            check_file_mode(kwargs['mode'])
         if files:
             self.add_all(files)
     
@@ -726,10 +728,10 @@ class FileOutput(FileManager, Generic[CharMode]):
     def __init__(self, files: FilesArg = None, mode: CharMode = TextMode,
                  access: str = 'w', linesep: CharMode = os.linesep,
                  encoding: str = 'utf-8'):
-        if access not in ('w', 'a', 'x'):
-            raise ValueError("Invalid access mode {}".format(access))
         super(FileOutput, self).__init__(
             mode=access + ('t' if mode == TextMode else 'b'))
+        if access not in ('w', 'a', 'x'):
+            raise ValueError("Invalid access mode {}".format(access))
         self.mode = mode
         self.encoding = encoding
         self.num_lines = 0

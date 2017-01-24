@@ -12,7 +12,7 @@ from xphyle.types import (Callable, Iterable, Union, Sequence, FileLike,
 
 from xphyle.formats import FORMATS, THREADS
 from xphyle.paths import (
-    STDIN, STDOUT, STDERR, EXECUTABLE_CACHE,
+    STDIN, STDOUT, STDERR, EXECUTABLE_CACHE, check_file_mode,
     check_readable_file, check_writeable_file, safe_check_readable_file)
 from xphyle.progress import ITERABLE_PROGRESS, PROCESS_PROGRESS
 from xphyle.urls import parse_url, open_url, get_url_file_name
@@ -163,8 +163,7 @@ def xopen(path: str, mode: str = 'r', compression: Union[bool, str] = None,
     # pylint: disable=redefined-variable-type
     if not isinstance(path, str):
         raise ValueError("'path' must be a string")
-    if not any(m in mode for m in ('r', 'w', 'a', 'x')):
-        raise ValueError("'mode' must contain one of (r,w,a,x)")
+    check_file_mode(mode)
     if 'U' in mode:
         if 'newline' in kwargs and kwargs['newline'] is not None:
             raise ValueError("newline={} not compatible with universal "

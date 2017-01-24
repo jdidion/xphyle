@@ -314,7 +314,7 @@ class PathTests(TestCase):
         
         pathinst = spec.parse(path, fullpath=True)
         self.assertEquals(
-            path_inst(path, dict(id='ABC123', ext='txt')),
+            path_inst(os.path.basename(path), dict(id='ABC123', ext='txt')),
             pathinst)
         
         path2 = self.root.make_file(name='abc123.txt')
@@ -365,6 +365,12 @@ class PathTests(TestCase):
             path_inst(level2, dict(root=base, subdir='ABC123', leaf='AAA')),
             pathinst)
         
+        path = self.root.make_file(parent=level2)
+        pathinst = spec.parse(path, fullpath=True)
+        self.assertEquals(
+            path_inst(level2, dict(root=base, subdir='ABC123', leaf='AAA')),
+            pathinst)
+        
         path2 = self.root.make_directory(name='abc123')
         with self.assertRaises(ValueError):
             spec.parse(path2)
@@ -392,7 +398,6 @@ class PathTests(TestCase):
                 PathVar('ext', pattern='[^\.]+', valid=('txt', 'exe')),
                 template='{id}.{ext}'))
         
-        # get a single file
         path_var_values = dict(root=base, subdir='ABC123', leaf='AAA',
                                id='FFF555', ext='txt')
         pathinst = spec(**path_var_values)
@@ -428,16 +433,67 @@ class PathTests(TestCase):
         all_paths = spec.find(base, recursive=True)
         self.assertEquals(1, len(all_paths))
         self.assertEquals(path_inst(path, path_var_values), all_paths[0])
-    
+        
+        # make sure it works with plain paths
+        spec = PathSpec(
+            level2,
+            FileSpec(
+                PathVar('id', pattern='[A-Z0-9_]+', invalid=('ABC123',)),
+                PathVar('ext', pattern='[^\.]+', valid=('txt', 'exe')),
+                template='{id}.{ext}'))
+        self.assertEquals(
+            path_inst(path, dict(id='FFF555', ext='txt')),
+            spec.parse(path))
+        with self.assertRaises(ValueError):
+            bad_path = os.path.join(
+                get_root(), 'foo', 'bar', os.path.basename(path))
+            spec.parse(bad_path)
+        
+        spec = PathSpec(
+            DirSpec(
+                PathVar('root'),
+                PathVar('subdir', pattern='[A-Z0-9_]+', invalid=('XYZ999',)),
+                PathVar('leaf', pattern='[^_]+', valid=('AAA', 'BBB')),
+                template=os.path.join('{root}', '{subdir}', '{leaf}')),
+            os.path.basename(path))
+        self.assertEquals(
+            path_inst(path, dict(root=base, subdir='ABC123', leaf='AAA')),
+            spec.parse(path))
+        
+        spec = PathSpec(level2, os.path.basename(path))
+        all_paths = spec.find()
+        self.assertEquals(1, len(all_paths))
+        self.assertEquals(path_inst(path), all_paths[0])
+        
     def test_default_search(self):
-        pass
+        spec = FileSpec(
+            PathVar('id', pattern='[A-Z0-9_]+', invalid=('XYZ999',)),
+            PathVar('ext', pattern='[^\.]+', valid=('txt', 'exe')),
+            template='{id}.{ext}')
+        with self.assertRaises(ValueError):
+            spec.find()
+        
+        level1 = self.root.make_directory(name='ABC123')
+        level2 = self.root.make_directory(parent=level1, name='AAA')
+        base = os.path.dirname(level1)
+        
+        spec = DirSpec(
+            PathVar('subdir', pattern='[A-Z0-9_]+', invalid=('XYZ999',)),
+            PathVar('leaf', pattern='[^_]+', valid=('AAA', 'BBB')),
+            template=os.path.join(base, '{subdir}', '{leaf}'))
+        
+        all_paths = spec.find(recursive=True)
+        self.assertEquals(1, len(all_paths))
+        self.assertEquals(
+            path_inst(level2, dict(subdir='ABC123', leaf='AAA')),
+            all_paths[0])
     
     def test_pathspec_default_search(self):
         path = self.root.make_file(name='FFF555.txt')
         base = os.path.dirname(path)
         
         spec = PathSpec(
-            base,
+            DirSpec(template=base),
             FileSpec(
                 PathVar('id', pattern='[A-Z0-9_]+', invalid=('ABC123',)),
                 PathVar('ext', pattern='[^\.]+', valid=('txt', 'exe')),

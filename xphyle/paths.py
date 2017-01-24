@@ -32,6 +32,25 @@ python >= 3.6, path-like means is a subclass of os.PathLike, otherwise means
 is a subclass of pathlib.PurePath.
 """
 
+def check_file_mode(mode: str) -> int:
+    """Check that a file mode string is valid:
+    
+    Args:
+        mode: File mode string to check
+    
+    Raises:
+        ValueError if the file mode string is invalid
+    """
+    # check that 'mode' contains an access character
+    get_access(mode)
+    # other checks
+    if len(mode) > 2:
+        raise ValueError("'mode' can be at most 2 characters")
+    diff = set(mode) - (set(ACCESS.keys()) | set(('b', 't', 'U')))
+    if diff:
+        raise ValueError("'mode' contains invalid character(s): ".format(
+            ','.join(diff)))
+
 def get_access(mode: str) -> int:
     """Returns the access mode constant associated with given mode string.
     
@@ -880,7 +899,7 @@ class SpecBase(object):
             pattern = re.compile(pattern)
         self.pattern = pattern
     
-    def __call__(self, **kwargs) -> PathInst:
+    def construct(self, **kwargs) -> PathInst:
         """Create a new PathInst from this spec using values in `kwargs`.
         
         Args:
@@ -895,6 +914,8 @@ class SpecBase(object):
         path = self.template.format(**values)
         return path_inst(path, values)
     
+    __call__ = construct
+    
     def parse(self, path: Union[str, PathLike], fullpath: bool = False
              ) -> PathInst:
         """Extract PathVar values from `path` and create a new PathInst.
@@ -904,11 +925,10 @@ class SpecBase(object):
         
         Returns: a PathInst
         """
-        match_path = path = str(path)
+        path = str(path)
         if fullpath:
-            path = os.path.expanduser(path)
-            match_path = self.path_part(path)
-        match = self.pattern.fullmatch(match_path)
+            path = self.path_part(os.path.expanduser(path))
+        match = self.pattern.fullmatch(path)
         if not match:
             raise ValueError("{} does not match {}".format(path, self))
         return path_inst(path, self._match_to_dict(match))
@@ -971,11 +991,15 @@ class DirSpec(SpecBase):
         return os.path.dirname(path)
     
     def default_search_root(self):
-        i1 = self.template.index('{')
-        if i1 < 0:
+        try:
+            i1 = self.template.index('{')
+        except:
             return self.template
-        i2 = self.template.rindex(os.sep, 0, i1)
-        return self.template[0:i2] if i2 > 0 else get_root()
+        try:
+            i2 = self.template.rindex(os.sep, 0, i1)
+            return self.template[0:i2]
+        except:
+            return get_root()
     
 class FileSpec(SpecBase):
     """Spec for the filename part of a path.
@@ -1024,7 +1048,7 @@ class PathSpec(object):
         if not self.fixed_file:
             self.path_vars.update(self.file_spec.path_vars)
     
-    def __call__(self, **kwargs) -> PathInst:
+    def construct(self, **kwargs) -> PathInst:
         """Create a new PathInst from this PathSpec using values in `kwargs`.
         
         Args:
@@ -1037,6 +1061,8 @@ class PathSpec(object):
         file_part = self.file_spec if self.fixed_file else self.file_spec(**kwargs)
         return dir_part.joinpath(file_part)
     
+    __call__ = construct
+    
     def parse(self, path: Union[str, PathLike]) -> PathInst:
         """Extract PathVar values from `path` and create a new PathInst.
         
@@ -1048,8 +1074,6 @@ class PathSpec(object):
         def parse_part(part, spec, fixed):
             """Parse part of path using 'spec'. Returns 'spec' if fixed is True.
             """
-            if part is None:
-                return
             if fixed:
                 inst = spec
                 if str(inst) != part:
@@ -1059,12 +1083,12 @@ class PathSpec(object):
             return inst
         
         dir_part, file_part = os.path.split(str(path))
-        dir_inst = parse_part(dir_part, self.dir_spec, self.fixed_dir)
-        file_inst = parse_part(file_part, self.file_spec, self.fixed_file)
-        if dir_inst and file_inst:
-            return dir_inst.joinpath(file_inst)
-        else:
-            return dir_inst or file_inst
+        dir_inst = file_inst = None
+        if dir_part:
+            dir_inst = parse_part(dir_part, self.dir_spec, self.fixed_dir)
+        if file_part:
+            file_inst = parse_part(file_part, self.file_spec, self.fixed_file)
+        return dir_inst.joinpath(file_inst) if dir_inst else file_inst
     
     def find(self, root: Union[str, PathLike] = None, types: str = 'f',
              recursive: bool = False) -> Sequence[PathInst]:
