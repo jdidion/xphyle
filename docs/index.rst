@@ -327,7 +327,7 @@ You can add support for another compression format by extending one of the base 
     import xphyle.formats
     
     class FooFormat(xphyle.formats.SingleExeCompressionFormat):
-        """Implementation of CompressionFormat for bzip2 files.
+        """Implementation of CompressionFormat for foo files.
         """
         name = 'foo' # name of the python library
         exts = ('foo',) # file extension(s) (without the separator)
