@@ -1,7 +1,6 @@
 from unittest import TestCase, skipIf
 import gzip
 import os
-import xphyle.formats
 from xphyle.formats import *
 from xphyle.paths import TempDir, EXECUTABLE_CACHE
 from . import *
@@ -241,9 +240,9 @@ class FileTests(TestCase):
         fmt = get_format('.gz')
         # Have to open in bytes mode, or it will get wrapped in a
         # TextBuffer, which does not use the underlying __iter__
-        with fmt.open_file(path, mode='w', ext='.gz', use_system=True) as f:
+        with fmt.open_file(path, mode='wb', ext='.gz', use_system=True) as f:
             f.write(text.encode())
-        with fmt.open_file(path, mode='r', ext='.gz', use_system=True) as f:
+        with fmt.open_file(path, mode='rb', ext='.gz', use_system=True) as f:
             lines = list(line.rstrip().decode() for line in iter(f))
         self.assertListEqual(lines, ['line1','line2','line3'])
     

@@ -28,7 +28,7 @@ class UtilsTests(TestCase):
     
     def test_read_lines(self):
         self.assertListEqual(list(read_lines('foobar', errors=False)), [])
-        
+    
         path = self.root.make_file()
         with open(path, 'wt') as o:
             o.write("1\n2\n3")
@@ -38,7 +38,7 @@ class UtilsTests(TestCase):
         self.assertListEqual(
             list(read_lines(path, convert=int)),
             [1,2,3])
-
+    
     def test_read_chunked(self):
         self.assertListEqual([], list(read_bytes('foobar', errors=False)))
         path = self.root.make_file()
@@ -46,7 +46,7 @@ class UtilsTests(TestCase):
             o.write("1234567890")
         chunks = list(read_bytes(path, 3))
         self.assertListEqual([b'123', b'456', b'789', b'0'], chunks)
-
+    
     def test_write_lines(self):
         linesep_len = len(os.linesep)
         path = self.root.make_file()
@@ -63,7 +63,7 @@ class UtilsTests(TestCase):
         self.assertEquals(
             11, write_lines(('foo', 'bar', 'baz'), path, linesep='|'))
         self.assertEqual(list(read_lines(path)), ['foo|bar|baz'])
-        path = self.root.make_file(mode='r')
+        path = self.root.make_file(permissions='r')
         self.assertEqual(-1, write_lines(['foo'], path, errors=False))
     
     def test_write_bytes(self):
@@ -78,7 +78,7 @@ class UtilsTests(TestCase):
         self.assertEqual(
             os.linesep.encode().join((b'foo',b'bar',b'baz')),
             b''.join(read_bytes(path)))
-        path = self.root.make_file(mode='r')
+        path = self.root.make_file(permissions='r')
         self.assertEqual(-1, write_bytes([b'foo'], path, errors=False))
     
     def test_read_dict(self):
@@ -102,20 +102,20 @@ class UtilsTests(TestCase):
     
     def test_tsv(self):
         self.assertListEqual([], list(read_delimited('foobar', errors=False)))
-        
+    
         path = self.root.make_file()
         with open(path, 'wt') as o:
             o.write('a\tb\tc\n')
             o.write('1\t2\t3\n')
             o.write('4\t5\t6\n')
-        
+    
         with self.assertRaises(ValueError):
             list(read_delimited(path, header=False, converters='int'))
         with self.assertRaises(ValueError):
             list(read_delimited(
                 path, header=False, converters=int, row_type='dict',
                 yield_header=False))
-        
+    
         self.assertListEqual(
             [
                 ['a','b','c'],
@@ -155,12 +155,12 @@ class UtilsTests(TestCase):
             o.write('id\ta\tb\tc\n')
             o.write('row1\t1\t2\t3\n')
             o.write('row2\t4\t5\t6\n')
-        
+    
         with self.assertRaises(ValueError):
             read_delimited_as_dict(path, key='id', header=False)
         with self.assertRaises(ValueError):
             read_delimited_as_dict(path, key=None, header=False)
-        
+    
         self.assertDictEqual(
             dict(
                 row1=['row1',1,2,3],
@@ -175,12 +175,12 @@ class UtilsTests(TestCase):
             ),
             read_delimited_as_dict(
                 path, key='id', header=True, converters=(str,int,int,int)))
-        
+    
         with open(path, 'wt') as o:
             o.write('a\tb\tc\n')
             o.write('1\t2\t3\n')
             o.write('4\t5\t6\n')
-            
+    
         self.assertDictEqual(
             dict(
                 row1=[1,2,3],
@@ -189,24 +189,24 @@ class UtilsTests(TestCase):
             read_delimited_as_dict(
                 path, key=lambda row: 'row{}'.format(row[0]),
                 header=True, converters=int))
-        
+    
     def test_tsv_dict_dups(self):
         path = self.root.make_file()
         with open(path, 'wt') as o:
             o.write('id\ta\tb\tc\n')
             o.write('row1\t1\t2\t3\n')
             o.write('row1\t4\t5\t6\n')
-        
+    
         with self.assertRaises(Exception):
             read_delimited_as_dict(
                 path, key='id', header=True, converters=(str,int,int,int))
     
     def test_compress_file_no_dest(self):
         path = self.root.make_file()
-        
+    
         with self.assertRaises(ValueError):
             compress_file(path, compression=True, keep=True)
-
+    
         with open(path, 'wt') as o:
             o.write('foo')
         gzfile = compress_file(path, compression='gz', keep=False)
@@ -220,7 +220,7 @@ class UtilsTests(TestCase):
         path = self.root.make_file()
         with open(path, 'wt') as o:
             o.write('foo')
-        
+    
         f = open(path, 'rb')
         try:
             gzfile = compress_file(f, compression='gz')
@@ -231,7 +231,7 @@ class UtilsTests(TestCase):
                 self.assertEqual(i.read(), 'foo')
         finally:
             f.close()
-        
+    
         gzpath = path + '.gz'
         gzfile = gzip.open(gzpath, 'w')
         try:
@@ -261,14 +261,14 @@ class UtilsTests(TestCase):
         gzfile = path + '.gz'
         with gzip.open(gzfile, 'wt') as o:
             o.write('foo')
-        
+    
         path2 = uncompress_file(gzfile, keep=True)
         self.assertEqual(path, path2)
         self.assertTrue(os.path.exists(gzfile))
         self.assertTrue(os.path.exists(path))
         with open(path, 'rt') as i:
             self.assertEqual(i.read(), 'foo')
-        
+    
         with open(gzfile, 'rb') as i:
             path2 = uncompress_file(i, keep=True)
             self.assertEqual(path, path2)
@@ -368,18 +368,18 @@ class UtilsTests(TestCase):
         self.assertTrue(os.path.exists(gzfile))
         with gzip.open(gzfile, 'rt') as i:
             self.assertEqual(i.read(), 'foo')
-
+    
     def test_move_on_close(self):
         path = self.root.make_file()
         dest = self.root.make_file()
         with FileWrapper(path, 'wt') as wrapper:
-            wrapper.register_listener('close', MoveOnClose(dest))
+            wrapper.register_listener('close', MoveOnClose(dest=dest))
             wrapper.write('foo')
         self.assertFalse(os.path.exists(path))
         self.assertTrue(os.path.exists(dest))
         with open(dest, 'rt') as i:
             self.assertEqual(i.read(), 'foo')
-
+    
     def test_remove_on_close(self):
         path = self.root.make_file()
         with FileWrapper(path, 'wt') as wrapper:
@@ -469,7 +469,7 @@ class UtilsTests(TestCase):
         with intercept_stdin(b'foo\nbar\n', is_bytes=True) as i:
             self.assertEqual(
             [b'foo\n',b'bar\n'],
-            list(fileinput(mode=BinMode)))
+            list(fileinput(char_mode=BinMode)))
     
     def test_single_file_output(self):
         file1 = self.root.make_file(suffix='.gz')
@@ -494,24 +494,27 @@ class UtilsTests(TestCase):
     def test_tee_file_output_binary(self):
         file1 = self.root.make_file(suffix='.gz')
         file2 = self.root.make_file()
-        with fileoutput((file1,file2), mode=BinMode,
-                        file_output_type=TeeFileOutput) as o:
+        with fileoutput(
+                (file1,file2), char_mode=BinMode,
+                file_output_type=TeeFileOutput) as o:
             o.writelines((b'foo',b'bar',b'baz'))
         with gzip.open(file1, 'rb') as i:
             self.assertEqual(b'foo\nbar\nbaz\n', i.read())
         with open(file2, 'rb') as i:
             self.assertEqual(b'foo\nbar\nbaz\n', i.read())
-        
-        with fileoutput((file1,file2), mode=TextMode,
-                        file_output_type=TeeFileOutput) as o:
+    
+        with fileoutput(
+                (file1,file2), char_mode=TextMode,
+                file_output_type=TeeFileOutput) as o:
             o.writelines((b'foo',b'bar',b'baz'))
         with gzip.open(file1, 'rt') as i:
             self.assertEqual('foo\nbar\nbaz\n', i.read())
         with open(file2, 'rt') as i:
             self.assertEqual('foo\nbar\nbaz\n', i.read())
-        
-        with fileoutput((file1,file2), mode=BinMode,
-                        file_output_type=TeeFileOutput) as o:
+    
+        with fileoutput(
+                (file1,file2), char_mode=BinMode,
+                file_output_type=TeeFileOutput) as o:
             o.writelines(('foo',b'bar',b'baz'))
         with gzip.open(file1, 'rb') as i:
             self.assertEqual(b'foo\nbar\nbaz\n', i.read())
@@ -540,8 +543,8 @@ class UtilsTests(TestCase):
             self.assertEqual('foo\nbar\nbaz\n', i.read())
         sys.argv = []
         with intercept_stdout(True) as outbuf:
-            with fileoutput(mode=BinMode) as o:
-                o.writelines((b'foo',b'bar',b'baz'))
+            with fileoutput(char_mode=BinMode) as o:
+                o.writelines((b'foo', b'bar', b'baz'))
             self.assertEqual(b'foo\nbar\nbaz\n', outbuf.getvalue())
     
     def test_cycle_file_output(self):
@@ -557,8 +560,9 @@ class UtilsTests(TestCase):
     def test_ncycle_file_output(self):
         file1 = self.root.make_file(suffix='.gz')
         file2 = self.root.make_file()
-        with fileoutput((file1,file2), lines_per_file=2,
-                        file_output_type=NCycleFileOutput) as o:
+        with fileoutput(
+                (file1,file2), lines_per_file=2,
+                file_output_type=NCycleFileOutput) as o:
             o.writelines(('foo','bar','baz','blorf','bing'))
         with gzip.open(file1, 'rt') as i:
             self.assertEqual('foo\nbar\nbing\n', i.read())

@@ -15,7 +15,7 @@ def parse_url(url_string: str) -> Url:
     """Attempts to parse a URL.
     
     Args:
-        s: String to test
+        s: String to test.
     
     Returns:
         A 6-tuple, as described in ``urlparse``, or  None if the URL cannot be
@@ -28,24 +28,25 @@ def parse_url(url_string: str) -> Url:
         return None
     return url
 
-def open_url(url_string: str, byte_range: Range = None, headers: dict = None,
-             **kwargs) -> Any:
+def open_url(
+        url_string: str, byte_range: Range = None, headers: dict = None,
+        **kwargs) -> Any:
     """Open a URL for reading.
     
     Args:
-        url: A valid url string
-        byte_range: Range of bytes to read (start, stop)
-        headers: dict of request headers
-        kwargs: Additional arguments to pass to ``urlopen``
+        url: A valid url string.
+        byte_range: Range of bytes to read (start, stop).
+        headers: dict of request headers.
+        kwargs: Additional arguments to pass to `urlopen`.
     
     Returns:
         A response object, or None if the URL is not valid or cannot be opened.
     
     Notes:
-        The return value of ``urlopen`` is only guaranteed to have
-        certain methods, not to be of any specific type, thus the ``Any``
+        The return value of `urlopen` is only guaranteed to have
+        certain methods, not to be of any specific type, thus the `Any`
         return type. Furthermore, the response may be wrapped in an
-        ``io.BufferedReader`` to ensure that a ``peek`` method is available.
+        `io.BufferedReader` to ensure that a `peek` method is available.
     """
     headers = copy.copy(headers) if headers else {}
     if byte_range:
@@ -65,10 +66,10 @@ def get_url_mime_type(response: Any) -> str:
     from the Content-Type header.
     
     Args:
-        response: A response object returned by ``open_url``
+        response: A response object returned by `open_url`.
     
     Returns:
-        The content type, or None if the response lacks a 'Content-Type' header
+        The content type, or None if the response lacks a 'Content-Type' header.
     """
     if hasattr(response, 'headers') and 'Content-Type' in response.headers:
         return response.headers['Content-Type']
@@ -81,13 +82,14 @@ def get_url_file_name(response: Any, parsed_url: Url = None) -> str:
     from the Content-Disposition header.
     
     Args:
-        response: A response object returned by ``open_url``
-        parsed_url: The result of calling ``parse_url``
+        response: A response object returned by `open_url`.
+        parsed_url: The result of calling `parse_url`.
     
     Returns:
-        The file name, or None if it could not be determined
+        The file name, or None if it could not be determined.
     """
-    if hasattr(response, 'headers') and 'Content-Disposition' in response.headers:
+    if (hasattr(response, 'headers') and
+            'Content-Disposition' in response.headers):
         match = CONTENT_DISPOSITION_RE.search(
             response.headers['Content-Disposition'])
         if match:

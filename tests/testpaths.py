@@ -10,16 +10,27 @@ class TempDirTests(TestCase):
             TempPathDescriptor(path_type='d', contents='foo')
         with self.assertRaises(IOError):
             TempPathDescriptor().absolute_path
-        with TempDir(mode='rwx') as temp:
-            f = temp.make_file(name='foo', mode=None)
+        with TempDir(permissions='rwx') as temp:
+            f = temp.make_file(name='foo', permissions=None)
+            os.remove(f)
+            self.assertIsNone(temp[f].set_permissions('r'))
+        with TempDir(permissions='rwx') as temp:
+            f = temp.make_file(name='foo', permissions=None)
             self.assertTrue('foo' in temp)
             self.assertTrue(temp[f].exists)
             self.assertEqual('foo', temp[f].relative_path)
-            self.assertEqual(os.path.join(temp.absolute_path, 'foo'), temp[f].absolute_path)
-            self.assertEqual('rwx', temp[f].mode)
-            temp[f].set_access('r')
+            self.assertEqual(
+                os.path.join(temp.absolute_path, 'foo'), temp[f].absolute_path)
+            self.assertEqual(PermissionSet('rwx'), temp[f].permissions)
+            self.assertEquals(PermissionSet('r'), temp[f].set_permissions('r'))
             with self.assertRaises(PermissionError):
                 open(f, 'w')
+        with TempDir(permissions='rwx') as temp:
+            desc = TempPathDescriptor(
+                name='foo', path_type='f', parent=temp)
+            self.assertEquals('foo', desc.relative_path)
+            self.assertEquals(
+                os.path.join(temp.absolute_path, 'foo'), desc.absolute_path)
     
     def test_context_manager(self):
         with TempDir() as temp:
@@ -33,7 +44,8 @@ class TempDirTests(TestCase):
         self.assertEqual(foo, os.path.join(temp.absolute_path, 'foo'))
         bar = temp.make_directory(name='bar', parent=foo)
         self.assertEqual(bar, os.path.join(temp.absolute_path, 'foo', 'bar'))
-        self.assertTrue(os.path.exists(os.path.join(temp.absolute_path, 'foo', 'bar')))
+        self.assertTrue(os.path.exists(
+            os.path.join(temp.absolute_path, 'foo', 'bar')))
         temp.close()
         self.assertFalse(os.path.exists(temp.absolute_path))
         # make sure trying to close again doesn't raise error
@@ -44,34 +56,37 @@ class TempDirTests(TestCase):
         foo = temp.make_directory(name='foo')
         bar = temp.make_directory(name='bar', parent=foo)
         f = temp.make_file(name='baz', parent=bar)
-        self.assertEqual(f, os.path.join(temp.absolute_path, 'foo', 'bar', 'baz'))
+        self.assertEqual(
+            f, os.path.join(temp.absolute_path, 'foo', 'bar', 'baz'))
         temp.close()
         self.assertFalse(os.path.exists(f))
     
     def test_mode(self):
         with self.assertRaises(IOError):
-            with TempDir(mode=None) as temp:
+            with TempDir(permissions=None) as temp:
                 temp.mode
         with TempDir('r') as temp:
             # Raises error because the tempdir is read-only
             with self.assertRaises(PermissionError):
                 temp.make_file(name='bar')
         # Should be able to create the tempdir with existing read-only files
-        with TempDir('r', [TempPathDescriptor(name='foo', contents='foo')]) as d:
+        with TempDir(
+                'r', [TempPathDescriptor(name='foo', contents='foo')]) as d:
             self.assertTrue(os.path.exists(d.absolute_path))
-            self.assertTrue(os.path.exists(os.path.join(d.absolute_path, 'foo')))
+            self.assertTrue(os.path.exists(
+                os.path.join(d.absolute_path, 'foo')))
             with open(os.path.join(d.absolute_path, 'foo'), 'rt') as i:
                 self.assertEqual('foo', i.read())
     
     def test_fifo(self):
         with TempDir() as temp:
+            with self.assertRaises(Exception):
+                path = temp.make_fifo(contents='foo')
             path = temp.make_fifo()
             p = subprocess.Popen('echo foo > {}'.format(path), shell=True)
             with open(path, 'rt') as i:
                 self.assertEqual(i.read(), 'foo\n')
             p.communicate()
-            with self.assertRaises(Exception):
-                path = temp.make_fifo(contents='foo')
 
 class PathTests(TestCase):
     def setUp(self):
@@ -80,39 +95,39 @@ class PathTests(TestCase):
     def tearDown(self):
         self.root.close()
         EXECUTABLE_CACHE.cache.clear()
-
-    def test_invalid_access(self):
-        with self.assertRaises(ValueError):
-            get_access('z')
+    
+    def test_get_set_permissions(self):
+        path = self.root.make_file(permissions='rw')
+        self.assertEquals(PermissionSet('rw'), get_permissions(path))
+        set_permissions(path, 'wx')
+        self.assertEquals(PermissionSet('wx'), get_permissions(path))
     
     def test_check_access_std(self):
         check_access(STDOUT, 'r')
         check_access(STDOUT, 'w')
         check_access(STDERR, 'w')
-        check_access(STDOUT, 'a')
-        check_access(STDERR, 'a')
         with self.assertRaises(IOError):
             check_access(STDOUT, 'x')
         with self.assertRaises(IOError):
             check_access(STDERR, 'r')
     
     def test_check_access_file(self):
-        path = self.root.make_file(mode='rwx')
+        path = self.root.make_file(permissions='rwx')
         check_access(path, 'r')
         check_access(path, 'w')
         check_access(path, 'x')
     
-    def test_set_access(self):
+    def test_set_permissions(self):
         path = self.root.make_file()
         with self.assertRaises(ValueError):
-            set_access(path, 'z')
-        set_access(path, 'r')
+            set_permissions(path, 'z')
+        set_permissions(path, 'r')
         with self.assertRaises(IOError):
             check_access(path, 'w')
     
-    def test_no_access(self):
+    def test_no_permissions(self):
         with self.assertRaises(IOError):
-            path = self.root.make_file(mode='r')
+            path = self.root.make_file(permissions='r')
             check_access(path, 'w')
     
     def test_abspath_std(self):
@@ -172,8 +187,8 @@ class PathTests(TestCase):
             resolve_path('foo')
     
     def test_check_readable_file(self):
-        readable = self.root.make_file(mode='r')
-        non_readable = self.root.make_file(mode='w')
+        readable = self.root.make_file(permissions='r')
+        non_readable = self.root.make_file(permissions='w')
         directory = self.root.make_directory()
         check_readable_file(readable)
         with self.assertRaises(IOError):
@@ -185,22 +200,22 @@ class PathTests(TestCase):
         self.assertTrue(safe_check_readable_file(readable))
         self.assertIsNone(safe_check_readable_file(non_readable))
     
-    def test_check_writeable_file(self):
-        writeable = self.root.make_file(mode='w')
-        non_writeable = self.root.make_file(mode='r')
-        check_writeable_file(writeable)
+    def test_check_writable_file(self):
+        writable = self.root.make_file(permissions='w')
+        non_writable = self.root.make_file(permissions='r')
+        check_writable_file(writable)
         with self.assertRaises(IOError):
-            check_writeable_file(non_writeable)
+            check_writable_file(non_writable)
         parent = self.root.make_directory()
-        check_writeable_file(os.path.join(parent, 'foo'))
+        check_writable_file(os.path.join(parent, 'foo'))
         subdir_path = os.path.join(parent, 'bar', 'foo')
-        check_writeable_file(subdir_path)
+        check_writable_file(subdir_path)
         self.assertTrue(os.path.exists(os.path.dirname(subdir_path)))
         with self.assertRaises(IOError):
-            parent = self.root.make_directory(mode='r')
-            check_writeable_file(os.path.join(parent, 'foo'))
-        self.assertTrue(safe_check_writeable_file(writeable))
-        self.assertIsNone(safe_check_writeable_file(non_writeable))
+            parent = self.root.make_directory(permissions='r')
+            check_writable_file(os.path.join(parent, 'foo'))
+        self.assertTrue(safe_check_writable_file(writable))
+        self.assertIsNone(safe_check_writable_file(non_writable))
     
     def test_check_path_std(self):
         check_path(STDOUT, 'f', 'r')
@@ -210,7 +225,7 @@ class PathTests(TestCase):
             check_path(STDOUT, 'd', 'r')
     
     def test_safe_checks(self):
-        path = self.root.make_file(mode='r')
+        path = self.root.make_file(permissions='r')
         self.assertTrue(safe_check_path(path, 'f', 'r'))
         self.assertFalse(safe_check_path(path, 'd', 'r'))
         self.assertFalse(safe_check_path(path, 'f', 'w'))
@@ -239,6 +254,12 @@ class PathTests(TestCase):
         x = find(level1, os.path.join(level1, 'foo.*', 'bar.*'), 'f', recursive=True)
         self.assertEqual(3, len(x))
         self.assertListEqual(sorted(paths), sorted(x))
+        
+        # fifo
+        path = self.root.make_fifo(prefix='baz', parent=level1)
+        x = find(level1, 'baz.*', '|')
+        self.assertEquals(1, len(x))
+        self.assertEquals(path, x[0])
     
     def test_find_with_matches(self):
         level1 = self.root.make_directory()
