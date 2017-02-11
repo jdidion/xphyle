@@ -10,11 +10,10 @@ import stat
 import sys
 import tempfile
 from xphyle.types import (
-    FileMode, ModeArg, ModeAccess, Permission, PermissionSet, PermissionSetArg,
-    PathType, PathTypeArg, PathLike, PathLikeClass, Sequence, Tuple, Union,
-    Iterable, Dict, Regexp, Match, Any, is_iterable)
+    ModeAccess, Permission, PermissionSet, PermissionSetArg, PathType,
+    PathTypeArg, PathLike, PathLikeClass, Sequence, Tuple, Union, Iterable,
+    Dict, Regexp, Match, Any)
 
-"""Dictionary mapping mode characters to access method constants"""
 STDIN = STDOUT = '-'
 """Placeholder for `sys.stdin` or `sys.stdout` (depending on access mode)"""
 STDERR = '_'
@@ -109,8 +108,8 @@ def get_root(path: PathLike = None) -> PathLike:
     return root
 
 def split_path(
-        path: PathLike, keep_seps: bool = True, resolve: bool = True
-        ) -> Tuple[str, ...]:
+        path: PathLike, keep_seps: bool = True,
+        resolve: bool = True) -> Tuple[str, ...]:
     """Splits a path into a (parent_dir, name, *ext) tuple.
     
     Args:
@@ -305,6 +304,7 @@ def find(
     fullmatch = os.sep in pattern.pattern
     
     def get_matching(names, parent):
+        """Get all names that match the pattern."""
         if fullmatch:
             names = (os.path.join(parent, name) for name in names)
         matching = []
@@ -734,12 +734,16 @@ class TempDir(TempPath):
 
 # User-defined path specifications
 
-_path_class = pathlib.WindowsPath if os.name == 'nt' else pathlib.PosixPath
+PATH_CLASS = pathlib.WindowsPath if os.name == 'nt' else pathlib.PosixPath
 
-class PathInst(_path_class):
+class PathInst(PATH_CLASS):
+    """A path-like that has a slot for variable values.
+    """
     __slots__ = ('values')
     
     def joinpath(self, *other: Sequence[PathLike]) -> 'PathInst':
+        """Join two path-like objects, including merging 'values' dicts.
+        """
         new_path = super().joinpath(*other)
         new_values = dict(self.values)
         for oth in other:
@@ -766,9 +770,9 @@ def path_inst(path: PathLike, values: dict = None) -> PathInst:
     Returns:
         A PathInst.
     """
-    p = PathInst(path)
-    p.values = values or {}
-    return p
+    pathinst = PathInst(path)
+    pathinst.values = values or {} # pylint: disable=attribute-defined-outside-init
+    return pathinst
 
 class PathVar(object):
     """Describes part of a path, used in PathSpec.
@@ -843,8 +847,8 @@ class PathVar(object):
             self.name, self.optional, self.default)
 
 def match_to_dict(
-        match: Match, path_vars: Dict[str, PathVar], errors: bool = True
-        ) -> Dict[str, Any]:
+        match: Match, path_vars: Dict[str, PathVar],
+        errors: bool = True) -> Dict[str, Any]:
     """Convert a regular expression Match to a dict of (name, value) for
     all PathVars.
     
@@ -865,12 +869,13 @@ def match_to_dict(
         return dict(
             (name, var(match_groups.get(name, None)))
             for name, var in path_vars.items())
-    except:
+    except ValueError:
         if errors:
             raise
         else:
             return None
 
+# pylint: disable=no-member
 class SpecBase(object):
     """Base class for :class:`DirSpec` and :class:`FileSpec`.
     
@@ -891,12 +896,16 @@ class SpecBase(object):
         
         self.template = template
         
-        def escape(s, chars):
-            for ch in chars:
-                s = s.replace(ch, "\{}".format(ch))
-            return s
+        def escape(strng, chars):
+            """Escape special characters in a string.
+            """
+            for char in chars:
+                strng = strng.replace(char, "\{}".format(char))
+            return strng
         
         def template_to_pattern(template):
+            """Convert a template string to a regular expression.
+            """
             pattern = escape(
                 template,
                 ('\\', '.', '*', '+', '?', '[', ']', '(', ')', '<', '>'))
@@ -965,8 +974,8 @@ class SpecBase(object):
         return match_to_dict(match, self.path_vars, errors)
     
     def find(
-            self, root: PathLike = None, recursive: bool = False
-            ) -> Sequence[PathInst]:
+            self, root: PathLike = None,
+            recursive: bool = False) -> Sequence[PathInst]:
         """Find all paths in `root` matching this spec.
         
         Args:
@@ -993,6 +1002,17 @@ class SpecBase(object):
             self.__class__.__name__,
             ','.join(str(var) for var in self.path_vars.values()),
             self.template, self.pattern)
+    
+    def path_part(self, path) -> str:
+        """Return the part of the absolute path corresponding to the spec type.
+        """
+        raise NotImplementedError()
+    
+    def default_search_root(self) -> PathLike: # pylint: disable=no-self-use
+        """Get the default root directory for searcing.
+        """
+        raise ValueError("'root' must be specified for FileSpec.find()")
+
 
 class DirSpec(SpecBase):
     """Spec for the directory part of a path.
@@ -1006,15 +1026,16 @@ class DirSpec(SpecBase):
     
     def default_search_root(self) -> PathLike:
         try:
-            i1 = self.template.index('{')
+            idx1 = self.template.index('{')
         except:
             return self.template
         try:
-            i2 = self.template.rindex(os.sep, 0, i1)
-            return self.template[0:i2]
-        except:
+            idx2 = self.template.rindex(os.sep, 0, idx1)
+            return self.template[0:idx2]
+        except ValueError:
             return get_root()
-    
+
+
 class FileSpec(SpecBase):
     """Spec for the filename part of a path.
     
@@ -1041,9 +1062,7 @@ class FileSpec(SpecBase):
     
     def path_part(self, path) -> str:
         return os.path.basename(path)
-    
-    def default_search_root(self) -> PathLike:
-        raise ValueError("'root' must be specified for FileSpec.find()")
+
 
 class PathSpec(object):
     """Specifies a path in terms of a template with named components ("path

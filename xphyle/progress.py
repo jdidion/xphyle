@@ -35,8 +35,8 @@ class IterableProgress(object):
         self.default_wrapper = default_wrapper
     
     def update(
-            self, enable: bool = None, wrapper: Callable[..., Iterable] = None
-            ) -> None:
+            self, enable: bool = None,
+            wrapper: Callable[..., Iterable] = None) -> None:
         """Enable the python progress bar and/or set a new wrapper.
         
         Args:
@@ -58,8 +58,8 @@ class IterableProgress(object):
                     "must be specified") from err
     
     def wrap(
-            self, itr: Iterable, desc: str = None, size: int = None
-            ) -> Iterable:
+            self, itr: Iterable, desc: str = None,
+            size: int = None) -> Iterable:
         """Wrap an iterable in a progress bar.
         
         Args:
@@ -116,8 +116,8 @@ class ProcessProgress(object):
         self.default_wrapper = default_wrapper
     
     def update(
-            self, enable: bool = None, wrapper: Union[str, Sequence[str]] = None
-            ) -> None:
+            self, enable: bool = None,
+            wrapper: Union[str, Sequence[str]] = None) -> None:
         """Enable the python system progress bar and/or set the wrapper
         command.
         

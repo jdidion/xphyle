@@ -13,8 +13,8 @@ from xphyle.paths import (
     split_path)
 from xphyle.progress import PROCESS_PROGRESS, iter_file_chunked
 from xphyle.types import (
-    FileMode, ModeAccess, ModeCoding, ModeArg, PathOrFile, FileLike, Union,
-    Callable, Iterable, Tuple)
+    FileMode, ModeCoding, ModeArg, PathOrFile, FileLike, Union, Callable,
+    Iterable, Tuple)
 
 # Number of concurrent threads that can be used
 # by formats that support parallelization
@@ -340,8 +340,8 @@ class CompressionFormat(FileFormat):
         return self.lib.decompress(compressed_bytes, **kwargs)
     
     def decompress_string(
-            self, compressed_bytes: bytes, encoding: str = 'utf-8', **kwargs
-            ) -> str:
+            self, compressed_bytes: bytes, encoding: str = 'utf-8',
+            **kwargs) -> str:
         """Decompress bytes and return as a string.
         
         Args:
@@ -372,8 +372,8 @@ class CompressionFormat(FileFormat):
         raise NotImplementedError()
     
     def open_file(
-            self, path: str, mode: ModeArg, use_system: bool = True, **kwargs
-            ) -> FileLike:
+            self, path: str, mode: ModeArg, use_system: bool = True,
+            **kwargs) -> FileLike:
         """Opens a compressed file for reading or writing.
         
         If ``use_system`` is True and the system provides an accessible
@@ -419,8 +419,8 @@ class CompressionFormat(FileFormat):
         return self.open_file_python(path, mode, **kwargs)
     
     def open_file_python(
-            self, path_or_file: PathOrFile, mode: ModeArg, **kwargs
-            ) -> FileLike:
+            self, path_or_file: PathOrFile, mode: ModeArg,
+            **kwargs) -> FileLike:
         """Open a file using the python library.
         
         Args:

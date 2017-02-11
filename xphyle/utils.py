@@ -148,9 +148,9 @@ def write_bytes(
 
 # key=value files
 
-FromStrFunc = Callable[[str], Any]
-ToStrFunc = Callable[[Any], str]
-RowFunc = Callable[[Sequence[str]], Any]
+FromStrFunc = Callable[[str], Any] # pylint: disable=invalid-name
+ToStrFunc = Callable[[Any], str] # pylint: disable=invalid-name
+RowFunc = Callable[[Sequence[str]], Any] # pylint: disable=invalid-name
 
 def read_dict(
         path_or_file: PathOrFile, sep: str = '=', convert: FromStrFunc = None,
@@ -181,8 +181,8 @@ def read_dict(
 
 def write_dict(
         dictobj: Dict[str, Any], path: PathLike, sep: str = '=',
-        linesep: str = '\n', convert: ToStrFunc = str, **kwargs
-        ) -> int:
+        linesep: str = '\n', convert: ToStrFunc = str,
+        **kwargs) -> int:
     """Write a dict to a file as name=value lines.
     
     Args:
@@ -326,8 +326,8 @@ def read_delimited_as_dict(
 def compress_file(
         source_file: PathOrFile, compressed_file: PathOrFile = None,
         compression: CompressionArg = None, keep: bool = True,
-        compresslevel: int = None, use_system: bool = True, **kwargs
-        ) -> PathLike:
+        compresslevel: int = None, use_system: bool = True,
+        **kwargs) -> PathLike:
     """Compress an existing file, either in-place or to a separate file.
     
     Args:
@@ -454,13 +454,13 @@ class RemoveOnClose(FileEventListener):
 # Processes
 
 def exec_process(
-        *args, input: AnyStr = None, timeout: int = None, **kwargs) -> Process:
+        *args, inp: AnyStr = None, timeout: int = None, **kwargs) -> Process:
     """Shortcut to execute a process, wait for it to terminate, and return the
     results.
     
     Args:
         args: Positional arguments to popen.
-        input: String/bytes to write to process input stream.
+        inp: String/bytes to write to process input stream.
         timeout: Time to wait for process to complete.
         kwargs: Keyword arguments to popen.
     
@@ -468,9 +468,9 @@ def exec_process(
         A terminated :class:`Process`. The contents of stdout and stderr are
         recorded in the `stdout` and `stderr` attributes.
     """
-    with popen(*args, **kwargs) as p:
-        p.communicate(input, timeout)
-    return p
+    with popen(*args, **kwargs) as process:
+        process.communicate(inp, timeout)
+    return process
 
 # Replacement for fileinput, plus fileoutput
 
@@ -734,8 +734,8 @@ class FileInput(FileManager, Generic[CharMode]):
             return b'' if self.char_mode == BinMode else ''
 
 def fileinput(
-        files: FilesArg = None, char_mode: CharMode = TextMode
-        ) -> FileInput[CharMode]:
+        files: FilesArg = None,
+        char_mode: CharMode = TextMode) -> FileInput[CharMode]:
     """Convenience method that creates a new ``FileInput``.
     
     Args:

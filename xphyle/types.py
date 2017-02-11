@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Type checking support. Defines commonly used types.
 """
-# pylint: disable=wildcard-import, unused-wildcard-import, import-error, disable=invalid-name
+# pylint: disable=wildcard-import, unused-wildcard-import, import-error, invalid-name
 import collections
 from enum import Enum
 import os
@@ -46,10 +46,14 @@ class ModeAccess(Enum):
     
     @property
     def readable(self):
+        """Whether this is readable mode.
+        """
         return any(char in self.value for char in ('r', '+'))
     
     @property
     def writable(self):
+        """Whether this is writable mode.
+        """
         return any(char in self.value for char in ('w', '+', 'a', 'x'))
 
 ModeAccessArg = Union[str, ModeAccess]
@@ -107,18 +111,26 @@ class FileMode(object):
     
     @property
     def readable(self):
+        """Whether this is readable mode.
+        """
         return self.access.readable
     
     @property
     def writable(self):
+        """Whether this is writable mode.
+        """
         return self.access.writable
     
     @property
     def binary(self):
+        """Whether this is binary mode.
+        """
         return self.coding == ModeCoding.BINARY
     
     @property
     def text(self):
+        """Whether this is text mode.
+        """
         return self.coding == ModeCoding.TEXT
     
     def __contains__(self, value: Union[str, ModeAccess, ModeCoding]) -> bool:
@@ -135,13 +147,15 @@ class FileMode(object):
     def __repr__(self):
         return self.value
 
-_os_aliases = dict(
+OS_ALIASES = dict(
     r=os.R_OK,
     w=os.W_OK,
     x=os.X_OK,
     t=0
 )
-_stat_aliases = dict(
+"""Dictionary mapping mode characters to :module:`os` flags"""
+
+STAT_ALIASES = dict(
     r=stat.S_IREAD,
     w=stat.S_IWRITE,
     x=stat.S_IEXEC,
@@ -150,6 +164,7 @@ _stat_aliases = dict(
     d=stat.S_IFDIR,
     fifo=stat.S_IFIFO
 )
+"""Dictionary mapping mode characters to :module:`stat` flags"""
 
 class Permission(Enum):
     """Enumeration of file permission flags ('r', 'w', 'x', 't'). Note that
@@ -169,13 +184,13 @@ class Permission(Enum):
     def stat_flag(self):
         """Returns the :module:`stat` flag.
         """
-        return _stat_aliases[self.value]
+        return STAT_ALIASES[self.value]
     
     @property
     def os_flag(self):
         """Returns the :module:`os` flag.
         """
-        return _os_aliases[self.value]
+        return OS_ALIASES[self.value]
 
 PermissionArg = Union[str, int, Permission, ModeAccess]
 """Types from which an Permission can be inferred."""
@@ -197,6 +212,11 @@ class PermissionSet(object):
                 self.add(flags)
     
     def add(self, flag: PermissionArg) -> None:
+        """Add a permission.
+        
+        Args:
+            flag: Permission to add.
+        """
         if isinstance(flag, str):
             self.flags.add(Permission(flag))
         elif isinstance(flag, int):
@@ -326,7 +346,7 @@ FileLike = Union[typing.io.IO, FileLikeInterface]
 
 # pragma: no-cover
 if sys.version_info >= (3, 6):
-    PathLikeClass = os.PathLike
+    PathLikeClass = os.PathLike # pylint: disable=no-member
 else:
     import pathlib
     PathLikeClass = pathlib.PurePath

@@ -9,7 +9,7 @@ import io
 import os
 import shlex
 import signal
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, TimeoutExpired
 import sys
 from xphyle.formats import FORMATS, THREADS
 from xphyle.paths import (
@@ -48,11 +48,13 @@ class EventListener(object):
             call_args: Additional keyword arguments, which are merged with
                 :attribute:`create_args`.
         """
-        raise NotImplemented() # pragma: no-cover
+        raise NotImplementedError() # pragma: no-cover
 
-EventListenerType = TypeVar('EventListenerType')
+EventListenerType = TypeVar('EventListenerType') # pylint: disable=invalid-name
 
 class EventManager(Generic[EventListenerType]):
+    """Mixin type for classes that allow registering event listners.
+    """
     def register_listener(
             self, event: EventTypeArg, listener: EventListenerType) -> None:
         """Register an event listener.
@@ -254,7 +256,7 @@ class StdWrapper(FileLikeWrapper[StdEventListener]):
         self.closed = True # pylint: disable=attribute-defined-outside-init
 
 
-PopenStdArg = Union[PathOrFile, int]
+PopenStdArg = Union[PathOrFile, int] # pylint: disable=invalid-name
 
 class ProcessEventListener(EventListener):
     """Base class for listener events that can be registered on a Process.
@@ -395,23 +397,23 @@ class Process(Popen, FileLikeInterface, EventManager[ProcessEventListener]):
         """
         return tuple(self.get_reader(std) for std in ('stdout', 'stderr'))
     
-    def communicate(self, input: AnyStr = None, timeout: int = None):
+    def communicate(self, inp: AnyStr = None, timeout: int = None):
         """Send input to stdin, wait for process to terminate, return
         results.
         
         Args:
-            input: Input to send to stdin.
+            inp: Input to send to stdin.
             timeout: Time to wait for process to finish.
         
         Returns:
             Tuple of (stdout, stderr).
         """
-        if input:
-            self.write(input)
+        if inp:
+            self.write(inp)
         self.close(timeout, True, True)
         return (self.stdout, self.stderr)
     
-    def seekable(self) -> bool:
+    def seekable(self) -> bool: # pylint: disable=no-self-use
         """Implementing file interface; returns False.
         """
         return False
@@ -436,7 +438,7 @@ class Process(Popen, FileLikeInterface, EventManager[ProcessEventListener]):
                 self.get_reader(), desc=str(self)))
         return self._iterator
     
-    def __exit__(self, type, value, traceback) -> None:
+    def __exit__(self, exception_type, exception_value, traceback) -> None: # pylint: disable=arguments-differ
         """On exit from a context manager, calls
         :method:`close(raise_on_error=True, record_output=True)`.
         """
@@ -447,7 +449,7 @@ class Process(Popen, FileLikeInterface, EventManager[ProcessEventListener]):
         if not self.closed:
             try:
                 self.close(1, False, False, True)
-            except: # pragma: no-cover
+            except: # pragma: no-cover; pylint: disable=bare-except
                 pass
         super().__del__()
     
@@ -465,9 +467,9 @@ class Process(Popen, FileLikeInterface, EventManager[ProcessEventListener]):
         
         Args:
             timeout: time in seconds to wait for stream to close; negative
-                value or None waits indefinitely
+                value or None waits indefinitely.
             raise_on_error: Whether to raise an exception if the process returns
-                an error
+                an error.
             record_output: Whether to store contents of stdout and stderr in
                 place of the actual streams after closing them.
             terminate: If True and `timeout` is a positive integer, the process
@@ -497,13 +499,13 @@ class Process(Popen, FileLikeInterface, EventManager[ProcessEventListener]):
                 stdin[1].close()
             try:
                 stdin[0].close()
-            except: # pragma: no-cover
+            except: # pragma: no-cover; pylint: disable=bare-except
                 pass
             self._std['stdin'] = None
         
         try:
             self.wait(timeout)
-        except:
+        except TimeoutExpired:
             if terminate:
                 self.terminate()
             else:
@@ -536,13 +538,22 @@ class Process(Popen, FileLikeInterface, EventManager[ProcessEventListener]):
     
     def check_valid_returncode(self, valid : Container[int] = (
             0, None, signal.SIGPIPE, signal.SIGPIPE + 128)):
+        """Check that the returncodes does not have a value associated with
+        an error state.
+        
+        Raises:
+            IOError if :attribute:`returncode` is associated with an error
+            state.
+        """
         if self.returncode not in valid:
             raise IOError("Process existed with return code {}".format(
                 self.returncode))
 
 # Methods
 
-_default_xopen_context_wrapper = False
+DEFAULTS = dict(
+    xopen_context_wrapper = False
+)
 
 def configure(
         default_xopen_context_wrapper: bool = None,
@@ -570,7 +581,7 @@ def configure(
             executables. These will be searched before the default system path.
     """
     if default_xopen_context_wrapper is not None:
-        _default_xopen_context_wrapper = default_xopen_context_wrapper
+        DEFAULTS.update(xopen_context_wrapper=default_xopen_context_wrapper)
     if progress is not None:
         ITERABLE_PROGRESS.update(progress, progress_wrapper)
     if system_progress is not None:
@@ -581,8 +592,9 @@ def configure(
         EXECUTABLE_CACHE.add_search_path(executable_path)
 
 @contextmanager
-def open_(path_or_file: PathOrFile, mode: ModeArg = 'r', errors: bool = True,
-          wrap_fileobj: bool = True, **kwargs) -> FileLike:
+def open_(
+        path_or_file: PathOrFile, mode: ModeArg = 'r', errors: bool = True,
+        wrap_fileobj: bool = True, **kwargs) -> FileLike:
     """Context manager that frees you from checking if an argument is a path
     or a file object. Calls ``xopen`` to open files.
     
@@ -704,7 +716,7 @@ def xopen(
         elif path.startswith('|'):
             file_type = FileType.PROCESS
     elif (is_str == (file_type is FileType.FILELIKE) or
-            is_std != (file_type is FileType.STDIO)):
+          is_std != (file_type is FileType.STDIO)):
         raise ValueError("file_type = {} does not match path {}".format(
             file_type, path))
     
@@ -729,7 +741,7 @@ def xopen(
         mode = FileMode(mode)
     
     if context_wrapper is None:
-        context_wrapper = _default_xopen_context_wrapper
+        context_wrapper = DEFAULTS['xopen_context_wrapper']
     
     # Return early if opening a process
     if file_type is FileType.PROCESS:
@@ -910,7 +922,7 @@ def guess_file_format(path: str) -> str:
     return fmt
 
 PopenStdParamsArg = Union[
-    PopenStdArg, dict, Tuple[PopenStdArg, Union[ModeArg, dict]]]
+    PopenStdArg, dict, Tuple[PopenStdArg, Union[ModeArg, dict]]] # pylint: disable=invalid-name
 
 def popen(
         args: Union[str, Iterable], stdin: PopenStdParamsArg = None,
