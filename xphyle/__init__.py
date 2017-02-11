@@ -48,11 +48,38 @@ class EventListener(object):
             call_args: Additional keyword arguments, which are merged with
                 :attribute:`create_args`.
         """
-        raise NotImplemented()
+        raise NotImplemented() # pragma: no-cover
 
 EventListenerType = TypeVar('EventListenerType')
 
-class FileLikeWrapper(FileLikeInterface, Generic[EventListenerType]):
+class EventManager(Generic[EventListenerType]):
+    def register_listener(
+            self, event: EventTypeArg, listener: EventListenerType) -> None:
+        """Register an event listener.
+        
+        Args:
+            event: Event name (currently, only 'close' is recognized)
+            listener: A listener object, which must be callable with a
+                single argument -- this file wrapper.
+        """
+        if not hasattr(self, '_listeners'):
+            object.__setattr__(self, '_listeners', defaultdict(lambda: []))
+        if isinstance(event, str):
+            event = EventType(event)
+        self._listeners[event].append(listener)
+    
+    def _fire_listeners(self, event: EventType, **kwargs) -> None:
+        """Fire :class:`FileEventListener`s associated with `event`.
+        
+        Args:
+            event: The event type.
+            kwargs: Additional arguments to pass to the listener.
+        """
+        if hasattr(self, '_listeners') and event in self._listeners:
+            for listener in self._listeners[event]:
+                listener(self, **kwargs)
+
+class FileLikeWrapper(FileLikeInterface, EventManager[EventListenerType]):
     """Base class for wrappers around file-like objects. By default, method
     calls are forwarded to the file object. Adds the following:
     
@@ -67,7 +94,6 @@ class FileLikeWrapper(FileLikeInterface, Generic[EventListenerType]):
     def __init__(self, fileobj: FileLike, compression: bool = False):
         object.__setattr__(self, '_fileobj', fileobj)
         object.__setattr__(self, 'compression', compression)
-        object.__setattr__(self, '_listeners', defaultdict(lambda: []))
     
     def __getattr__(self, name: str) -> Any:
         return getattr(self._fileobj, name)
@@ -127,8 +153,9 @@ class FileLikeWrapper(FileLikeInterface, Generic[EventListenerType]):
                 peek = self._fileobj.read(size)
             finally:
                 self._fileobj.seek(curpos)
-        else: # pragma: no-cover
-            # I don't think it's possible to get here, but leaving for now
+        else:
+            # TODO I don't think it's possible to get here, but leaving for now
+            # pragma: no-cover
             raise IOError("Unpeekable file: {}".format(self.name))
         return peek
     
@@ -144,31 +171,6 @@ class FileLikeWrapper(FileLikeInterface, Generic[EventListenerType]):
     def _close(self) -> None:
         self._fileobj.close()
 
-    def register_listener(
-            self, event: EventTypeArg, listener: EventListenerType) -> None:
-        """Register an event listener.
-        
-        Args:
-            event: Event name (currently, only 'close' is recognized)
-            listener: A listener object, which must be callable with a
-                single argument -- this file wrapper.
-        """
-        if isinstance(event, str):
-            event = EventType(event)
-        self._listeners[event].append(listener)
-    
-    def _fire_listeners(self, event: EventTypeArg, **kwargs) -> None:
-        """Fire :class:`FileEventListener`s associated with `event`.
-        
-        Args:
-            event: The event type.
-            kwargs: Additional arguments to pass to the listener.
-        """
-        if isinstance(event, str):
-            event = EventType(event)
-        if event in self._listeners:
-            for listener in self._listeners[event]:
-                listener(self, **kwargs)
 
 class FileEventListener(EventListener):
     """Base class for listener events that can be registered on a FileWrapper.
@@ -187,6 +189,7 @@ class FileEventListener(EventListener):
             kwargs: Additional arguments.
         """
         raise NotImplementedError()
+
 
 class FileWrapper(FileLikeWrapper[FileEventListener]):
     """Wrapper around a file object.
@@ -214,8 +217,9 @@ class FileWrapper(FileLikeWrapper[FileEventListener]):
         if name:
             object.__setattr__(self, 'name', name)
 
+
 class StdEventListener(EventListener):
-    """Base class for listener events that can be registered on a FileWrapper.
+    """Base class for listener events that can be registered on a StdWrapper.
     """
     def __call__(self, std_wrapper: 'StdWrapper', **call_args) -> None:
         kwargs = dict(self.create_args)
@@ -231,6 +235,7 @@ class StdEventListener(EventListener):
             kwargs: Additional arguments.
         """
         raise NotImplementedError()
+
 
 class StdWrapper(FileLikeWrapper[StdEventListener]):
     """Wrapper around stdin/stdout/stderr.
@@ -248,9 +253,29 @@ class StdWrapper(FileLikeWrapper[StdEventListener]):
         self._fileobj.flush()
         self.closed = True # pylint: disable=attribute-defined-outside-init
 
+
 PopenStdArg = Union[PathOrFile, int]
 
-class Process(Popen):
+class ProcessEventListener(EventListener):
+    """Base class for listener events that can be registered on a Process.
+    """
+    def __call__(self, process: 'Process', **call_args) -> None:
+        kwargs = dict(self.create_args)
+        if call_args:
+            kwargs.update(call_args)
+        self.execute(process, **kwargs)
+    
+    def execute(self, process: 'Process', **kwargs) -> None:
+        """Handle an event. This method must be implemented by subclasses.
+        
+        Args:
+            process: The process.
+            kwargs: Additional arguments.
+        """
+        raise NotImplementedError()
+
+
+class Process(Popen, FileLikeInterface, EventManager[ProcessEventListener]):
     """Subclass of :class:`subprocess.Popen` with the following additions:
     
     * Provides :method:`Process.wrap_pipes` for wrapping stdin/stdout/stderr
@@ -262,11 +287,11 @@ class Process(Popen):
     
     Args:
         args: Positional arguments, passed to :class:`subprocess.Popen`
-            constructor
+            constructor.
         stdin, stdout, stderr: Identical to the same arguments to
-            :class:`subprocess.Popen`
+            :class:`subprocess.Popen`.
         kwargs: Keyword arguments, passed to :class:`subprocess.Popen`
-            constructor
+            constructor.
     """
     def __init__(
             self, *args, stdin: PopenStdArg = None, stdout: PopenStdArg = None,
@@ -277,7 +302,7 @@ class Process(Popen):
         self._std = dict(
             (name, [stream, None, desc == PIPE])
             for name, desc, stream in zip(
-                ('stdin', 'stdout', 'stderr')
+                ('stdin', 'stdout', 'stderr'),
                 (stdin, stdout, stderr),
                 (self.stdin, self.stdout, self.stderr)))
         self._iterator = None
@@ -289,13 +314,14 @@ class Process(Popen):
             kwargs: for each of 'stdin', 'stdout', 'stderr', a dict providing
                 arguments to xopen describing how the stream should be wrapped.
         """
-        for name, args in kwargs:
+        for name, args in kwargs.items():
             if name not in self._std:
                 raise ValueError("Invalid stream name: {}".format(name))
             std = self._std[name]
             if not std[2]:
                 raise IOError("Only PIPE streams can be wrapped")
-            std[1] = xopen(std[0], **kwargs)
+            args['validate'] = False
+            std[1] = xopen(std[0], **args)
     
     def is_wrapped(self, name: str) -> bool:
         """Returns True if the stream corresponding to `name` is wrapped.
@@ -305,7 +331,7 @@ class Process(Popen):
         """
         if name not in self._std:
             raise ValueError("Invalid stream name: {}".format(name))
-        return self._std[1] is not None
+        return self._std[name][1] is not None
     
     def writable(self) -> bool:
         """Returns True if this Popen has stdin, otherwise False.
@@ -356,25 +382,34 @@ class Process(Popen):
                 stdout is used if it exists, otherwise stderr.
         
         Returns:
-            The specified stream
-        
-        Raises:
-            IOError if the specified stream doesn't exist.
+            The specified stream, or None if the stream doesn't exist.
         """
         if which in ('stdout', None):
-            std = self._std[1]
-            reader = std[1] or std[0]
-            if reader:
-                return reader
-            elif which == 'stdout':
-                raise IOError("This Popen has no stdout")
+            std = self._std['stdout']
+        else:
+            std = self._std['stderr']
+        return std[1] or std[0]
+    
+    def get_readers(self):
+        """Returns (stdout, stderr) tuple.
+        """
+        return tuple(self.get_reader(std) for std in ('stdout', 'stderr'))
+    
+    def communicate(self, input: AnyStr = None, timeout: int = None):
+        """Send input to stdin, wait for process to terminate, return
+        results.
         
-        std = self._std[2]
-        reader = std[1] or std[0]
-        if reader:
-            return reader
-        elif which == 'stderr':
-            raise IOError("This Popen has no stderr")
+        Args:
+            input: Input to send to stdin.
+            timeout: Time to wait for process to finish.
+        
+        Returns:
+            Tuple of (stdout, stderr).
+        """
+        if input:
+            self.write(input)
+        self.close(timeout, True, True)
+        return (self.stdout, self.stderr)
     
     def seekable(self) -> bool:
         """Implementing file interface; returns False.
@@ -385,7 +420,7 @@ class Process(Popen):
         """Flushes stdin if there is one.
         """
         if self.writable():
-            self._writer().flush()
+            self.get_writer().flush()
     
     def __next__(self) -> AnyStr:
         """Returns the next line from the iterator.
@@ -398,24 +433,33 @@ class Process(Popen):
         """
         if not self._iterator:
             self._iterator = iter(ITERABLE_PROGRESS.wrap(
-                self._reader(), desc=str(self)))
+                self.get_reader(), desc=str(self)))
         return self._iterator
     
     def __exit__(self, type, value, traceback) -> None:
         """On exit from a context manager, calls
         :method:`close(raise_on_error=True, record_output=True)`.
         """
-        self.close(raise_on_error=True, record_output=True)
+        if not self.closed:
+            self.close(raise_on_error=True, record_output=True)
     
     def __del__(self) -> None:
-        try:
-            self.close(1, False, False, True)
-        except:
-            pass
+        if not self.closed:
+            try:
+                self.close(1, False, False, True)
+            except: # pragma: no-cover
+                pass
         super().__del__()
     
-    def close(self, timeout: int = None, raise_on_error: bool = False,
-              record_output: bool = False, terminate: bool = False) -> int:
+    @property
+    def closed(self):
+        """Whether the Process has been closed.
+        """
+        return self._std is None
+    
+    def close(
+            self, timeout: int = None, raise_on_error: bool = False,
+            record_output: bool = False, terminate: bool = False) -> int:
         """Close stdin/stdout/stderr streams, wait for process to finish, and
         return the process return code.
         
@@ -441,13 +485,19 @@ class Process(Popen):
             IOError if `raise_on_error` is True and the process returns an
                 error code.
         """
-        stdin = self._std[0]
+        if self.closed:
+            if raise_on_error:
+                raise IOError("Process already closed")
+            else:
+                return None
+        
+        stdin = self._std['stdin']
         if stdin and stdin[0]:
             if stdin[1]:
                 stdin[1].close()
             try:
                 stdin[0].close()
-            except:
+            except: # pragma: no-cover
                 pass
             self._std['stdin'] = None
         
@@ -458,9 +508,6 @@ class Process(Popen):
                 self.terminate()
             else:
                 raise
-        
-        if raise_on_error:
-            self.check_valid_returncode()
         
         def _close_reader(name):
             std = self._std[name]
@@ -477,11 +524,18 @@ class Process(Popen):
         
         self.stdout = _close_reader('stdout')
         self.stderr = _close_reader('stderr')
+        self._iterator = None
+        self._std = None
+        
+        if raise_on_error:
+            self.check_valid_returncode()
+        
+        self._fire_listeners(EventType.CLOSE, returncode=self.returncode)
         
         return self.returncode
     
     def check_valid_returncode(self, valid : Container[int] = (
-                               0, None, signal.SIGPIPE, signal.SIGPIPE + 128)):
+            0, None, signal.SIGPIPE, signal.SIGPIPE + 128)):
         if self.returncode not in valid:
             raise IOError("Process existed with return code {}".format(
                 self.returncode))
@@ -661,19 +715,18 @@ def xopen(
         elif not url_parts:
             raise ValueError("{} is not a valid URL".format(path))
     
-    if mode:
-        if isinstance(mode, str):
-            # pylint: disable=redefined-variable-type
-            if ('U' in mode
-                    and 'newline' in kwargs and
-                    kwargs['newline'] is not None):
-                raise ValueError(
-                    "newline={} not compatible with universal newlines ('U') "
-                    "mode".format(kwargs['newline']))
-            mode = FileMode(mode)
-    else:
+    if not mode:
         # set to default
         mode = FileMode()
+    elif isinstance(mode, str):
+        # pylint: disable=redefined-variable-type
+        if ('U' in mode
+                and 'newline' in kwargs and
+                kwargs['newline'] is not None):
+            raise ValueError(
+                "newline={} not compatible with universal newlines ('U') "
+                "mode".format(kwargs['newline']))
+        mode = FileMode(mode)
     
     if context_wrapper is None:
         context_wrapper = _default_xopen_context_wrapper
@@ -685,8 +738,17 @@ def xopen(
         popen_args = dict(kwargs)
         for std in ('stdin', 'stdout', 'stderr'):
             popen_args[std] = PIPE
-        target = 'stdin' if mode.readable else 'stdout'
-        popen_args['{}_args'.format(target)] = dict(
+        if mode.writable:
+            if compression is True:
+                raise ValueError(
+                    "Can determine compression automatically when writing to "
+                    "process stdin")
+            elif compression is None:
+                compression = False
+            target = 'stdin'
+        else:
+            target = 'stdout'
+        popen_args[target] = dict(
             mode=mode, compression=compression, validate=validate,
             context_wrapper=context_wrapper)
         return popen(path, **popen_args)
@@ -714,6 +776,9 @@ def xopen(
                 access='r' if fileobj.readable else 'w',
                 coding='t' if hasattr(fileobj, 'encoding') else 'b')
         else:
+            # TODO I don't think we can actually get here, but leaving
+            # for now.
+            # pragma: no-cover
             raise ValueError("Cannot determine file mode")
         
         # make sure modes are compatible
@@ -735,7 +800,7 @@ def xopen(
                 if not hasattr(fileobj, 'peek'):
                     fileobj = io.BufferedReader(fileobj)
                 guess = FORMATS.guess_format_from_buffer(fileobj)
-            elif hasattr(fileobj, 'name'):
+            elif hasattr(fileobj, 'name') and isinstance(fileobj.name, str):
                 guess = FORMATS.guess_compression_format(fileobj.name)
             else:
                 raise ValueError(
@@ -844,23 +909,26 @@ def guess_file_format(path: str) -> str:
         fmt = FORMATS.guess_format_from_file_header(path)
     return fmt
 
-PopenStdParamsArg = Union[PopenStdArg, Tuple[PopenStdArg, dict]]
+PopenStdParamsArg = Union[
+    PopenStdArg, dict, Tuple[PopenStdArg, Union[ModeArg, dict]]]
 
-def popen(args: Union[str, Iterable], stdin: PopenStdParamsArg = None,
-          stdout: PopenStdParamsArg = None, stderr: PopenStdParamsArg = None,
-          shell: bool = False, **kwargs) -> Process:
+def popen(
+        args: Union[str, Iterable], stdin: PopenStdParamsArg = None,
+        stdout: PopenStdParamsArg = None, stderr: PopenStdParamsArg = None,
+        shell: bool = False, **kwargs) -> Process:
     """Opens a subprocess, using xopen to open input/output streams.
     
     Args:
-        args: argument string or tuple of arguments
-        stdin, stdout, stderr: file to use as stdin, PIPE to open a pipe, or a
-            tuple of (stdin, dict), where the dict contains parameters to pass
-            to xopen
-        shell: The 'shell' arg from `subprocess.Popen`
-        kwargs: additional arguments to `subprocess.Popen`
+        args: argument string or tuple of arguments.
+        stdin, stdout, stderr: file to use as stdin, PIPE to open a pipe, a
+            dict to pass xopen args for a PIPE, a tuple of (path, mode) or a
+            tuple of (path, dict), where the dict contains parameters to pass
+            to xopen.
+        shell: The 'shell' arg from `subprocess.Popen`.
+        kwargs: additional arguments to `subprocess.Popen`.
     
     Returns:
-        A Process object, which is a subclass of `subprocess.Popen`
+        A Process object, which is a subclass of `subprocess.Popen`.
     """
     is_str = isinstance(args, str)
     if not is_str:
@@ -868,28 +936,40 @@ def popen(args: Union[str, Iterable], stdin: PopenStdParamsArg = None,
     if shell and not is_str:
         args = ' '.join(args)
     elif not shell and is_str:
-        args = shlex.split(' ')
-    
+        args = shlex.split(args)
     std_args = {}
     
     # Open non-PIPE streams
     for name, arg, default_mode in zip(
             ('stdin', 'stdout', 'stderr'),
             (stdin, stdout, stderr),
-            ('rt', 'wt', 'wt')):
-        if not isinstance(arg, tuple):
-            arg = (arg, {})
-        path, args = arg
-        if path == PIPE:
-            args['file_type'] = FileType.FILELIKE
-            std_args[name] = args
-        elif path is not None:
-            if 'mode' not in args:
-                args['mode'] = default_mode
-            path = xopen(path, **args)
+            ('rb', 'wb', 'wb')):
+        if arg is None:
+            kwargs[name] = None
+            continue
+        if isinstance(arg, tuple):
+            path, path_args = arg
+            if not isinstance(path_args, dict):
+                path_args = dict(mdoe=path_args)
+        elif isinstance(arg, dict):
+            path = PIPE
+            path_args = arg
+        else:
+            path = arg
+            path_args = {}
+        if path == PIPE and path_args:
+            path_args['file_type'] = FileType.FILELIKE
+            std_args[name] = path_args
+        elif path not in (PIPE, None):
+            path_args['use_system'] = False
+            path_args['context_wrapper'] = True
+            if 'mode' not in path_args:
+                path_args['mode'] = default_mode
+            path = xopen(path, **path_args)
         kwargs[name] = path
     
     # add defaults for some Popen args
+    kwargs['shell'] = shell
     if 'executable' not in kwargs:
         kwargs['executable'] = os.environ.get('SHELL') if shell else None
     if 'preexec_fn' not in kwargs:
@@ -900,12 +980,31 @@ def popen(args: Union[str, Iterable], stdin: PopenStdParamsArg = None,
     
     # Wrap PIPE streams
     if std_args:
-        process.wrap_std(**std_args)
+        process.wrap_pipes(**std_args)
     
     return process
 
-def _prefunc():
+def _prefunc(): # pragma: no-cover
     """Handle a SIGPIPE error in Popen (happens when calling a command that has
-    pipes.
+    pipes).
     """
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+
+def exec_process(
+        *args, input: AnyStr = None, timeout: int = None, **kwargs) -> Process:
+    """Shortcut to execute a process, wait for it to terminate, and return the
+    results.
+    
+    Args:
+        args: Positional arguments to popen.
+        input: String/bytes to write to process input stream.
+        timeout: Time to wait for process to complete.
+        kwargs: Keyword arguments to popen.
+    
+    Returns:
+        A terminated :class:`Process`. The contents of stdout and stderr are
+        recorded in the `stdout` and `stderr` attributes.
+    """
+    with popen(*args, **kwargs) as p:
+        p.communicate(input, timeout)
+    return p

@@ -132,9 +132,8 @@ class FileMode(object):
                     return False
             return True
     
-    def __str__(self):
+    def __repr__(self):
         return self.value
-
 
 _os_aliases = dict(
     r=os.R_OK,
@@ -259,7 +258,7 @@ class PermissionSet(object):
             access_flag = Permission(access_flag)
         return access_flag in self.flags
     
-    def __str__(self) -> str:
+    def __repr__(self) -> str:
         return ''.join(f.value for f in Permission if f in self.flags)
 
 class FileType(Enum):
@@ -300,10 +299,13 @@ class FileLikeInterface(object):
     #def __iter__(self): pass
     #def truncate(self, size=None): pass
     #def seek(self,offset,whence=0): pass
+    #def seekable(self): pass
     #def tell(self): pass
     #def read(self, size=-1): pass
+    #def readable(self): pass
     #def readline(self, size=-1): pass
     #def readlines(self, sizehint=-1): pass
+    #def writable(self): pass
     #def write(self, string): pass
     #def writelines(self, seq): pass
 
