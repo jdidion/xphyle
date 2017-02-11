@@ -40,6 +40,10 @@ myfile = xopen('infile.gz')
 # e.g. gzip -c afile | python my_program.py
 stdin = xopen(STDIN)
 
+# Easily write to the stdin of a subprocess
+with open_('|cat', 'wt') as process:
+    process.write('foo')
+
 # We have to tell xopen what kind of compression
 # to use when writing to stdout
 stdout = xopen(STDOUT, compression='gz')

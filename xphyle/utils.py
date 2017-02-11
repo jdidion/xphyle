@@ -11,7 +11,7 @@ from itertools import cycle
 import os
 import shutil
 import sys
-from xphyle import open_, xopen, FileEventListener
+from xphyle import open_, xopen, Process, popen, FileEventListener
 from xphyle.formats import FORMATS
 from xphyle.paths import STDIN, STDOUT
 from xphyle.progress import iter_file_chunked
@@ -450,6 +450,27 @@ class RemoveOnClose(FileEventListener):
     """
     def execute(self, path: PathLike):
         os.remove(path)
+
+# Processes
+
+def exec_process(
+        *args, input: AnyStr = None, timeout: int = None, **kwargs) -> Process:
+    """Shortcut to execute a process, wait for it to terminate, and return the
+    results.
+    
+    Args:
+        args: Positional arguments to popen.
+        input: String/bytes to write to process input stream.
+        timeout: Time to wait for process to complete.
+        kwargs: Keyword arguments to popen.
+    
+    Returns:
+        A terminated :class:`Process`. The contents of stdout and stderr are
+        recorded in the `stdout` and `stderr` attributes.
+    """
+    with popen(*args, **kwargs) as p:
+        p.communicate(input, timeout)
+    return p
 
 # Replacement for fileinput, plus fileoutput
 

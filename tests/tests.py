@@ -297,7 +297,6 @@ class XphyleTests(TestCase):
             with gzip.open(inp, 'rt') as o, open(out, 'wt') as i:
                 with Process('cat', stdin=o, stdout=i) as p:
                     p.wrap_pipes(stdin=dict(mode='wt'))
-        exec_process('cat', stdin=inp, stdout=out)
         with gzip.open(out, 'rt') as i:
             self.assertEquals('foo', i.read())
         with popen(('echo', 'abc\n123'), stdout=PIPE) as p:

@@ -989,22 +989,3 @@ def _prefunc(): # pragma: no-cover
     pipes).
     """
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
-
-def exec_process(
-        *args, input: AnyStr = None, timeout: int = None, **kwargs) -> Process:
-    """Shortcut to execute a process, wait for it to terminate, and return the
-    results.
-    
-    Args:
-        args: Positional arguments to popen.
-        input: String/bytes to write to process input stream.
-        timeout: Time to wait for process to complete.
-        kwargs: Keyword arguments to popen.
-    
-    Returns:
-        A terminated :class:`Process`. The contents of stdout and stderr are
-        recorded in the `stdout` and `stderr` attributes.
-    """
-    with popen(*args, **kwargs) as p:
-        p.communicate(input, timeout)
-    return p

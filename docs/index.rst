@@ -94,7 +94,7 @@ If you want to be explicit about whether to expect a compressed file, what type 
     # Do not try to use the system-level gzip program for decompression
     f = xopen('input.gz', 'rt', compression='gzip', use_system=False)
 
-By default, ``xopen`` wraps the returned file. This wrapper behaves just like a file, but also adds a few additional features:
+By default, ``xopen`` returns the file. If desired, ``xopen`` can also wrap the file such that it behaves just like a file with a few additional features:
 
 * A file iterator is wrapped in a progress bar (if they have been enabled via the ``configure`` method described above).
 * A simple event system that enables callbacks to be registered for various events. Currently, the only supported event is closing the file. The ``xphyle.utils`` package provides a few useful event listeners, e.g. to compress, move, or delete the file when it is closed.
@@ -106,7 +106,11 @@ By default, ``xopen`` wraps the returned file. This wrapper behaves just like a 
             for line in infile:
                 print(line)
 
-The wrapping behavior can be disabled by passing ``context_wrapper=False`` to ``xopen``.
+The wrapping behavior can be enabled by passing ``context_wrapper=True`` to ``xopen``. You can configure ``xopen`` to wrap files by default::
+    
+    xphyle.configure(default_xopen_context_wrapper=True)
+
+Note that this represents a change from xphyle 1.x, in which wrapping occurred by default.
 
 Another common pattern is to write functions that accept either a path or an open file object. Rather than having to test whether the user passed a path or a file and handle each differently, you can use the ``open_`` convenience method::
     
@@ -116,6 +120,50 @@ Another common pattern is to write functions that accept either a path or an ope
         with open_(path_or_file) as infile:
             for line in infile:
                 print(line)
+
+Note that ``open_`` wraps files by default, including already open file-like objects. To disable this, set ``wrap_fileobj=False``.
+
+Processess
+~~~~~~~~~~
+
+As of xphyle 2.0.0, you can easily open subprocesses using the ``xphyle.popen`` method. This method is similar to python ``subprocess.Popen``, except that it uses ``xopen`` to open files passed to stdin, stdout, and stderr, and/or to wrap subprocess PIPEs. ``xphyle.popen`` returns an ``xphyle.Process`` object, which is a subclass of ``subprocess.Popen`` but adds additional functionality, essentially making a Process behave like a regular file. Writing to a process writes to its stdin PIPE, and reading from a process reads from its stdout or stderr PIPE.
+
+::
+    from xphyle import popen, PIPE
+    proc = popen('cat', stdin=PIPE, stdout='myfile.gz')
+    try:
+        proc.write('foo')
+    finally:
+        proc.close()
+        
+    # equivalent to:
+    with popen('cat', stdin=PIPE, stdout='myfile.gz'):
+        proc.write('foo')
+    
+    # and also to:
+    popen('cat', stdin=PIPE, stdout='myfile.gz').communicate('foo')
+    
+    # for the common case above, there's also a shortcut method
+    from xphyle.utils import exec_process
+    exec_process('cat', 'foo', stdout='myfile.gz')
+
+In addition, ``open_`` and ``xopen`` can open subprocesses. The primariy difference is that ``popen`` enables customization of stdin, stdout, and stderr, whereas opening a process through ``open_`` or ``xopen`` uses default behavior of opening PIPEs for all of the streams, and wrapping the PIPE indicated by the file mode. For example::
+    
+    # write to the process stdin
+    with open_('|cat', 'wt') as proc:
+        proc.write('foo')
+    
+    # this command wraps stdin with gzip compression
+    with open_('|zcat', 'wt', compression='gzip') as proc:
+        proc.write('foo')
+    
+    # this command wraps stdout with gzip decompression;
+    # furthermore, the compression format is determined
+    # automatically
+    with open_('|gzip -c foobar.txt', 'rt') as proc:
+        text = proc.read()
+
+Note that with ``open_`` and ``xopen``, the system command must be specified as a string starting with '|'.
 
 Supported file formats
 ~~~~~~~~~~~~~~~~~~~~~~

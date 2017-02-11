@@ -301,6 +301,15 @@ class UtilsTests(TestCase):
         with bz2.open(bzfile, 'rt') as i:
             self.assertEqual('foo', i.read())
     
+    def test_exec_process(self):
+        inp = self.root.make_file(suffix='.gz')
+        with gzip.open(inp, 'wt') as o:
+            o.write('foo')
+        out = self.root.make_file(suffix='.gz')
+        exec_process('cat', stdin=inp, stdout=out)
+        with gzip.open(out, 'rt') as o:
+            self.assertEquals('foo', o.read())
+    
     def test_linecount(self):
         self.assertEqual(-1, linecount('foobar', errors=False))
         path = self.root.make_file()
