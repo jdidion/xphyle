@@ -17,9 +17,9 @@ from xphyle.paths import (
     check_readable_file, check_writable_file, safe_check_readable_file)
 from xphyle.progress import ITERABLE_PROGRESS, PROCESS_PROGRESS
 from xphyle.types import (
-    FileType, FileLikeInterface, FileLike, FileMode, ModeArg, CompressionArg,
-    EventType, EventTypeArg, PathOrFile, Callable, Container, Iterable,
-    Iterator, Union, Sequence, Tuple, AnyStr, Any, Generic, TypeVar)
+    FileType, FileLikeInterface, FileLike, FileMode, ModeArg, ModeAccess,
+    CompressionArg, EventType, EventTypeArg, PathOrFile, Callable, Container,
+    Iterable, Iterator, Union, Sequence, Tuple, AnyStr, Any)
 from xphyle.urls import parse_url, open_url, get_url_file_name
 
 # pylint: disable=protected-access
@@ -39,24 +39,37 @@ class EventListener(object):
     def __init__(self, **kwargs):
         self.create_args = kwargs
     
-    def __call__(self, file_wrapper: 'FileLikeWrapper', **call_args) -> None:
+    def __call__(self, wrapper: 'EventManager', **call_args) -> None:
         """Called by :method:`FileLikeWrapper._fire_listeners`.
         
         Args:
-            file_wrapper: The FileLikeWrapper on which this event was
+            wrapper: The :class:`EventManager` on which this event was
                 registered.
             call_args: Additional keyword arguments, which are merged with
                 :attribute:`create_args`.
         """
-        raise NotImplementedError() # pragma: no-cover
+        kwargs = dict(self.create_args)
+        if call_args:
+            kwargs.update(call_args)
+        self.execute(wrapper, **kwargs)
+    
+    def execute(self, wrapper: 'EventManager', **kwargs) -> None:
+        """Handle an event. This method must be implemented by subclasses.
+        
+        Args:
+            wrapper: The :class:`EventManager` on which this event was
+                registered.
+            kwargs: A union of the keyword arguments passed to the constructor
+                and the __call__ method.
+        """
+        raise NotImplementedError()
 
-EventListenerType = TypeVar('EventListenerType') # pylint: disable=invalid-name
 
-class EventManager(Generic[EventListenerType]):
+class EventManager(object):
     """Mixin type for classes that allow registering event listners.
     """
     def register_listener(
-            self, event: EventTypeArg, listener: EventListenerType) -> None:
+            self, event: EventTypeArg, listener: EventListener) -> None:
         """Register an event listener.
         
         Args:
@@ -81,7 +94,8 @@ class EventManager(Generic[EventListenerType]):
             for listener in self._listeners[event]:
                 listener(self, **kwargs)
 
-class FileLikeWrapper(FileLikeInterface, EventManager[EventListenerType]):
+
+class FileLikeWrapper(FileLikeInterface, EventManager):
     """Base class for wrappers around file-like objects. By default, method
     calls are forwarded to the file object. Adds the following:
     
@@ -174,26 +188,7 @@ class FileLikeWrapper(FileLikeInterface, EventManager[EventListenerType]):
         self._fileobj.close()
 
 
-class FileEventListener(EventListener):
-    """Base class for listener events that can be registered on a FileWrapper.
-    """
-    def __call__(self, file_wrapper: 'FileWrapper', **call_args) -> None:
-        kwargs = dict(self.create_args)
-        if call_args:
-            kwargs.update(call_args)
-        self.execute(file_wrapper._path, **kwargs)
-    
-    def execute(self, path: str, **kwargs) -> None:
-        """Handle an event. This method must be implemented by subclasses.
-        
-        Args:
-            path: The path to the file that generated the event.
-            kwargs: Additional arguments.
-        """
-        raise NotImplementedError()
-
-
-class FileWrapper(FileLikeWrapper[FileEventListener]):
+class FileWrapper(FileLikeWrapper):
     """Wrapper around a file object.
     
     Args:
@@ -220,32 +215,42 @@ class FileWrapper(FileLikeWrapper[FileEventListener]):
             object.__setattr__(self, 'name', name)
 
 
-class StdEventListener(EventListener):
-    """Base class for listener events that can be registered on a StdWrapper.
-    """
-    def __call__(self, std_wrapper: 'StdWrapper', **call_args) -> None:
-        kwargs = dict(self.create_args)
-        if call_args:
-            kwargs.update(call_args)
-        self.execute(std_wrapper._fileobj, **kwargs)
+class BufferWrapper(FileWrapper):
+    """Wrapper around a string/bytes buffer.
     
-    def execute(self, stream: FileLike, **kwargs) -> None:
-        """Handle an event. This method must be implemented by subclasses.
-        
-        Args:
-            stream: The std stream.
-            kwargs: Additional arguments.
-        """
-        raise NotImplementedError()
+    Args:
+        fileobj: The fileobj to wrap (the raw or wrapped buffer).
+        buffer: The raw buffer.
+        compression: Compression type.
+    """
+    def __init__(
+            self, fileobj: PathOrFile, buffer: FileLike,
+            compression: CompressionArg = False, name: str = None):
+        super().__init__(fileobj, compression=compression, name=name)
+        object.__setattr__(self, 'buffer', buffer)
+    
+    def getvalue(self) -> AnyStr:
+        if hasattr(self, '_value'):
+            return self._value
+        else:
+            return self.buffer.getvalue()
+    
+    def _close(self):
+        if self.compression:
+            self._fileobj.close()
+            value = self.getvalue()
+        else:
+            value = self.getvalue()
+            self._fileobj.close()
+        object.__setattr__(self, '_value', value)
 
 
-class StdWrapper(FileLikeWrapper[StdEventListener]):
+class StdWrapper(FileLikeWrapper):
     """Wrapper around stdin/stdout/stderr.
     
     Args:
         stream: The stream to wrap.
         compression: Compression type.
-        name: An alternative name to use for the stream.
     """
     def __init__(self, stream: FileLike, compression: CompressionArg = False):
         super().__init__(stream, compression=compression)
@@ -258,26 +263,7 @@ class StdWrapper(FileLikeWrapper[StdEventListener]):
 
 PopenStdArg = Union[PathOrFile, int] # pylint: disable=invalid-name
 
-class ProcessEventListener(EventListener):
-    """Base class for listener events that can be registered on a Process.
-    """
-    def __call__(self, process: 'Process', **call_args) -> None:
-        kwargs = dict(self.create_args)
-        if call_args:
-            kwargs.update(call_args)
-        self.execute(process, **kwargs)
-    
-    def execute(self, process: 'Process', **kwargs) -> None:
-        """Handle an event. This method must be implemented by subclasses.
-        
-        Args:
-            process: The process.
-            kwargs: Additional arguments.
-        """
-        raise NotImplementedError()
-
-
-class Process(Popen, FileLikeInterface, EventManager[ProcessEventListener]):
+class Process(Popen, FileLikeInterface, EventManager):
     """Subclass of :class:`subprocess.Popen` with the following additions:
     
     * Provides :method:`Process.wrap_pipes` for wrapping stdin/stdout/stderr
@@ -549,6 +535,7 @@ class Process(Popen, FileLikeInterface, EventManager[ProcessEventListener]):
             raise IOError("Process existed with return code {}".format(
                 self.returncode))
 
+
 # Methods
 
 DEFAULTS = dict(
@@ -591,15 +578,22 @@ def configure(
     if executable_path:
         EXECUTABLE_CACHE.add_search_path(executable_path)
 
+
+# The following doesn't work due to a known bug
+# https://github.com/python/typing/issues/266
+# OpenArg = Union[PathOrFile, Type[Union[bytes, str]]] # pylint: disable=invalid-name
+
 @contextmanager
 def open_(
-        path_or_file: PathOrFile, mode: ModeArg = 'r', errors: bool = True,
+        path_or_file, mode: ModeArg = None, errors: bool = True,
         wrap_fileobj: bool = True, **kwargs) -> FileLike:
     """Context manager that frees you from checking if an argument is a path
     or a file object. Calls ``xopen`` to open files.
     
     Args:
-        path_or_file: A path or file-like object.
+        path_or_file: A relative or absolute path, a URL, a system command, a
+            file-like object, or :class:`bytes` or :class:`str` to indicate a
+            writeable byte/string buffer.
         mode: The file open mode.
         errors: Whether to raise an error if there is a problem opening the
             file. If False, yields None when there is an error.
@@ -626,13 +620,18 @@ def open_(
         else:
             yield None
     else:
-        if isinstance(path_or_file, str):
-            if not wrap_fileobj:
+        is_fileobj = not (
+            isinstance(path_or_file, str) or
+            path_or_file in (str, bytes))
+        if not wrap_fileobj:
+            if is_fileobj:
+                yield path_or_file
+            else:
                 raise ValueError(
-                    "'wrap_fileobj' must be True if 'path_or_file' is a string")
-            kwargs['context_wrapper'] = True
-        
-        if wrap_fileobj:
+                    "'wrap_fileobj must be True if 'path' is not file-like")
+        else:
+            if not is_fileobj:
+                kwargs['context_wrapper'] = True
             try:
                 with xopen(path_or_file, mode, **kwargs) as fileobj:
                     yield fileobj
@@ -641,11 +640,10 @@ def open_(
                     raise
                 else:
                     yield None
-        else:
-            yield path_or_file
+
 
 def xopen(
-        path: PathOrFile, mode: ModeArg = None,
+        path, mode: ModeArg = None,
         compression: CompressionArg = None, use_system: bool = True,
         context_wrapper: bool = None, file_type: FileType = None,
         validate: bool = True, **kwargs) -> FileLike:
@@ -654,8 +652,9 @@ def xopen(
     subprocessess, and automatically handles compressed files.
     
     Args:
-        path: A relative or absolute path, a URL, a system command, or a
-            file-like object.
+        path: A relative or absolute path, a URL, a system command, a
+            file-like object, or :class:`bytes` or :class:`str` to
+            indicate a writeable byte/string buffer.
         mode: Some combination of the access mode ('r', 'w', 'a', or 'x')
             and the open mode ('b' or 't'). If the later is not given, 't'
             is used by default.
@@ -707,16 +706,21 @@ def xopen(
     is_std = path in (STDIN, STDOUT, STDERR)
     # Whether path is a string or fileobj
     is_str = isinstance(path, str)
+    # Whether path is a class indicating a buffer type
+    is_buffer = path in (str, bytes)
     
     if not file_type:
         if is_std:
             file_type = FileType.STDIO
+        elif is_buffer:
+            file_type = FileType.BUFFER
         elif not is_str:
             file_type = FileType.FILELIKE
         elif path.startswith('|'):
             file_type = FileType.PROCESS
     elif (is_str == (file_type is FileType.FILELIKE) or
-          is_std != (file_type is FileType.STDIO)):
+          is_std != (file_type is FileType.STDIO) or
+          is_buffer != (file_type is FileType.BUFFER)):
         raise ValueError("file_type = {} does not match path {}".format(
             file_type, path))
     
@@ -729,7 +733,12 @@ def xopen(
     
     if not mode:
         # set to default
-        mode = FileMode()
+        if not is_buffer:
+            mode = FileMode()
+        elif path == str:
+            mode = FileMode('wt')
+        else:
+            mode = FileMode('wb')
     elif isinstance(mode, str):
         # pylint: disable=redefined-variable-type
         if ('U' in mode
@@ -765,59 +774,33 @@ def xopen(
             context_wrapper=context_wrapper)
         return popen(path, **popen_args)
     
+    if file_type is FileType.BUFFER:
+        if path == str:
+            path = io.StringIO()
+        elif path == bytes:
+            path = io.BytesIO()
+        if context_wrapper:
+            buffer = path
+        if not mode.readable:
+            if compression is True:
+                raise ValueError(
+                    "Cannot guess compression for a write-only buffer")
+            elif compression is None:
+                compression = False
+            validate = False
+    
     # The file handle we will open
     fileobj = None
     # The name to use for the file
     name = None
+    # Guessed compression type, if compression in (None, True)
+    guess = None
     # Whether to try and guess file format
     guess_format = compression in (None, True)
     # Whether to validate that the actually compression format matches expected
     validate = validate and compression and not guess_format
-    # Guessed compression type, if compression in (None, True)
-    guess = None
     
-    if file_type is FileType.FILELIKE:
-        fileobj = path
-        use_system = False
-        
-        # determine mode of fileobj
-        if hasattr(fileobj, 'mode'):
-            fileobj_mode = FileMode(path.mode)
-        elif hasattr(fileobj, 'readable'):
-            fileobj_mode = FileMode(
-                access='r' if fileobj.readable else 'w',
-                coding='t' if hasattr(fileobj, 'encoding') else 'b')
-        else:
-            # TODO I don't think we can actually get here, but leaving
-            # for now.
-            # pragma: no-cover
-            raise ValueError("Cannot determine file mode")
-        
-        # make sure modes are compatible
-        if not ((mode.readable and fileobj_mode.readable) or
-                (mode.writable and fileobj_mode.writable)):
-            raise ValueError(
-                "mode {} and file mode {} are not compatible".format(
-                    mode, fileobj_mode))
-        
-        # compression/decompression only possible for binary files
-        if fileobj_mode.text:
-            if compression:
-                raise ValueError(
-                    "Cannot compress to/decompress from a text-mode file")
-            else:
-                guess_format = False
-        elif validate or guess_format:
-            if mode.readable:
-                if not hasattr(fileobj, 'peek'):
-                    fileobj = io.BufferedReader(fileobj)
-                guess = FORMATS.guess_format_from_buffer(fileobj)
-            elif hasattr(fileobj, 'name') and isinstance(fileobj.name, str):
-                guess = FORMATS.guess_compression_format(fileobj.name)
-            else:
-                raise ValueError(
-                    "Could not guess compression format from {}".format(path))
-    elif file_type is FileType.STDIO:
+    if file_type is FileType.STDIO:
         use_system = False
         if path == STDERR:
             if not mode.writable:
@@ -833,6 +816,54 @@ def xopen(
             guess = FORMATS.guess_format_from_buffer(fileobj)
         else:
             validate = False
+    elif file_type in (FileType.FILELIKE, FileType.BUFFER):
+        fileobj = path
+        use_system = False
+        
+        # determine mode of fileobj
+        if hasattr(fileobj, 'mode'):
+            fileobj_mode = FileMode(path.mode)
+        elif hasattr(fileobj, 'readable'):
+            access = ModeAccess.READWRITE
+            # if fileobj.readable and fileobj.writable:
+            #     access = ModeAccess.READWRITE
+            # elif fileobj.writable:
+            #     access = ModeAccess.WRITE
+            # else:
+            #     access = ModeAccess.READ
+            fileobj_mode = FileMode(
+                access=access,
+                coding='t' if hasattr(fileobj, 'encoding') else 'b')
+        else:
+            # TODO I don't think we can actually get here, but leaving for now.
+            # pragma: no-cover
+            raise ValueError("Cannot determine file mode")
+        
+        # make sure modes are compatible
+        if not ((mode.readable and fileobj_mode.readable) or
+                (mode.writable and fileobj_mode.writable)):
+            raise ValueError(
+                "mode {} and file mode {} are not compatible".format(
+                    mode, fileobj_mode))
+        
+        # compression/decompression only possible for binary files
+        if fileobj_mode.text:
+            if compression:
+                raise ValueError(
+                    "Cannot compress to/decompress from a text-mode "
+                    "file/buffer")
+            else:
+                guess_format = False
+        elif validate or guess_format:
+            if mode.readable:
+                if not hasattr(fileobj, 'peek'):
+                    fileobj = io.BufferedReader(fileobj)
+                guess = FORMATS.guess_format_from_buffer(fileobj)
+            elif hasattr(fileobj, 'name') and isinstance(fileobj.name, str):
+                guess = FORMATS.guess_compression_format(fileobj.name)
+            else:
+                raise ValueError(
+                    "Could not guess compression format from {}".format(path))
     elif file_type is FileType.URL:
         if not mode.readable:
             raise ValueError("URLs can only be opened in read mode")
@@ -899,6 +930,8 @@ def xopen(
     if context_wrapper:
         if is_std:
             fileobj = StdWrapper(fileobj, compression=compression)
+        elif file_type == FileType.BUFFER:
+            fileobj = BufferWrapper(fileobj, buffer, compression=compression)
         else:
             fileobj = FileWrapper(fileobj, name=name, compression=compression)
     

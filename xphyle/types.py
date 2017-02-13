@@ -296,6 +296,8 @@ class FileType(Enum):
     FILELIKE = 'filelike'
     """An object that implements the methods in
     :class:`xphyle.types.FileLikeInterface`."""
+    BUFFER = 'buffer'
+    """A StringIO or BytesIO."""
 
 class EventType(Enum):
     """Enumeration of event types that can be registered on a

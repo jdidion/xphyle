@@ -123,6 +123,20 @@ Another common pattern is to write functions that accept either a path or an ope
 
 Note that ``open_`` wraps files by default, including already open file-like objects. To disable this, set ``wrap_fileobj=False``.
 
+Supported file formats
+~~~~~~~~~~~~~~~~~~~~~~
+
+Currently, xphyle supports the most commonly used file formats: gzip, bzip2/7zip, and lzma/xz.
+
+Also supported is block-based gzip (bgzip), a format commonly used in bioinformatics. Somewhat confusingly, '.gz' is an acceptable extension for bgzip files, and gzip will decompress bgzip files. Thus, to specifically use bgzip, either use a '.bgz' file exteionsion or specify 'bgzip' as the compression format::
+
+    f = xopen('input.gz', 'rt', compression='bgzip', validate=False)
+
+Additional compression formats may be added in the future. To get the most up-to-date list::
+    
+    from xphyle.formats import FORMATS
+    print(', '.join(FORMATS.list_compression_formats())
+
 Processess
 ~~~~~~~~~~
 
@@ -165,19 +179,20 @@ In addition, ``open_`` and ``xopen`` can open subprocesses. The primariy differe
 
 Note that with ``open_`` and ``xopen``, the system command must be specified as a string starting with '|'.
 
-Supported file formats
-~~~~~~~~~~~~~~~~~~~~~~
+Buffers
+~~~~~~~
 
-Currently, xphyle supports the most commonly used file formats: gzip, bzip2/7zip, and lzma/xz.
+As of xphyle 2.1.0, ``open_`` and ``xopen`` can also open buffer types. A buffer is an instance of ``io.StringIO`` or ``io.BytesIO`` (or similar) -- basically an in memory read/write buffer. Passing open buffer objects worked before (they were treated as file-like), but now there is a special file type -- ``FileType.BUFFER`` -- that will cause them to be handeled  a bit differently. In addition, you can now pass ``str`` or ``bytes`` (the type objects) to automatically create the corresponding buffer type.
 
-Also supported is block-based gzip (bgzip), a format commonly used in bioinformatics. Somewhat confusingly, '.gz' is an acceptable extension for bgzip files, and gzip will decompress bgzip files. Thus, to specifically use bgzip, either use a '.bgz' file exteionsion or specify 'bgzip' as the compression format::
-
-    f = xopen('input.gz', 'rt', compression='bgzip', validate=False)
-
-Additional compression formats may be added in the future. To get the most up-to-date list::
+::
+    with open_(str) as buf:
+        buf.write('foo')
+    string_foo = buf.getvalue()
     
-    from xphyle.formats import FORMATS
-    print(', '.join(FORMATS.list_compression_formats())
+    # with compression, type must be 'bytes'
+    with open_(bytes, compression='gzip') as buf:
+        buf.write('foo')
+    compressed_foo = buf.getvalue()
 
 Reading/writing data
 ~~~~~~~~~~~~~~~~~~~~

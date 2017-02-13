@@ -11,7 +11,7 @@ from itertools import cycle
 import os
 import shutil
 import sys
-from xphyle import open_, xopen, Process, popen, FileEventListener
+from xphyle import open_, xopen, FileWrapper, Process, popen, EventListener
 from xphyle.formats import FORMATS
 from xphyle.paths import STDIN, STDOUT
 from xphyle.progress import iter_file_chunked
@@ -430,26 +430,26 @@ def transcode_file(
         for chunk in iter_file_chunked(src):
             dst.write(chunk)
 
-# FileEventListeners
+# EventListeners
 
-class CompressOnClose(FileEventListener):
+class CompressOnClose(EventListener):
     """Compress a file after it is closed.
     """
     compressed_path = None
-    def execute(self, path: PathLike, *args, **kwargs):
-        self.compressed_path = compress_file(path, *args, **kwargs)
+    def execute(self, file_wrapper: FileWrapper, **kwargs):
+        self.compressed_path = compress_file(file_wrapper._path, **kwargs)
 
-class MoveOnClose(FileEventListener):
+class MoveOnClose(EventListener):
     """Move a file after it is closed.
     """
-    def execute(self, path: PathLike, dest: PathLike): # pylint: disable=arguments-differ
-        shutil.move(path, dest)
+    def execute(self, file_wrapper: FileWrapper, dest: PathLike): # pylint: disable=arguments-differ
+        shutil.move(file_wrapper._path, dest)
 
-class RemoveOnClose(FileEventListener):
+class RemoveOnClose(EventListener):
     """Remove a file after it is closed.
     """
-    def execute(self, path: PathLike):
-        os.remove(path)
+    def execute(self, file_wrapper: FileWrapper):
+        os.remove(file_wrapper._path)
 
 # Processes
 
@@ -546,8 +546,8 @@ class FileManager(object):
         self._paths[key] = path
     
     def add_all(
-            self, files: Union[Iterable[PathOrFile],
-            Dict[Any, PathOrFile]], **kwargs) -> None:
+            self, files: Union[Iterable[PathOrFile], Dict[Any, PathOrFile]],
+            **kwargs) -> None:
         """Add all files from an iterable or dict.
         
         Args:

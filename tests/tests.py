@@ -197,6 +197,33 @@ class XphyleTests(TestCase):
         with gzip.open(path, 'rt') as i:
             self.assertEquals('foo', i.read())
     
+    def test_xopen_buffer(self):
+        buf = BytesIO(b'foo')
+        f = xopen(buf, 'rb')
+        self.assertEquals(b'foo', f.read(3))
+        with self.assertRaises(ValueError):
+            xopen(buf, 'wb')
+        
+        with open_(str) as buf:
+            buf.write('foo')
+        self.assertEquals('foo', buf.getvalue())
+        
+        with open_(bytes) as buf:
+            buf.write(b'foo')
+        self.assertEquals(b'foo', buf.getvalue())
+        
+        # with compression
+        with self.assertRaises(ValueError):
+            with open_(bytes, compression=True) as buf:
+                pass
+        with self.assertRaises(ValueError):
+            with open_(str, compression='gzip') as buf:
+                pass
+        
+        with open_(bytes, mode='wt', compression='gzip') as buf:
+            buf.write('foo')
+        self.assertEquals(b'foo', gzip.decompress(buf.getvalue()))
+    
     @skipIf(no_internet(), "No internet connection")
     def test_xopen_url(self):
         badurl = 'http://google.com/__badurl__'
@@ -208,13 +235,6 @@ class XphyleTests(TestCase):
         with open_(url, 'rt') as i:
             self.assertEqual('gzip', i.compression)
             self.assertEqual('foo\n', i.read())
-    
-    def test_xopen_buffer(self):
-        buf = BytesIO(b'foo')
-        f = xopen(buf, 'rb')
-        self.assertEquals(b'foo', f.read(3))
-        with self.assertRaises(ValueError):
-            xopen(buf, 'wb')
     
     def test_open_process(self):
         with open_('|cat', 'wt') as p:
@@ -239,10 +259,10 @@ class XphyleTests(TestCase):
                 self.assertEqual('foo\n', next(i))
     
     def test_event_listeners(self):
-        class MockStdEventListener(StdEventListener):
-            def execute(self, stream: FileLike, **kwargs):
+        class MockEventListener(EventListener):
+            def execute(self, file_wrapper: FileLikeWrapper, **kwargs):
                 self.executed = True
-        std_listener = MockStdEventListener()
+        std_listener = MockEventListener()
         with intercept_stdin('foo'):
             f = xopen(STDIN, context_wrapper=True)
             try:
@@ -251,10 +271,7 @@ class XphyleTests(TestCase):
                 f.close()
             self.assertTrue(std_listener.executed)
     
-        class MockFileEventListener(FileEventListener):
-            def execute(self, path: str, **kwargs):
-                self.executed = True
-        file_listener = MockFileEventListener()
+        file_listener = MockEventListener()
         path = self.root.make_file()
         f = xopen(path, 'w', context_wrapper=True)
         try:
@@ -325,7 +342,7 @@ class XphyleTests(TestCase):
             self.assertTupleEqual((b'foo\n', b''), p.communicate(b'foo\n'))
     
     def test_process_del(self):
-        class MockProcessListener(ProcessEventListener):
+        class MockProcessListener(EventListener):
             def execute(self, process: Process, **kwargs) -> None:
                 self.executed = True
         listener = MockProcessListener()
