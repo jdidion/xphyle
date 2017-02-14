@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Convenience functions for working with file paths.
 """
+from abc import ABCMeta, abstractmethod
 import errno
 import os
 import pathlib
@@ -876,7 +877,7 @@ def match_to_dict(
             return None
 
 # pylint: disable=no-member
-class SpecBase(object):
+class SpecBase(metaclass=ABCMeta):
     """Base class for :class:`DirSpec` and :class:`FileSpec`.
     
     Args:
@@ -1006,7 +1007,7 @@ class SpecBase(object):
     def path_part(self, path) -> str:
         """Return the part of the absolute path corresponding to the spec type.
         """
-        raise NotImplementedError()
+        pass
     
     def default_search_root(self) -> PathLike: # pylint: disable=no-self-use
         """Get the default root directory for searcing.

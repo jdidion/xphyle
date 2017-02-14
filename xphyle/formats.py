@@ -2,6 +2,7 @@
 """Interfaces to compression file formats.
 Magic numbers from: https://en.wikipedia.org/wiki/List_of_file_signatures
 """
+from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from importlib import import_module
 import io
@@ -236,7 +237,7 @@ class SystemWriter(object):
     def __exit__(self, exception_type, exception_value, traceback):
         self.close()
 
-class CompressionFormat(FileFormat):
+class CompressionFormat(FileFormat, metaclass=ABCMeta):
     """Base class for classes that provide access to system-level and
     python-level implementations of compression formats.
     """
@@ -354,6 +355,7 @@ class CompressionFormat(FileFormat):
         """
         return self.decompress(compressed_bytes, **kwargs).decode(encoding)
     
+    @abstractmethod
     def get_command(
             self, operation: str, src: str = STDIN, stdout: bool = True,
             compresslevel: int = None):
@@ -369,7 +371,7 @@ class CompressionFormat(FileFormat):
         Returns:
             List of command arguments
         """
-        raise NotImplementedError()
+        pass
     
     def open_file(
             self, path: str, mode: ModeArg, use_system: bool = True,

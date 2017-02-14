@@ -4,6 +4,7 @@ managing files. All of these functions are 'safe', meaning that if you pass
 ``errors=False`` and there is a problem opening the file, the error will be
 handled gracefully.
 """
+from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 import copy
 import csv
@@ -810,11 +811,12 @@ class FileOutput(FileManager, Generic[CharMode]):
             sep = self.linesep
         self._writeline(self._encode(line), sep)
     
+    @abstractmethod
     def _writeline(self, line: CharMode, sep: CharMode) -> None:
         """Does the work of writing a line to the output(s). Must be implemented
         by subclasses.
         """
-        raise NotImplementedError()
+        pass
     
     def _encode(self, line: AnyStr) -> CharMode:
         is_binary = isinstance(line, bytes)

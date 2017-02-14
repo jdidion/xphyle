@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """The main xphyle methods -- xopen, popen, and open_.
 """
+from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from contextlib import contextmanager
 import io
@@ -27,7 +28,7 @@ del get_versions
 
 # Classes
 
-class EventListener(object):
+class EventListener(metaclass=ABCMeta):
     """Base class for listener events that can be registered on a
     FileLikeWrapper.
     
@@ -51,6 +52,7 @@ class EventListener(object):
             kwargs.update(call_args)
         self.execute(wrapper, **kwargs)
     
+    @abstractmethod
     def execute(self, wrapper: 'EventManager', **kwargs) -> None:
         """Handle an event. This method must be implemented by subclasses.
         
@@ -60,7 +62,7 @@ class EventListener(object):
             kwargs: A union of the keyword arguments passed to the constructor
                 and the __call__ method.
         """
-        raise NotImplementedError()
+        pass
 
 
 class EventManager(object):
