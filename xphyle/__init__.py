@@ -213,7 +213,10 @@ class FileWrapper(FileLikeWrapper):
         object.__setattr__(self, '_path', path)
         if name:
             object.__setattr__(self, 'name', name)
-
+    
+    @property
+    def path(self):
+        return getattr(self, '_path', None)
 
 class BufferWrapper(FileWrapper):
     """Wrapper around a string/bytes buffer.

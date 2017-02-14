@@ -439,19 +439,19 @@ class CompressOnClose(EventListener):
     """
     compressed_path = None
     def execute(self, file_wrapper: FileWrapper, **kwargs):
-        self.compressed_path = compress_file(file_wrapper._path, **kwargs)
+        self.compressed_path = compress_file(file_wrapper.path, **kwargs)
 
 class MoveOnClose(EventListener):
     """Move a file after it is closed.
     """
     def execute(self, file_wrapper: FileWrapper, dest: PathLike): # pylint: disable=arguments-differ
-        shutil.move(file_wrapper._path, dest)
+        shutil.move(file_wrapper.path, dest)
 
 class RemoveOnClose(EventListener):
     """Remove a file after it is closed.
     """
     def execute(self, file_wrapper: FileWrapper):
-        os.remove(file_wrapper._path)
+        os.remove(file_wrapper.path)
 
 # Processes
 

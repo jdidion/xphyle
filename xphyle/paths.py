@@ -1028,7 +1028,7 @@ class DirSpec(SpecBase):
     def default_search_root(self) -> PathLike:
         try:
             idx1 = self.template.index('{')
-        except:
+        except ValueError:
             return self.template
         try:
             idx2 = self.template.rindex(os.sep, 0, idx1)
