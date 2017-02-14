@@ -4,7 +4,6 @@ from collections import OrderedDict
 import gzip
 import bz2
 import os
-import xphyle
 from xphyle import FileWrapper
 from xphyle.formats import THREADS
 from xphyle.paths import TempDir, EXECUTABLE_CACHE
@@ -446,7 +445,7 @@ class UtilsTests(TestCase):
         f = FileInput()
         self.assertTrue(f._pending)
         f.add(file1)
-        l = list(f)
+        list(f)
         self.assertTrue(f.finished)
         self.assertFalse(f._pending)
         file2 = self.root.make_file(suffix='.gz')
@@ -475,14 +474,13 @@ class UtilsTests(TestCase):
             lines = list(fileinput([STDIN]))
             self.assertEqual(1, len(lines))
             self.assertEqual('foo\n', lines[0])
-        with intercept_stdin(b'foo\nbar\n', is_bytes=True) as i:
+        with intercept_stdin(b'foo\nbar\n', is_bytes=True):
             self.assertEqual(
             [b'foo\n',b'bar\n'],
             list(fileinput(char_mode=BinMode)))
     
     def test_single_file_output(self):
         file1 = self.root.make_file(suffix='.gz')
-        file2 = self.root.make_file()
         with fileoutput(file1) as o:
             o.writelines(('foo','bar','baz'))
         with gzip.open(file1, 'rt') as i:

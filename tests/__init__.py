@@ -1,11 +1,6 @@
 from contextlib import contextmanager
-from io import StringIO, BytesIO, TextIOWrapper
-import os
+from io import BytesIO, TextIOWrapper
 import random
-import stat
-import sys
-import tempfile
-import shutil
 from unittest.mock import patch
 import urllib.request
 

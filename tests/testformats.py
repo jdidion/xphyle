@@ -247,11 +247,11 @@ class FileTests(TestCase):
         self.assertListEqual(lines, ['line1','line2','line3'])
     
     @skipIf(bz_path is None, "'bzip2' not available")
-    def test_system_gzip(self):
+    def test_system_bzip(self):
         self.write_read_file('.bz2', True)
     
     @skipIf(xz_path is None, "'xz' not available")
-    def test_system_gzip(self):
+    def test_system_lzma(self):
         self.write_read_file('.xz', True)
     
     def test_compress_path(self):
@@ -319,7 +319,7 @@ class FileTests(TestCase):
             o.write('foo')
         with self.assertRaises(Exception):
             fmt = get_format('.gz')
-            dest = fmt.uncompress_file(path)
+            fmt.uncompress_file(path)
     
     def test_uncompress_path(self):
         b = (True, False) if gz_path else (False,)

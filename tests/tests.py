@@ -1,7 +1,7 @@
 from unittest import TestCase, skipIf
 from . import *
 import gzip
-from io import StringIO, BytesIO, TextIOWrapper
+from io import BytesIO
 from subprocess import PIPE
 from xphyle import *
 from xphyle.paths import TempDir, STDIN, STDOUT, STDERR, EXECUTABLE_CACHE
@@ -24,9 +24,6 @@ class XphyleTests(TestCase):
         EXECUTABLE_CACHE.cache = {}
 
     def test_configure(self):
-        import xphyle.progress
-        import xphyle.formats
-        import xphyle.paths
         def wrapper(a,b,c):
             pass
         configure(progress=True, progress_wrapper=wrapper,

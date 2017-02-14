@@ -303,7 +303,8 @@ def read_delimited_as_dict(
     
     # pylint: disable=redefined-variable-type
     if isinstance(key, int):
-        keyfn = lambda row: row[key]
+        def keyfn(row):
+            return row[key]
     elif callable(key):
         keyfn = key
     else:

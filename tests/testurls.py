@@ -1,5 +1,4 @@
-from unittest import TestCase, skipIf
-import gzip
+from unittest import TestCase
 import os
 from xphyle.formats import *
 from xphyle.urls import *

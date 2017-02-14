@@ -1,7 +1,7 @@
 from unittest import TestCase
 from . import *
 import xphyle
-from xphyle.paths import TempDir, STDOUT
+from xphyle.paths import TempDir
 from xphyle.progress import ITERABLE_PROGRESS, PROCESS_PROGRESS
 from xphyle.utils import *
 
@@ -32,7 +32,7 @@ class ProgressTests(TestCase):
         with open(path, 'wt') as o:
             for i in range(100):
                 o.write(random_text())
-        gzfile = compress_file(
+        compress_file(
             path, compression='gz', use_system=False)
         self.assertEqual(100, progress.count)
     
