@@ -216,6 +216,8 @@ class FileWrapper(FileLikeWrapper):
     
     @property
     def path(self):
+        """The source path.
+        """
         return getattr(self, '_path', None)
 
 class BufferWrapper(FileWrapper):
@@ -233,6 +235,8 @@ class BufferWrapper(FileWrapper):
         object.__setattr__(self, 'buffer', buffer)
     
     def getvalue(self) -> AnyStr:
+        """Returns the contents of the buffer.
+        """
         if hasattr(self, '_value'):
             return self._value
         else:

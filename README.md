@@ -1,6 +1,7 @@
 ![https://pypi.python.org/pypi/xphyle](https://img.shields.io/pypi/v/xphyle.svg?branch=master)
 ![https://travis-ci.org/jdidion/xphyle](https://travis-ci.org/jdidion/xphyle.svg?branch=master)
 [![Coverage Status](https://coveralls.io/repos/github/jdidion/xphyle/badge.svg?branch=master)](https://coveralls.io/github/jdidion/xphyle?branch=master)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/b2c0baa52b604e39a09ed108ac2f53ee)](https://www.codacy.com/app/jdidion/xphyle?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=jdidion/xphyle&amp;utm_campaign=Badge_Grade)
 [![Documentation Status](https://readthedocs.org/projects/xphyle/badge/?version=latest)](http://xphyle.readthedocs.io/en/latest/?badge=latest)
 
 # xphyle: extraordinarily simple file handling

@@ -1004,6 +1004,7 @@ class SpecBase(metaclass=ABCMeta):
             ','.join(str(var) for var in self.path_vars.values()),
             self.template, self.pattern)
     
+    @abstractmethod
     def path_part(self, path) -> str:
         """Return the part of the absolute path corresponding to the spec type.
         """
