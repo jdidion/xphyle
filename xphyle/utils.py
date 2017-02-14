@@ -754,7 +754,7 @@ def fileinput(
         files = (files,)
     return FileInput(files, char_mode)
 
-class FileOutput(FileManager, Generic[CharMode]):
+class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
     """Base class for file manager that writes to multiple files.
     
     Args:

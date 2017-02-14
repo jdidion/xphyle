@@ -438,7 +438,7 @@ class Process(Popen, FileLikeInterface, EventManager):
         if not self.closed:
             try:
                 self.close(1, False, False, True)
-            except: # pragma: no-cover; pylint: disable=bare-except
+            except IOError: # pragma: no-cover
                 pass
         super().__del__()
     
@@ -488,7 +488,7 @@ class Process(Popen, FileLikeInterface, EventManager):
                 stdin[1].close()
             try:
                 stdin[0].close()
-            except: # pragma: no-cover; pylint: disable=bare-except
+            except IOError: # pragma: no-cover
                 pass
             self._std['stdin'] = None
         
