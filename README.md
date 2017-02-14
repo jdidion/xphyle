@@ -1,6 +1,7 @@
 ![https://pypi.python.org/pypi/xphyle](https://img.shields.io/pypi/v/xphyle.svg?branch=master)
 ![https://travis-ci.org/jdidion/xphyle](https://travis-ci.org/jdidion/xphyle.svg?branch=master)
 [![Coverage Status](https://coveralls.io/repos/github/jdidion/xphyle/badge.svg?branch=master)](https://coveralls.io/github/jdidion/xphyle?branch=master)
+[![Code Climate](https://codeclimate.com/github/jdidion/xphyle/badges/gpa.svg)](https://codeclimate.com/github/jdidion/xphyle)
 [![Documentation Status](https://readthedocs.org/projects/xphyle/badge/?version=latest)](http://xphyle.readthedocs.io/en/latest/?badge=latest)
 
 # xphyle: extraordinarily simple file handling
