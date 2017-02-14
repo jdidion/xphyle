@@ -6,9 +6,9 @@ engines:
       languages:
       - python
   fixme:
-    enabled: true
+    enabled: false
   radon:
-    enabled: true
+    enabled: false
 ratings:
   paths:
   - "**.py"
