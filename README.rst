@@ -1,6 +1,6 @@
 |https://pypi.python.org/pypi/xphyle|
-|https://travis-ci.org/jdidion/xphyle| |Coverage Status| |Documentation
-Status|
+|https://travis-ci.org/jdidion/xphyle| |Coverage Status| |Codacy Badge|
+|Documentation Status|
 
 xphyle: extraordinarily simple file handling
 ============================================
@@ -18,6 +18,9 @@ Installation
 ::
 
     pip install xphyle
+
+If you are using python 3.3 or 3.4, this will install one dependency:
+`backports.typing <https://pypi.python.org/pypi/backports.typing>`__.
 
 Building from source
 ====================
@@ -42,6 +45,10 @@ Example usages:
     # ...or a compressed stream
     # e.g. gzip -c afile | python my_program.py
     stdin = xopen(STDIN)
+
+    # Easily write to the stdin of a subprocess
+    with open_('|cat', 'wt') as process:
+        process.write('foo')
 
     # We have to tell xopen what kind of compression
     # to use when writing to stdout
@@ -84,9 +91,11 @@ Developers
 ==========
 
 We welcome any contributions via pull requests. Style-wise, we try to
-adhere to the Google python style guidelines. We run pylint as part of
-each build and strive to maintain a 10/10 score. However, we disable
-some pylint checks:
+adhere to the Google python style guidelines. We use Google-style
+docstrings, which are formatted by the `Napoleon Sphinx
+Plugin <https://pypi.python.org/pypi/sphinxcontrib-napoleon>`__. We run
+pylint as part of each build and strive to maintain a 10/10 score.
+However, we disable some pylint checks:
 
 -  Function annotations: pylint does not properly handle whitespace
    around function annotations
@@ -101,5 +110,7 @@ some pylint checks:
 .. |https://travis-ci.org/jdidion/xphyle| image:: https://travis-ci.org/jdidion/xphyle.svg?branch=master
 .. |Coverage Status| image:: https://coveralls.io/repos/github/jdidion/xphyle/badge.svg?branch=master
    :target: https://coveralls.io/github/jdidion/xphyle?branch=master
+.. |Codacy Badge| image:: https://api.codacy.com/project/badge/Grade/b2c0baa52b604e39a09ed108ac2f53ee
+   :target: https://www.codacy.com/app/jdidion/xphyle?utm_source=github.com&utm_medium=referral&utm_content=jdidion/xphyle&utm_campaign=Badge_Grade
 .. |Documentation Status| image:: https://readthedocs.org/projects/xphyle/badge/?version=latest
    :target: http://xphyle.readthedocs.io/en/latest/?badge=latest
