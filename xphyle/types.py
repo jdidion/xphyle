@@ -69,6 +69,9 @@ class ModeCoding(Enum):
     BINARY = 'b'
     """Binary mode."""
 
+FILE_MODE_CACHE = {}
+"""Cache of FileMode objects."""
+
 ModeCodingArg = Union[str, ModeCoding]
 
 class FileMode(object):
@@ -81,6 +84,14 @@ class FileMode(object):
         access: The file access mode (default: :attribute:`ModeAccess.READ`).
         coding: The file open mode (default: :attribute:`ModeCoding.TEXT`).
     """
+    def __new__(
+            cls, mode: str = None, access: ModeAccessArg = None,
+            coding: ModeCodingArg = None) -> 'FileMode':
+        key = (mode, access, coding)
+        if not key in FILE_MODE_CACHE:
+            FILE_MODE_CACHE[key] = super().__new__(cls)
+        return FILE_MODE_CACHE[key]
+    
     def __init__(
             self, mode: str = None, access: ModeAccessArg = None,
             coding: ModeCodingArg = None):
@@ -144,6 +155,11 @@ class FileMode(object):
                     return False
             return True
     
+    def __eq__(self, other):
+        return (isinstance(other, FileMode) and
+            self.access == other.access and
+            self.coding == other.coding)
+    
     def __repr__(self):
         return self.value
 
@@ -192,6 +208,8 @@ class Permission(Enum):
         """
         return OS_ALIASES[self.value]
 
+PERMISSION_SET_CACHE = {}
+
 PermissionArg = Union[str, int, Permission, ModeAccess]
 """Types from which an Permission can be inferred."""
 
@@ -202,6 +220,13 @@ class PermissionSet(object):
         flags: Sequence of flags as string ('r', 'w', 'x'), int,
             :class:`ModeAccess`, or :class:`Permission`.
     """
+    def __new__(
+            cls, flags: Union[PermissionArg, Iterable[PermissionArg]] = None
+            ) -> 'PermissionSet':
+        if not flags in PERMISSION_SET_CACHE:
+            PERMISSION_SET_CACHE[flags] = super().__new__(cls)
+        return PERMISSION_SET_CACHE[flags]
+    
     def __init__(
             self, flags: Union[PermissionArg, Iterable[PermissionArg]] = None):
         self.flags = set()
@@ -300,8 +325,8 @@ class FileType(Enum):
     """A StringIO or BytesIO."""
 
 class EventType(Enum):
-    """Enumeration of event types that can be registered on a
-    :class:`FileLikeWrapper`.
+    """Enumeration of event types that can be registered on an
+    :class:`EventManager`.
     """
     CLOSE = 'close'
 

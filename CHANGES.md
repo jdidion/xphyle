@@ -1,5 +1,16 @@
-v2.1.0 (dev)
+v2.1.2 (dev)
 ------------
+
+* Add caching for FileMode and PermissionSet
+
+v2.1.1 (2017.02.13)
+-------------------
+
+* Minor bug fixes
+* Code cleanup (thanks to Codacy)
+
+v2.1.0 (2017.02.11)
+-------------------
 
 * Added support for opening buffer types.
 

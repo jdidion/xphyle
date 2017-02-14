@@ -43,8 +43,8 @@ class TypeTests(TestCase):
         self.assertEquals(stat.S_IREAD, Permission.READ.stat_flag)
         self.assertEquals(stat.S_IWRITE, Permission.WRITE.stat_flag)
         self.assertEquals(stat.S_IEXEC, Permission.EXECUTE.stat_flag)
-    
-    def test_access_flag_set(self):
+        
+    def test_permission_set(self):
         for a in (
                 PermissionSet('rwx'),
                 PermissionSet(('r','w','x')),
@@ -63,3 +63,20 @@ class TypeTests(TestCase):
         a.add(ModeAccess.READ)
         a.add(ModeAccess.WRITE)
         self.assertEquals('rw', str(a))
+    
+    def test_cache(self):
+        fm1 = FileMode('rt')
+        fm2 = FileMode('rt')
+        fm3 = FileMode('tr')
+        self.assertEquals(fm1, fm2)
+        self.assertEquals(fm1, fm3)
+        self.assertEquals(id(fm1), id(fm2))
+        self.assertNotEquals(id(fm1), id(fm3))
+        
+        perm1 = PermissionSet('rw')
+        perm2 = PermissionSet('rw')
+        perm3 = PermissionSet('wr')
+        self.assertEquals(perm1, perm2)
+        self.assertEquals(perm1, perm3)
+        self.assertEquals(id(perm1), id(perm2))
+        self.assertNotEquals(id(perm1), id(perm3))
