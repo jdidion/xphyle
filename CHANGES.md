@@ -1,7 +1,13 @@
-v2.1.2 (dev)
+v2.2.1 (dev)
 ------------
 
+
+
+v2.2.0 (2017.02.17)
+-------------------
+
 * Add caching for FileMode and PermissionSet
+* Add PatternFileOutput subclass of FileOuptut for generating output files from a pattern and tokens derived from lines in the file.
 
 v2.1.1 (2017.02.13)
 -------------------
