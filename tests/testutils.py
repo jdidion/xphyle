@@ -578,10 +578,24 @@ class UtilsTests(TestCase):
     
     def test_rolling_file_output(self):
         path = self.root.make_file()
-        with RollingFileOutput(path + '{0}.txt', lines_per_file=3) as out:
+        with RollingFileOutput(path + '{index}.txt', lines_per_file=3) as out:
             for i in range(6):
                 out.writeline(str(i))
         with open(path + '0.txt', 'rt') as infile:
             self.assertEqual('0\n1\n2\n', infile.read())
         with open(path + '1.txt', 'rt') as infile:
             self.assertEqual('3\n4\n5\n', infile.read())
+    
+    def test_pattern_file_output(self):
+        path = self.root.make_file()
+        def get_tokens(line):
+            return dict(zip(('a','b'), line.split(' ')))
+        with PatternFileOutput(
+                path + '{a}.{b}.txt', token_func=get_tokens) as out:
+            for a in range(2):
+                for b in range(2):
+                    out.writeline('{} {}'.format(a, b))
+        for a in range(2):
+            for b in range(2):
+                with open(path + '{}.{}.txt'.format(a, b), 'rt') as infile:
+                    self.assertEqual('{} {}\n'.format(a, b), infile.read())

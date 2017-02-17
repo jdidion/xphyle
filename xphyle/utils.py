@@ -241,10 +241,10 @@ def read_delimited(
         
         reader = csv.reader(fileobj, delimiter=sep, **kwargs)
         
-        if header is True:
+        if header:
             header_row = next(reader)
-        if header and yield_header:
-            yield header_row
+            if yield_header:
+                yield header_row
         
         if converters:
             if not is_iterable(converters):
@@ -895,7 +895,64 @@ class NCycleFileOutput(FileOutput[CharMode]):
         self._cur_line_idx += 1
 
 
-class RollingFileOutput(FileOutput[CharMode]):
+class TokenFileOutput(FileOutput[CharMode]):
+    """Generate file names according to a pattern.
+    
+    Args:
+        filename_pattern: The pattern of file names to create. Should have a
+            single token ('{}' or '{0}') that is replaced with the file index.
+        char_mode: The character mode.
+        kwargs: Additional args.
+    """
+    def __init__(
+            self, filename_pattern: str, char_mode: CharMode = TextMode,
+            **kwargs):
+        super().__init__(char_mode=char_mode, **kwargs)
+        self.filename_pattern = filename_pattern
+    
+    def _writeline(self, line: CharMode = None, sep: CharMode = None) -> None:
+        tokens = self._get_outfile_tokens(line)
+        path = self.filename_pattern.format(**tokens)
+        if path not in self:
+            self.add(path)
+        self._write_to_file(self.get(path), line, sep)
+    
+    @abstractmethod
+    def _get_outfile_tokens(self, line: CharMode = None) -> dict:
+        """Get the tokens that determine 1) the file key and 2) the file name.
+        
+        Args:
+            line: The line from the file.
+        
+        Returns:
+            A dict of tokens.
+        """
+        pass # pragma: no-cover
+
+
+class PatternFileOutput(TokenFileOutput[CharMode]):
+    """Use a callable to generate filenames based on data in lines.
+    
+    Args:
+        filename_pattern: The pattern of file names to create. Should have a
+            single token ('{}' or '{0}') that is replaced with the file index.
+        char_mode: The character mode.
+        token_func: Function to extract token(s) from lines in file. By default
+            this is the identity function, which is almost never what you want.
+        kwargs: Additional args.
+    """
+    def __init__(
+            self, filename_pattern: str, char_mode: CharMode = TextMode,
+            token_func: Callable[[AnyStr], Dict[str, Any]] = lambda x: x,
+            **kwargs):
+        super().__init__(filename_pattern, char_mode, **kwargs)
+        self.token_func = token_func
+    
+    def _get_outfile_tokens(self, line: CharMode = None) -> dict:
+        return self.token_func(line)
+
+
+class RollingFileOutput(TokenFileOutput[CharMode]):
     """Write up to ``num_lines`` lines to a file before opening the next file.
     File names are created from a pattern.
     
@@ -904,27 +961,24 @@ class RollingFileOutput(FileOutput[CharMode]):
             single token ('{}' or '{0}') that is replaced with the file index.
         char_mode: The character mode.
         num_lines: The max number of lines to write to each file.
+        kwargs: Additional args.
     """
     def __init__(
             self, filename_pattern: str, char_mode: CharMode = TextMode,
             lines_per_file: int = 1, **kwargs):
-        super().__init__(char_mode=char_mode, **kwargs)
-        self.filename_pattern = filename_pattern
+        super().__init__(filename_pattern, char_mode, **kwargs)
         self.lines_per_file = lines_per_file
         self._cur_line_idx = 0
         self._cur_file_idx = 0
     
-    def _writeline(self, line: CharMode = None, sep: CharMode = None) -> None:
+    def _get_outfile_tokens(self, line: CharMode = None) -> dict:
         if self._cur_line_idx >= self.lines_per_file:
             self._cur_line_idx = 0
             self._cur_file_idx += 1
-        if self._cur_file_idx >= len(self):
-            self._open_next_file()
-        self._write_to_file(self.get(self._cur_file_idx), line, sep)
-        self._cur_line_idx += 1
-    
-    def _open_next_file(self):
-        self.add(self.filename_pattern.format(self._cur_file_idx))
+        try:
+            return { 'index' : self._cur_file_idx }
+        finally:
+            self._cur_line_idx += 1
 
 
 def fileoutput(
