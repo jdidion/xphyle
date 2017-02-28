@@ -795,9 +795,10 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
         if not isinstance(data, (str, bytes)):
             data = str(data)
         if detect_newlines:
-            self.writelines(data.split(self.linesep))
+            result = self.writelines(data.split(self.linesep))
         else:
-            self.writeline(data)
+            result = self.writeline(data)
+        return result[1]
     
     def writelines(self, lines: Iterable[AnyStr]) -> int:
         """Write an iterable of lines to the output(s).
@@ -806,26 +807,34 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
             lines: An iterable of lines to write.
         
         Returns:
-            The number of lines written.
+            The tuple (lines_written, chars_written).
         """
-        i = 0
-        for i, line in enumerate(lines, 1):
-            self.writeline(line)
-        return i
+        counts = zip(*(self.writeline(line) for line in lines))
+        return tuple(sum(count_list) for count_list in counts)
     
     def writeline(self, line: AnyStr = None) -> None:
         """Write a line to the output(s).
         
         Args:
             line: The line to write.
+        
+        Returns:
+            The tuple (lines_written, chars_written).
         """
-        self._writeline(self._encode(line))
+        char_count = self._writeline(self._encode(line))
         self.num_lines += 1
+        return (1, char_count)
     
     @abstractmethod
-    def _writeline(self, line: CharMode) -> None:
+    def _writeline(self, line: CharMode) -> int:
         """Does the work of writing a line to the output(s). Must be implemented
         by subclasses.
+        
+        Args:
+            line: The line to write.
+        
+        Returns:
+            The number of characters written.
         """
         pass
     
@@ -838,9 +847,16 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
         return line
     
     def _write_to_file( # pylint: disable=no-self-use
-            self, fileobj: FileLike, line: CharMode) -> None:
+            self, fileobj: FileLike, line: CharMode) -> int:
         """Writes a line to a file, gracefully handling the (rare? nonexistant?)
         case where the file has a `writelines` but not a `write` method.
+        
+        Args:
+            fileobj: The file in which to write the line.
+            line: The line to write.
+        
+        Returns:
+            The number of bytes/characters written.
         """
         try:
             if line:
@@ -848,14 +864,21 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
             fileobj.write(self.linesep)
         except AttributeError: # pragma: no-cover
             fileobj.writelines((line + self.linesep,))
+        return len(line) + self._linesep_len
 
 
 class TeeFileOutput(FileOutput[CharMode]):
     """Write output to mutliple files simultaneously.
     """
     def _writeline(self, line: CharMode = None) -> None:
+        char_count = None
         for _, fileobj in self.iter_files():
-            self._write_to_file(fileobj, line)
+            file_char_count = self._write_to_file(fileobj, line)
+            if char_count:
+                assert char_count == file_char_count
+            else:
+                char_count = file_char_count
+        return char_count
 
 
 class CycleFileOutput(FileOutput[CharMode]):
@@ -871,7 +894,7 @@ class CycleFileOutput(FileOutput[CharMode]):
         super().__init__(files=files, char_mode=char_mode, **kwargs)
     
     def _writeline(self, line: CharMode = None) -> None:
-        self._write_to_file(self.get(self.num_lines % len(self)), line)
+        return self._write_to_file(self.get(self.num_lines % len(self)), line)
 
 
 class NCycleFileOutput(FileOutput[CharMode]):
@@ -891,7 +914,7 @@ class NCycleFileOutput(FileOutput[CharMode]):
     
     def _writeline(self, line: CharMode = None) -> None:
         file_idx = (self.num_lines // self.lines_per_file) % len(self)
-        self._write_to_file(self.get(file_idx), line)
+        return self._write_to_file(self.get(file_idx), line)
 
 
 class TokenFileOutput(FileOutput[CharMode]):
@@ -914,7 +937,7 @@ class TokenFileOutput(FileOutput[CharMode]):
         path = self.filename_pattern.format(**tokens)
         if path not in self:
             self.add(path)
-        self._write_to_file(self.get(path), line)
+        return self._write_to_file(self.get(path), line)
     
     @abstractmethod
     def _get_outfile_tokens(self, line: CharMode = None) -> dict:
