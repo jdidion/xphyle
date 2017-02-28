@@ -927,7 +927,7 @@ class TokenFileOutput(FileOutput[CharMode]):
         kwargs: Additional args.
     """
     def __init__(
-            self, filename_pattern: str, char_mode: CharMode = TextMode,
+            self, filename_pattern: str = None, char_mode: CharMode = TextMode,
             **kwargs):
         super().__init__(char_mode=char_mode, **kwargs)
         self.filename_pattern = filename_pattern
@@ -964,9 +964,12 @@ class PatternFileOutput(TokenFileOutput[CharMode]):
         kwargs: Additional args.
     """
     def __init__(
-            self, filename_pattern: str, char_mode: CharMode = TextMode,
+            self, filename_pattern: FilesArg = None,
+            char_mode: CharMode = TextMode,
             token_func: Callable[[AnyStr], Dict[str, Any]] = lambda x: x,
             **kwargs):
+        if not isinstance(filename_pattern, str):
+            filename_pattern = filename_pattern[0]
         super().__init__(filename_pattern, char_mode, **kwargs)
         self.token_func = token_func
     
@@ -986,8 +989,11 @@ class RollingFileOutput(TokenFileOutput[CharMode]):
         kwargs: Additional args.
     """
     def __init__(
-            self, filename_pattern: str, char_mode: CharMode = TextMode,
+            self, filename_pattern: FilesArg = None,
+            char_mode: CharMode = TextMode,
             lines_per_file: int = 1, **kwargs):
+        if not isinstance(filename_pattern, str):
+            filename_pattern = filename_pattern[0]
         super().__init__(filename_pattern, char_mode, **kwargs)
         self.lines_per_file = lines_per_file
     
