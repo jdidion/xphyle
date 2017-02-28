@@ -772,6 +772,7 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
             access=access, coding='t' if char_mode == TextMode else 'b'))
         self.access = access
         self.char_mode = char_mode
+        self._empty = b'' if char_mode == BinMode else ''
         self.encoding = encoding
         self.num_lines = 0
         self.linesep = linesep
@@ -779,40 +780,50 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
         if files:
             self.add_all(files)
     
-    def writelines(self, lines: Iterable[AnyStr], newlines: bool = True) -> int:
+    def write(self, data: Any, detect_newlines: bool = True) -> int:
+        """Writes data to the output.
+        
+        Args:
+            data: The data to write; will be converted to string/bytes.
+            detect_newlines: If True, `data` is split on :attr:`linesep` and the
+                resulting lines are written using :method:`writelines`,
+                otherwise data is writen using :method:`writeline`.
+        
+        Returns:
+            The number of characters written.
+        """
+        if not isinstance(data, (str, bytes)):
+            data = str(data)
+        if detect_newlines:
+            self.writelines(data.split(self.linesep))
+        else:
+            self.writeline(data)
+    
+    def writelines(self, lines: Iterable[AnyStr]) -> int:
         """Write an iterable of lines to the output(s).
         
         Args:
             lines: An iterable of lines to write.
-            newlines: Whether to add line separators after each line.
         
         Returns:
             The number of lines written.
         """
         i = 0
         for i, line in enumerate(lines, 1):
-            self.writeline(line, newline=newlines)
+            self.writeline(line)
         return i
     
-    def writeline(self, line: AnyStr = None, newline: bool = True) -> None:
+    def writeline(self, line: AnyStr = None) -> None:
         """Write a line to the output(s).
         
         Args:
             line: The line to write.
-            newline: Whether to also write a line separator. If None (the
-                default), the line will be checked to see if it already has a
-                line separator, and one will be written if it does not.
         """
-        if self.num_lines == 0:
-            self.num_lines += 1
-        sep = None
-        if newline:
-            self.num_lines += 1
-            sep = self.linesep
-        self._writeline(self._encode(line), sep)
+        self._writeline(self._encode(line))
+        self.num_lines += 1
     
     @abstractmethod
-    def _writeline(self, line: CharMode, sep: CharMode) -> None:
+    def _writeline(self, line: CharMode) -> None:
         """Does the work of writing a line to the output(s). Must be implemented
         by subclasses.
         """
@@ -827,27 +838,24 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
         return line
     
     def _write_to_file( # pylint: disable=no-self-use
-            self, fileobj: FileLike, line: CharMode, sep: CharMode) -> None:
+            self, fileobj: FileLike, line: CharMode) -> None:
         """Writes a line to a file, gracefully handling the (rare? nonexistant?)
         case where the file has a `writelines` but not a `write` method.
         """
         try:
             if line:
                 fileobj.write(line)
-            if sep:
-                fileobj.write(sep)
+            fileobj.write(self.linesep)
         except AttributeError: # pragma: no-cover
-            if sep:
-                line += sep
-            fileobj.writelines((line,))
+            fileobj.writelines((line + self.linesep,))
 
 
 class TeeFileOutput(FileOutput[CharMode]):
     """Write output to mutliple files simultaneously.
     """
-    def _writeline(self, line: CharMode = None, sep: CharMode = None) -> None:
+    def _writeline(self, line: CharMode = None) -> None:
         for _, fileobj in self.iter_files():
-            self._write_to_file(fileobj, line, sep)
+            self._write_to_file(fileobj, line)
 
 
 class CycleFileOutput(FileOutput[CharMode]):
@@ -861,11 +869,9 @@ class CycleFileOutput(FileOutput[CharMode]):
             self, files: FilesArg = None, char_mode: CharMode = TextMode,
             **kwargs):
         super().__init__(files=files, char_mode=char_mode, **kwargs)
-        self._cur_file_idx = 0
     
-    def _writeline(self, line: CharMode = None, sep: CharMode = None) -> None:
-        self._write_to_file(self.get(self._cur_file_idx), line, sep)
-        self._cur_file_idx = (self._cur_file_idx + 1) % len(self)
+    def _writeline(self, line: CharMode = None) -> None:
+        self._write_to_file(self.get(self.num_lines % len(self)), line)
 
 
 class NCycleFileOutput(FileOutput[CharMode]):
@@ -882,17 +888,10 @@ class NCycleFileOutput(FileOutput[CharMode]):
             lines_per_file: int = 1, **kwargs):
         super().__init__(files=files, char_mode=char_mode, **kwargs)
         self.lines_per_file = lines_per_file
-        self._cur_line_idx = 0
-        self._cur_file_idx = 0
     
-    def _writeline(self, line: CharMode = None, sep: CharMode = None) -> None:
-        if self._cur_line_idx >= self.lines_per_file:
-            self._cur_line_idx = 0
-            self._cur_file_idx += 1
-        if self._cur_file_idx >= len(self):
-            self._cur_file_idx = 0
-        self._write_to_file(self.get(self._cur_file_idx), line, sep)
-        self._cur_line_idx += 1
+    def _writeline(self, line: CharMode = None) -> None:
+        file_idx = (self.num_lines // self.lines_per_file) % len(self)
+        self._write_to_file(self.get(file_idx), line)
 
 
 class TokenFileOutput(FileOutput[CharMode]):
@@ -910,12 +909,12 @@ class TokenFileOutput(FileOutput[CharMode]):
         super().__init__(char_mode=char_mode, **kwargs)
         self.filename_pattern = filename_pattern
     
-    def _writeline(self, line: CharMode = None, sep: CharMode = None) -> None:
+    def _writeline(self, line: CharMode = None) -> None:
         tokens = self._get_outfile_tokens(line)
         path = self.filename_pattern.format(**tokens)
         if path not in self:
             self.add(path)
-        self._write_to_file(self.get(path), line, sep)
+        self._write_to_file(self.get(path), line)
     
     @abstractmethod
     def _get_outfile_tokens(self, line: CharMode = None) -> dict:
@@ -968,17 +967,9 @@ class RollingFileOutput(TokenFileOutput[CharMode]):
             lines_per_file: int = 1, **kwargs):
         super().__init__(filename_pattern, char_mode, **kwargs)
         self.lines_per_file = lines_per_file
-        self._cur_line_idx = 0
-        self._cur_file_idx = 0
     
     def _get_outfile_tokens(self, line: CharMode = None) -> dict:
-        if self._cur_line_idx >= self.lines_per_file:
-            self._cur_line_idx = 0
-            self._cur_file_idx += 1
-        try:
-            return { 'index' : self._cur_file_idx }
-        finally:
-            self._cur_line_idx += 1
+        return { 'index' : self.num_lines // self.lines_per_file }
 
 
 def fileoutput(
@@ -1012,6 +1003,7 @@ def fileoutput(
     return file_output_type(
         files, char_mode=char_mode, linesep=linesep, encoding=encoding,
         **kwargs)
+
 
 # Misc
 
