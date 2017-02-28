@@ -4,21 +4,18 @@ cache:
   directories:
     - $HOME/.cache/pip
 python:
-  - "3.4"
-  - "3.5"
-  - "3.6"
-
+  - 3.4
+  - 3.5
+  - 3.6
 install:
   - pip install --upgrade pip wheel
   - pip install nose2
   - pip install cov-core
   - pip install coveralls
   - pip install pylint
-  - pip install .
-
+  - make install
 script:
-  - nose2 -C tests --coverage-config .coveragerc --coverage-report term-missing
-
+  - make test
 after_success:
   - coveralls
   - pylint xphyle

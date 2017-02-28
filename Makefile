@@ -1,15 +1,24 @@
-test = tests
-build = python setup.py install && \
-		nose2 -C $(test) --coverage-report term-missing --coverage-config .coveragerc
+tests = tests
+
+BUILD = python setup.py install
+TEST  = nose2 -C $(tests) --coverage-report term-missing --coverage-config .coveragerc
+
+all:
+	$(BUILD)
+	$(TEST)
 
 install:
-	$(call build,)
+	$(BUILD)
+
+test:
+	$(TEST)
 
 release:
 	# tag
 	git tag $(version)
 	# build
-	$(call build,)
+	$(BUILD)
+	$(TEST)
 	python setup.py sdist bdist_wheel
 	# release
 	twine register dist/xphyle-$(version).tar.gz
