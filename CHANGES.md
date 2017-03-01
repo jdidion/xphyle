@@ -1,7 +1,10 @@
 v2.2.1 (dev)
 ------------
 
-
+* Switch to pytest for testing
+* Bugfixes in fileoutput
+* Add ability to specifiy a file header for each file opened by fileoutput
+* Add ability to pass initializing text/bytes to xopen with file_type==BUFFER to create a readable buffer.
 
 v2.2.0 (2017.02.17)
 -------------------

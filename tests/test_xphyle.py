@@ -220,6 +220,19 @@ class XphyleTests(TestCase):
         with open_(bytes, mode='wt', compression='gzip') as buf:
             buf.write('foo')
         self.assertEquals(b'foo', gzip.decompress(buf.getvalue()))
+        
+        # from string/bytes
+        with self.assertRaises(ValueError):
+            xopen('foo', 'wt', file_type=FileType.BUFFER)
+        with self.assertRaises(ValueError):
+            xopen('foo', 'rb', file_type=FileType.BUFFER)
+        with open_('foo', file_type=FileType.BUFFER, context_wrapper=True) as buf:
+            self.assertEquals('foo', buf.read())
+        
+        with self.assertRaises(ValueError):
+            xopen(b'foo', 'rt', file_type=FileType.BUFFER)
+        with open_(b'foo', file_type=FileType.BUFFER, context_wrapper=True) as buf:
+            self.assertEquals(b'foo', buf.read())
     
     @skipIf(no_internet(), "No internet connection")
     def test_xopen_url(self):

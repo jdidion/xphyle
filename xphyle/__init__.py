@@ -17,14 +17,15 @@ from xphyle.paths import (
 from xphyle.progress import ITERABLE_PROGRESS, PROCESS_PROGRESS
 from xphyle.types import (
     FileType, FileLikeInterface, FileLike, FileMode, ModeArg, ModeAccess,
-    CompressionArg, EventType, EventTypeArg, PathOrFile, Callable, Container,
-    Iterable, Iterator, Union, Sequence, Tuple, AnyStr, Any)
+    ModeCoding, CompressionArg, EventType, EventTypeArg, PathOrFile, Callable,
+    Container, Iterable, Iterator, Union, Sequence, Tuple, AnyStr, Any)
 from xphyle.urls import parse_url, open_url, get_url_file_name
 
 # pylint: disable=protected-access
 from xphyle._version import get_versions
 __version__ = get_versions()['version']
 del get_versions
+
 
 # Classes
 
@@ -219,6 +220,7 @@ class FileWrapper(FileLikeWrapper):
         """The source path.
         """
         return getattr(self, '_path', None)
+
 
 class BufferWrapper(FileWrapper):
     """Wrapper around a string/bytes buffer.
@@ -588,11 +590,12 @@ def configure(
 
 # The following doesn't work due to a known bug
 # https://github.com/python/typing/issues/266
-# OpenArg = Union[PathOrFile, Type[Union[bytes, str]]] # pylint: disable=invalid-name
+# OpenArg = Union[PathOrFile, bytes, Type[Union[bytes, str]]] # pylint: disable=invalid-name
 
 @contextmanager
 def open_(
-        path_or_file, mode: ModeArg = None, errors: bool = True,
+        path_or_file, #: OpenArg
+        mode: ModeArg = None, errors: bool = True,
         wrap_fileobj: bool = True, **kwargs) -> FileLike:
     """Context manager that frees you from checking if an argument is a path
     or a file object. Calls ``xopen`` to open files.
@@ -650,7 +653,8 @@ def open_(
 
 
 def xopen(
-        path, mode: ModeArg = None,
+        path, #: OpenArg
+        mode: ModeArg = None,
         compression: CompressionArg = None, use_system: bool = True,
         context_wrapper: bool = None, file_type: FileType = None,
         validate: bool = True, **kwargs) -> FileLike:
@@ -689,6 +693,9 @@ def xopen(
         * If a file-like object, it is used as-is
         * If one of STDIN, STDOUT, STDERR, the appropriate `sys` stream is used
         * If parseable by `xphyle.urls.parse_url()`, it is assumed to be a URL
+        * If file_type == FileType.BUFFER and path is a string or bytes and
+          mode is readable, a new StringIO/BytesIO is created with 'path' passed
+          to its constructor.
         * Otherwise it is assumed to be a local file
     
     If `use_system` is True and the file is compressed, the file is opened with
@@ -725,6 +732,10 @@ def xopen(
             file_type = FileType.FILELIKE
         elif path.startswith('|'):
             file_type = FileType.PROCESS
+    elif file_type == FileType.BUFFER and (is_str or isinstance(path, bytes)):
+        if not mode:
+            mode = FileMode(access='r', coding='t' if is_str else 'b')
+        is_buffer = True
     elif (is_str == (file_type is FileType.FILELIKE) or
           is_std != (file_type is FileType.STDIO) or
           is_buffer != (file_type is FileType.BUFFER)):
@@ -786,6 +797,19 @@ def xopen(
             path = io.StringIO()
         elif path == bytes:
             path = io.BytesIO()
+        elif is_str or isinstance(path, bytes):
+            if not mode.readable:
+                raise ValueError(
+                    "'mode' must be readable when 'file_type' == BUFFER "
+                    "and 'path' is string or bytes.")
+            if is_str:
+                if mode.coding != ModeCoding.TEXT:
+                    raise ValueError("Must use text mode with a string buffer")
+                path = io.StringIO(path)
+            else:
+                if mode.coding != ModeCoding.BINARY:
+                    raise ValueError("Must use binary mode with a bytes buffer")
+                path = io.BytesIO(path)
         if context_wrapper:
             buffer = path
         if not mode.readable:
