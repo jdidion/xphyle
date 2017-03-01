@@ -1,5 +1,5 @@
-v2.2.1 (dev)
-------------
+v2.2.1 (2017.03.01)
+-------------------
 
 * Switch to pytest for testing
 * Bugfixes in fileoutput
