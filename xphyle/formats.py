@@ -682,6 +682,9 @@ class BGzip(GzipBase):
     file specifically has a .bgz (rather than .gz) extension.
     """
     name = 'bgzip'
+    # TODO: This is a bug: bgzip doesn't actually allow bgz extension, but the
+    # way Formats currently works does not support on extension being used with
+    # multiple formats.
     exts = ('bgz',)
     system_commands = ('bgzip',)
     default_compresslevel = None
