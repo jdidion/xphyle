@@ -1,7 +1,7 @@
 tests = tests
 
 BUILD = python setup.py install
-TEST  = nose2 -C $(tests) --coverage-report term-missing --coverage-config .coveragerc
+TEST  = pytest --cov --cov-report term-missing $(tests)
 
 all:
 	$(BUILD)

@@ -23,6 +23,7 @@ setup(
     license='Public Domain',
     packages = ['xphyle'],
     install_requires = requirements,
+    tests_require = ['pytest', 'pytest-cov'],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
