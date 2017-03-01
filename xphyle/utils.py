@@ -483,11 +483,13 @@ class FileManager(object):
     Args:
         files: An iterable of files to add. Each item can either be a string
             path or a (key, fileobj) tuple.
+        header: A header to write when opening writable files.
         kwargs: Default arguments to pass to xopen.
     """
-    def __init__(self, files: FilesArg = None, **kwargs):
+    def __init__(self, files: FilesArg = None, header=None, **kwargs):
         self._files = OrderedDict()
         self._paths = {}
+        self.header = header
         self.default_open_args = kwargs
         if files:
             self.add_all(files)
@@ -588,6 +590,8 @@ class FileManager(object):
             path = self._paths[key]
             fileobj['context_wrapper'] = True
             fileobj = xopen(path, **fileobj)
+            if self.header and fileobj.writable():
+                fileobj.write(self.header)
             self._files[key] = fileobj
         return fileobj
     
@@ -763,13 +767,16 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
         access: How to open the output files ('w', 'a', 'x').
         linesep: The line separator (type must match `char_mode`).
         encoding: Default character encoding to use.
+        header: Default file header to write when opening output files.
     """
     def __init__(
             self, files: FilesArg = None, access: ModeAccessArg = 'w',
             char_mode: CharMode = TextMode, linesep: CharMode = os.linesep,
-            encoding: str = 'utf-8'):
-        super().__init__(mode=FileMode(
-            access=access, coding='t' if char_mode == TextMode else 'b'))
+            encoding: str = 'utf-8', header: CharMode = None):
+        super().__init__(
+            mode=FileMode(
+                access=access, coding='t' if char_mode == TextMode else 'b'),
+            header=header)
         self.access = access
         self.char_mode = char_mode
         self._empty = b'' if char_mode == BinMode else ''
@@ -836,7 +843,7 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
         Returns:
             The number of characters written.
         """
-        pass
+        pass # pragma: no-cover
     
     def _encode(self, line: AnyStr) -> CharMode:
         is_binary = isinstance(line, bytes)
