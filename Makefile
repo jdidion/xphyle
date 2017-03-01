@@ -1,7 +1,7 @@
 tests = tests
 
 BUILD = python setup.py install
-TEST  = pytest --cov --cov-report term-missing $(tests)
+TEST  = py.test --cov --cov-report term-missing $(tests)
 
 all:
 	$(BUILD)
