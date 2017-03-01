@@ -802,7 +802,7 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
         if not isinstance(data, (str, bytes)):
             data = str(data)
         if detect_newlines:
-            result = self.writelines(data.split(self.linesep))
+            result = self.writelines(data.rstrip().split(self.linesep))
         else:
             result = self.writeline(data)
         return result[1]
