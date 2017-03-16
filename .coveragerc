@@ -4,6 +4,7 @@ omit =
     setup.py
     xphyle/_version.py
     versioneer.py
+    *site-packages/*
 
 [report]
 exclude_lines =
