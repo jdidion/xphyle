@@ -49,6 +49,7 @@ with open_('|cat', 'wt') as process:
 # to use when writing to stdout
 stdout = xopen(STDOUT, compression='gz')
 
+# The `open_` method ensures that the file is usable with the `with` keyword.
 # Print all lines in a compressed file...
 with open_('infile.gz') as myfile:
     for line in myfile:

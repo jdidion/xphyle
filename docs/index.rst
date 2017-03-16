@@ -102,7 +102,7 @@ By default, ``xopen`` returns the file. If desired, ``xopen`` can also wrap the 
     
     def print_lines(path):
         # this works whether path refers to a local file, URL or STDIN
-        with xopen(path) as infile:
+        with xopen(path, context_wrapper=True) as infile:
             for line in infile:
                 print(line)
 
@@ -110,7 +110,7 @@ The wrapping behavior can be enabled by passing ``context_wrapper=True`` to ``xo
     
     xphyle.configure(default_xopen_context_wrapper=True)
 
-Note that this represents a change from xphyle 1.x, in which wrapping occurred by default.
+**Note that this represents a change from xphyle 1.x, in which wrapping occurred by default.**
 
 Another common pattern is to write functions that accept either a path or an open file object. Rather than having to test whether the user passed a path or a file and handle each differently, you can use the ``open_`` convenience method::
     
@@ -140,9 +140,8 @@ Additional compression formats may be added in the future. To get the most up-to
 Processess
 ~~~~~~~~~~
 
-As of xphyle 2.0.0, you can easily open subprocesses using the ``xphyle.popen`` method. This method is similar to python ``subprocess.Popen``, except that it uses ``xopen`` to open files passed to stdin, stdout, and stderr, and/or to wrap subprocess PIPEs. ``xphyle.popen`` returns an ``xphyle.Process`` object, which is a subclass of ``subprocess.Popen`` but adds additional functionality, essentially making a Process behave like a regular file. Writing to a process writes to its stdin PIPE, and reading from a process reads from its stdout or stderr PIPE.
+As of xphyle 2.0.0, you can easily open subprocesses using the ``xphyle.popen`` method. This method is similar to python ``subprocess.Popen``, except that it uses ``xopen`` to open files passed to stdin, stdout, and stderr, and/or to wrap subprocess PIPEs. ``xphyle.popen`` returns an ``xphyle.Process`` object, which is a subclass of ``subprocess.Popen`` but adds additional functionality, essentially making a Process behave like a regular file. Writing to a process writes to its stdin PIPE, and reading from a process reads from its stdout or stderr PIPE::
 
-::
     from xphyle import popen, PIPE
     proc = popen('cat', stdin=PIPE, stdout='myfile.gz')
     try:
@@ -182,9 +181,8 @@ Note that with ``open_`` and ``xopen``, the system command must be specified as 
 Buffers
 ~~~~~~~
 
-As of xphyle 2.1.0, ``open_`` and ``xopen`` can also open buffer types. A buffer is an instance of ``io.StringIO`` or ``io.BytesIO`` (or similar) -- basically an in memory read/write buffer. Passing open buffer objects worked before (they were treated as file-like), but now there is a special file type -- ``FileType.BUFFER`` -- that will cause them to be handeled  a bit differently. In addition, you can now pass ``str`` or ``bytes`` (the type objects) to automatically create the corresponding buffer type.
+As of xphyle 2.1.0, ``open_`` and ``xopen`` can also open buffer types. A buffer is an instance of ``io.StringIO`` or ``io.BytesIO`` (or similar) -- basically an in memory read/write buffer. Passing open buffer objects worked before (they were treated as file-like), but now there is a special file type -- ``FileType.BUFFER`` -- that will cause them to be handeled  a bit differently. In addition, you can now pass ``str`` or ``bytes`` (the type objects) to automatically create the corresponding buffer type::
 
-::
     with open_(str) as buf:
         buf.write('foo')
     string_foo = buf.getvalue()
@@ -263,7 +261,7 @@ There are convenience methods for compressing and uncompressing files::
     transcode_file('http://recipes.com/allrecipes.txt.gz',
                    'local_recipes.txt.bz2')
 
-There is a replacement for ``fileiinput``::
+There is a replacement for ``fileinput``::
     
     from xphyle.utils import fileinput
     
