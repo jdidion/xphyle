@@ -1,5 +1,12 @@
-v2.2.2 (dev)
+v2.2.4 (dev)
 ------------
+
+
+v2.2.3 (2017.04.09)
+-------------------
+
+* Add get_compression_format_name() method to Formats.
+* Validate the compression type in xopen.
 
 v2.2.1 (2017.03.01)
 -------------------
