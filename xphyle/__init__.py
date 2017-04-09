@@ -716,6 +716,14 @@ def xopen(
                 the acutal format of the file
             * the path or mode are invalid
     """
+    if compression and isinstance(compression, str):
+        cannonical_fmt_name = FORMATS.get_compression_format_name(compression)
+        if cannonical_fmt_name is None:
+            raise ValueError(
+                "Invalid compression format: {}".format(compression))
+        else:
+            compression = cannonical_fmt_name
+    
     # Whether the file object is stdin/stdout/stderr
     is_std = path in (STDIN, STDOUT, STDERR)
     # Whether path is a string or fileobj

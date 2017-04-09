@@ -17,9 +17,6 @@ from xphyle.types import (
     FileMode, ModeCoding, ModeArg, PathOrFile, FileLike, Union, Callable,
     Iterable, Tuple)
 
-# Number of concurrent threads that can be used
-# by formats that support parallelization
-
 class ThreadsVar(object):
     """Maintain ``threads`` variable.
     """
@@ -48,6 +45,9 @@ class ThreadsVar(object):
             self.threads = threads # pylint: disable=redefined-variable-type
 
 THREADS = ThreadsVar()
+"""Number of concurrent threads that can be used by formats that support 
+parallelization.
+"""
 
 # File formats
 # pylint: disable=no-member
@@ -892,25 +892,35 @@ class Formats(object):
             self.magic_bytes[magic[0]].append((fmt.name, magic[1:]))
         for mime in fmt.mime_types:
             self.mime_types[mime] = fmt.name
-
+    
     def list_compression_formats(self) -> Tuple:
         """Returns a list of all registered compression formats.
         """
         return tuple(self.compression_formats.keys())
-
+    
     def get_compression_format(self, name: str) -> CompressionFormat:
         """Returns the CompressionFormat associated with the given name.
         
         Raises:
-            ValueError if that format is not supported
+            ValueError if that format is not supported.
         """
         if name in self.compression_format_aliases:
             name = self.compression_format_aliases[name]
             return self.compression_formats[name]
         raise ValueError("Unsupported compression format: {}".format(name))
-
+    
+    def get_compression_format_name(self, alias: str):
+        """Returns the cannonical name for the given alias.
+        """
+        if alias in self.compression_formats:
+            return alias
+        return self.compression_format_aliases.get(alias, None)
+    
     def guess_compression_format(self, name: str) -> str:
         """Guess the compression format by name or file extension.
+        
+        Returns:
+            The format name, or ``None`` if it could not be guessed.
         """
         if name in self.compression_format_aliases:
             return self.compression_format_aliases[name]
@@ -920,7 +930,7 @@ class Formats(object):
             if ext in self.compression_format_aliases:
                 return self.compression_format_aliases[ext]
         return None
-
+    
     def guess_format_from_file_header(self, path: str) -> str:
         """Guess file format from 'magic bytes' at the beginning of the file.
         
@@ -932,12 +942,12 @@ class Formats(object):
             path: Path to the file
         
         Returns:
-            The name of the format, or ``None`` if it could not be guessed.
+            The format name, or ``None`` if it could not be guessed.
         """
         with open(path, 'rb') as infile:
             magic = infile.read(self.max_magic_bytes)
         return self.guess_format_from_header_bytes(magic)
-
+    
     def guess_format_from_buffer(self, buffer: str) -> str:
         """Guess file format from a byte buffer that provides a ``peek`` method.
         
@@ -945,11 +955,11 @@ class Formats(object):
             buffer: The buffer object
         
         Returns:
-            The name of the format, or ``None`` if it could not be guessed
+            The format name, or ``None`` if it could not be guessed.
         """
         magic = buffer.peek(self.max_magic_bytes)
         return self.guess_format_from_header_bytes(magic)
-
+    
     def guess_format_from_header_bytes(self, header_bytes: bytes) -> str:
         """Guess file format from a sequence of bytes from a file header.
         
@@ -957,7 +967,7 @@ class Formats(object):
             header_bytes: The bytes
         
         Returns:
-            The name of the format, or ``None`` if it could not be guessed
+            The format name, or ``None`` if it could not be guessed.
         """
         num_bytes = len(header_bytes)
         if num_bytes > 0:
@@ -973,7 +983,7 @@ class Formats(object):
                             for i in range(1, len(tail)+1)) == tail):
                         return fmt
         return None
-
+    
     def get_format_for_mime_type(self, mime_type: str) -> str:
         """Returns the file format associated with a MIME type, or None if no
         format is associated with the mime type.
