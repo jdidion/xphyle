@@ -7,9 +7,13 @@ from enum import Enum
 import os
 import stat
 import sys
-import typing.io
 from typing import *
+# ISSUE: not sure why this has to be imported separately
+from typing import IO
 from typing.re import *
+
+# ISSUE: there are several mypy errors due to incomplete enum support.
+# enums should be fully suported in the next version of mypy (>0.501).
 
 def is_iterable(obj: Any, include_str: bool = False) -> bool:
     """Test whether an object is iterable.
@@ -69,10 +73,10 @@ class ModeCoding(Enum):
     BINARY = 'b'
     """Binary mode."""
 
-FILE_MODE_CACHE = {}
-"""Cache of FileMode objects."""
-
 ModeCodingArg = Union[str, ModeCoding]
+
+FILE_MODE_CACHE = {} # type: Dict[Tuple[str, ModeAccessArg, ModeCodingArg], FileMode]
+"""Cache of FileMode objects."""
 
 class FileMode(object):
     """Definition of a file mode as composed of a :class:`ModeAccess` and a
@@ -94,24 +98,30 @@ class FileMode(object):
     
     def __init__(
             self, mode: str = None, access: ModeAccessArg = None,
-            coding: ModeCodingArg = None):
+            coding: ModeCodingArg = None) -> None:
         if mode:
+            access_val = None
             for a in ModeAccess:
                 if a.value in mode:
-                    access = a
+                    access_val = a
                     break
+            coding_val = None
             for e in ModeCoding:
                 if e.value in mode:
-                    coding = e
+                    coding_val = e
                     break
         else:
             if isinstance(access, str):
-                access = ModeAccess(access)
+                access_val = ModeAccess(access)
+            else:
+                access_val = cast(ModeAccess, access)
             if isinstance(coding, str):
-                coding = ModeCoding(coding)
+                coding_val = ModeCoding(coding)
+            else:
+                coding_val = cast(ModeCoding, coding)
         
-        self.access = access or ModeAccess.READ
-        self.coding = coding or ModeCoding.TEXT
+        self.access = access_val or ModeAccess.READ
+        self.coding = coding_val or ModeCoding.TEXT
         self.value = '{}{}'.format(self.access.value, self.coding.value)
         
         if mode:
@@ -208,10 +218,10 @@ class Permission(Enum):
         """
         return OS_ALIASES[self.value]
 
-PERMISSION_SET_CACHE = {}
-
 PermissionArg = Union[str, int, Permission, ModeAccess]
 """Types from which an Permission can be inferred."""
+
+PERMISSION_SET_CACHE = {} # type: Dict[Union[PermissionArg, Iterable[PermissionArg]], PermissionSet]
 
 class PermissionSet(object):
     """A set of :class:`Permission`s.
@@ -228,13 +238,14 @@ class PermissionSet(object):
         return PERMISSION_SET_CACHE[flags]
     
     def __init__(
-            self, flags: Union[PermissionArg, Iterable[PermissionArg]] = None):
-        self.flags = set()
+            self, flags: Union[PermissionArg, Iterable[PermissionArg]] = None
+            ) -> None:
+        self.flags = set() # type: Set[Permission]
         if flags:
             if isinstance(flags, str) or is_iterable(flags):
-                self.update(flags)
+                self.update(cast(Iterable[PermissionArg], flags))
             else:
-                self.add(flags)
+                self.add(cast(Union[int, Permission, ModeAccess], flags))
     
     def add(self, flag: PermissionArg) -> None:
         """Add a permission.
@@ -257,7 +268,7 @@ class PermissionSet(object):
             self.flags.add(flag)
     
     def update(
-            self, flags: Union['PermissionSet', Sequence[PermissionArg]]
+            self, flags: Union['PermissionSet', Iterable[PermissionArg]]
             ) -> None:
         """Add all flags in `flags` to this `PermissionSet`.
         
@@ -369,7 +380,7 @@ class PathType(Enum):
 AnyChar = Union[bytes, Text]
 """Similar to AnyStr, but specifies that strings must be unicode."""
 
-FileLike = Union[typing.io.IO, FileLikeInterface]
+FileLike = Union[IO, FileLikeInterface]
 """File-like object; either a subclass of :class:`io.IOBase` or a
 :class:`FileLikeInterface`.
 """

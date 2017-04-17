@@ -31,7 +31,7 @@ class IterableProgress(object):
     """
     def __init__(self, default_wrapper: Callable = Tqdm) -> None:
         self.enabled = False
-        self.wrapper = None
+        self.wrapper = None # type: Callable[..., Iterable]
         self.default_wrapper = default_wrapper
     
     def update(
@@ -112,7 +112,7 @@ class ProcessProgress(object):
     """
     def __init__(self, default_wrapper: Callable = pv_command) -> None:
         self.enabled = False
-        self.wrapper = None
+        self.wrapper = None # type: Sequence[str]
         self.default_wrapper = default_wrapper
     
     def update(
@@ -194,8 +194,9 @@ def iter_file_chunked(fileobj: FileLike, chunksize: int = 1024) -> Iterable:
                 yield data
             else:
                 break
-    try:
-        name = fileobj.name
-    except: # pylint: disable=bare-except
-        name = None
+    
+    name = None
+    if hasattr(fileobj, 'name'):
+        name = getattr(fileobj, 'name')
+        
     return ITERABLE_PROGRESS.wrap(_itr(), desc=name)

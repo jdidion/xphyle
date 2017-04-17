@@ -4,10 +4,11 @@
 import copy
 import io
 import re
+from http.client import HTTPResponse
 from urllib.error import URLError
 from urllib.parse import urlparse
 from urllib.request import urlopen, Request
-from xphyle.types import Url, Range, Any
+from xphyle.types import Url, Range, Any, cast
 
 # URLs
 
@@ -56,7 +57,10 @@ def open_url(
         response = urlopen(request)
         # HTTPResponse didn't have 'peek' until 3.5
         if response and not hasattr(response, 'peek'):
-            return io.BufferedReader(response)
+            # ISSUE: HTTPResponse inherits BufferedIOBase (rather than
+            # RawIOBase), but for this purpose it's completely compatible 
+            # with BufferedReader. Not sure how to make it type-compatible.
+            return io.BufferedReader(cast(HTTPResponse, response))
         else:
             return response
         return response
@@ -99,5 +103,8 @@ def get_url_file_name(response: Any, parsed_url: Url = None) -> str:
     if not parsed_url:
         parsed_url = parse_url(response.geturl())
     if parsed_url and hasattr(parsed_url, 'path'):
-        return parsed_url.path
+        # ISSUE: ParseResult has named attributes that mypy does not
+        # yet recognize
+        #return parsed_url.path
+        return parsed_url[2]
     return None
