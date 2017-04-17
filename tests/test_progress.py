@@ -16,7 +16,7 @@ class MockProgress(object):
 class ProgressTests(TestCase):
     def setUp(self):
         self.root = TempDir()
-        xphyle.configure(False, False)
+        xphyle.configure(progress=False, progress_wrapper=False)
     
     def tearDown(self):
         self.root.close()
@@ -34,6 +34,17 @@ class ProgressTests(TestCase):
                 o.write(random_text())
         compress_file(
             path, compression='gz', use_system=False)
+        self.assertEqual(100, progress.count)
+    
+    def test_progress_delmited(self):
+        progress = MockProgress()
+        xphyle.configure(progress=True, progress_wrapper=progress)
+        path = self.root.make_file()
+        with open(path, 'wt') as o:
+            for i in range(100):
+                o.write('row\t{}\n'.format(i))
+        rows = list(read_delimited(path))
+        self.assertEqual(100, len(rows))
         self.assertEqual(100, progress.count)
     
     def test_iter_stream(self):
