@@ -20,7 +20,7 @@ from xphyle.types import (
 class ThreadsVar(object):
     """Maintain ``threads`` variable.
     """
-    def __init__(self, default_value: int = 1):
+    def __init__(self, default_value: int = 1) -> None:
         self.threads = default_value
         self.default_value = default_value
     

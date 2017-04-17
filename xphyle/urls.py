@@ -56,7 +56,9 @@ def open_url(
         response = urlopen(request)
         # HTTPResponse didn't have 'peek' until 3.5
         if response and not hasattr(response, 'peek'):
-            response = io.BufferedReader(response)
+            return io.BufferedReader(response)
+        else:
+            return response
         return response
     except (URLError, ValueError):
         return None
@@ -93,7 +95,7 @@ def get_url_file_name(response: Any, parsed_url: Url = None) -> str:
         match = CONTENT_DISPOSITION_RE.search(
             response.headers['Content-Disposition'])
         if match:
-            return match.groups(1)
+            return match.group(1)
     if not parsed_url:
         parsed_url = parse_url(response.geturl())
     if parsed_url and hasattr(parsed_url, 'path'):

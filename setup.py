@@ -8,7 +8,7 @@ if sys.version_info < (3, 3):
     sys.exit(1)
 elif sys.version_info < (3, 5):
     # typing was added in 3.5, but a backport is avaialble for 3.3+
-    requirements.append('backports.typing')
+    requirements.append('typing')
 
 import versioneer
 

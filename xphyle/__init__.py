@@ -18,7 +18,8 @@ from xphyle.progress import ITERABLE_PROGRESS, PROCESS_PROGRESS
 from xphyle.types import (
     FileType, FileLikeInterface, FileLike, FileMode, ModeArg, ModeAccess,
     ModeCoding, CompressionArg, EventType, EventTypeArg, PathOrFile, Callable,
-    Container, Iterable, Iterator, Union, Sequence, Tuple, AnyStr, Any)
+    Container, Iterable, Iterator, Union, Sequence, Tuple, Dict, AnyChar, Any, 
+    Generic, TypeVar)
 from xphyle.urls import parse_url, open_url, get_url_file_name
 
 # pylint: disable=protected-access
@@ -29,17 +30,19 @@ del get_versions
 
 # Classes
 
-class EventListener(metaclass=ABCMeta):
+E = TypeVar('E', bound='EventManager')
+
+class EventListener(Generic[E], metaclass=ABCMeta):
     """Base class for listener events that can be registered on a
     FileLikeWrapper.
     
     Args:
         kwargs: keyword arguments to pass through to ``execute``
     """
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Dict[Any, Any]) -> None:
         self.create_args = kwargs
     
-    def __call__(self, wrapper: 'EventManager', **call_args) -> None:
+    def __call__(self, wrapper: E, **call_args) -> None:
         """Called by :method:`FileLikeWrapper._fire_listeners`.
         
         Args:
@@ -54,7 +57,7 @@ class EventListener(metaclass=ABCMeta):
         self.execute(wrapper, **kwargs)
     
     @abstractmethod
-    def execute(self, wrapper: 'EventManager', **kwargs) -> None:
+    def execute(self, wrapper: E, **kwargs) -> None:
         """Handle an event. This method must be implemented by subclasses.
         
         Args:
@@ -96,7 +99,7 @@ class EventManager(object):
                 listener(self, **kwargs)
 
 
-class FileLikeWrapper(FileLikeInterface, EventManager):
+class FileLikeWrapper(EventManager, FileLikeInterface):
     """Base class for wrappers around file-like objects. By default, method
     calls are forwarded to the file object. Adds the following:
     
@@ -108,14 +111,16 @@ class FileLikeWrapper(FileLikeInterface, EventManager):
         fileobj: The file-like object to wrap.
         compression: Whether the wrapped file is compressed.
     """
-    def __init__(self, fileobj: FileLike, compression: bool = False):
+    def __init__(
+            self, fileobj: FileLike, compression: CompressionArg = False
+            ) -> None:
         object.__setattr__(self, '_fileobj', fileobj)
         object.__setattr__(self, 'compression', compression)
     
     def __getattr__(self, name: str) -> Any:
         return getattr(self._fileobj, name)
     
-    def __next__(self) -> AnyStr:
+    def __next__(self) -> AnyChar:
         return next(iter(self))
     
     def __iter__(self) -> Iterator:
@@ -132,7 +137,7 @@ class FileLikeWrapper(FileLikeInterface, EventManager):
     def __exit__(self, exception_type, exception_value, traceback) -> None:
         self.close()
     
-    def peek(self, size: int = 1) -> AnyStr:
+    def peek(self, size: int = 1) -> AnyChar:
         """Return bytes/characters from the stream without advancing the
         position. At most one single read on the raw stream is done to satisfy
         the call.
@@ -202,10 +207,11 @@ class FileWrapper(FileLikeWrapper):
     def __init__(
             self, source: PathOrFile, mode: ModeArg = 'w',
             compression: CompressionArg = False, name: str = None,
-            **kwargs):
+            **kwargs) -> None:
         if isinstance(source, str):
             path = source
-            source = xopen(source, mode=mode, compression=compression, **kwargs)
+            source = xopen(
+                source, mode=mode, compression=compression, **kwargs)
         elif name or not hasattr(source, 'name'):
             path = name
         else:
@@ -236,7 +242,7 @@ class BufferWrapper(FileWrapper):
         super().__init__(fileobj, compression=compression, name=name)
         object.__setattr__(self, 'buffer', buffer)
     
-    def getvalue(self) -> AnyStr:
+    def getvalue(self) -> AnyChar:
         """Returns the contents of the buffer.
         """
         if hasattr(self, '_value'):
@@ -272,7 +278,7 @@ class StdWrapper(FileLikeWrapper):
 
 PopenStdArg = Union[PathOrFile, int] # pylint: disable=invalid-name
 
-class Process(Popen, FileLikeInterface, EventManager):
+class Process(Popen, EventManager, FileLikeInterface):
     """Subclass of :class:`subprocess.Popen` with the following additions:
     
     * Provides :method:`Process.wrap_pipes` for wrapping stdin/stdout/stderr
@@ -292,7 +298,7 @@ class Process(Popen, FileLikeInterface, EventManager):
     """
     def __init__(
             self, *args, stdin: PopenStdArg = None, stdout: PopenStdArg = None,
-            stderr: PopenStdArg = None, **kwargs):
+            stderr: PopenStdArg = None, **kwargs) -> None:
         super().__init__(
             *args, stdin=stdin, stdout=stdout, stderr=stderr, **kwargs)
         # Construct a dict of name=(stream, wrapper, is_pipe) for std streams
@@ -302,6 +308,7 @@ class Process(Popen, FileLikeInterface, EventManager):
                 ('stdin', 'stdout', 'stderr'),
                 (stdin, stdout, stderr),
                 (self.stdin, self.stdout, self.stderr)))
+        # PEP526 self._iterator: Iterable[str] = None
         self._iterator = None
     
     def wrap_pipes(self, **kwargs) -> None:
@@ -335,7 +342,7 @@ class Process(Popen, FileLikeInterface, EventManager):
         """
         return self.get_writer() is not None
     
-    def write(self, data: AnyStr) -> int:
+    def write(self, data: AnyChar) -> int:
         """Write `data` to stdin.
         
         Args:
@@ -345,7 +352,7 @@ class Process(Popen, FileLikeInterface, EventManager):
         Returns:
             Number of bytes/characters written
         """
-        self.get_writer().write(data)
+        return self.get_writer().write(data)
     
     def get_writer(self) -> FileLike:
         """Returns the stream for writing to stdin.
@@ -358,7 +365,7 @@ class Process(Popen, FileLikeInterface, EventManager):
         """
         return self.get_reader() is not None
     
-    def read(self, size: int = -1, which: str = None) -> AnyStr:
+    def read(self, size: int = -1, which: str = None) -> AnyChar:
         """Read `size` bytes/characters from stdout or stderr.
         
         Args:
@@ -392,7 +399,8 @@ class Process(Popen, FileLikeInterface, EventManager):
         """
         return tuple(self.get_reader(std) for std in ('stdout', 'stderr'))
     
-    def communicate(self, inp: AnyStr = None, timeout: int = None):
+    def communicate(
+            self, inp: AnyChar = None, timeout: int = None) -> Tuple[str, str]:
         """Send input to stdin, wait for process to terminate, return
         results.
         
@@ -419,12 +427,12 @@ class Process(Popen, FileLikeInterface, EventManager):
         if self.writable():
             self.get_writer().flush()
     
-    def __next__(self) -> AnyStr:
+    def __next__(self) -> AnyChar:
         """Returns the next line from the iterator.
         """
         return next(iter(self))
     
-    def __iter__(self) -> Iterable[AnyStr]:
+    def __iter__(self) -> Iterable[AnyChar]:
         """Returns the currently open iterator. If one isn't open,
         :method:`_reader(which=None)` is used to create one.
         """
@@ -1020,7 +1028,7 @@ def popen(
     if shell and not is_str:
         args = ' '.join(args)
     elif not shell and is_str:
-        args = shlex.split(args)
+        args = shlex.split(str(args))
     std_args = {}
     
     # Open non-PIPE streams

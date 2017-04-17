@@ -29,7 +29,7 @@ class IterableProgress(object):
         default_wrapper: Callable (typically a class) that returns a Callable
             with the signature of ``wrap``.
     """
-    def __init__(self, default_wrapper: Callable = Tqdm):
+    def __init__(self, default_wrapper: Callable = Tqdm) -> None:
         self.enabled = False
         self.wrapper = None
         self.default_wrapper = default_wrapper
@@ -91,7 +91,7 @@ def system_progress_command(
     Returns:
         A tuple of (executable_path, *args).
     """
-    executable_path = EXECUTABLE_CACHE.get_path(exe)
+    executable_path = EXECUTABLE_CACHE.get_path(str(exe))
     if executable_path is not None:
         check_path(executable_path, PathType.FILE, Permission.EXECUTE)
     elif require:
@@ -110,7 +110,7 @@ class ProcessProgress(object):
         default_wrapper: Callable that returns the argument list for the
             default wrapper command.
     """
-    def __init__(self, default_wrapper: Callable = pv_command):
+    def __init__(self, default_wrapper: Callable = pv_command) -> None:
         self.enabled = False
         self.wrapper = None
         self.default_wrapper = default_wrapper

@@ -430,16 +430,19 @@ class PathTests(TestCase):
         self.assertEquals('txt', pathinst['ext'])
         
         fail1 = dict(path_var_values)
+        # should fail because expecting all caps
         fail1['id'] = 'abc123'
         with self.assertRaises(ValueError):
             spec(**fail1)
         
         fail2 = dict(path_var_values)
+        # should fail because foo is not in the valid list
         fail2['ext'] = 'foo'
         with self.assertRaises(ValueError):
             spec(**fail2)
         
         fail3 = dict(path_var_values)
+        # should fail because ABC123 is in the invalid list
         fail3['id'] = 'ABC123'
         with self.assertRaises(ValueError):
             spec(**fail3)

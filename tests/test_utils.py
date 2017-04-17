@@ -405,16 +405,16 @@ class UtilsTests(TestCase):
         file1 = self.root.make_file(suffix='.gz')
         with gzip.open(file1, 'wt') as o:
             o.write('foo\nbar\n')
-        with fileinput(file1) as i:
+        with textinput(file1) as i:
             lines = list(i)
             self.assertListEqual(['foo\n','bar\n'], lines)
         file2 = self.root.make_file(suffix='.gz')
         with gzip.open(file2, 'wt') as o:
             o.write('baz\n')
-        with fileinput((file1, file2)) as i:
+        with textinput((file1, file2)) as i:
             lines = list(i)
             self.assertListEqual(['foo\n','bar\n', 'baz\n'], lines)
-        with fileinput([('key1',file1), ('key2', file2)]) as i:
+        with textinput([('key1',file1), ('key2', file2)]) as i:
             self.assertEqual(i.filekey, None)
             self.assertEqual(i.filename, None)
             self.assertEqual(i.lineno, 0)
@@ -442,7 +442,7 @@ class UtilsTests(TestCase):
         file1 = self.root.make_file(suffix='.gz')
         with gzip.open(file1, 'wt') as o:
             o.write('foo\nbar\n')
-        f = FileInput()
+        f = FileInput(char_mode=TextMode)
         self.assertTrue(f._pending)
         f.add(file1)
         list(f)
@@ -468,20 +468,18 @@ class UtilsTests(TestCase):
         sys.argv = [self.system_args[0], path]
         self.assertEqual(
             ['foo\n','bar\n'],
-            list(fileinput()))
+            list(textinput()))
         sys.argv = []
         with intercept_stdin('foo\n'):
-            lines = list(fileinput([STDIN]))
+            lines = list(textinput([STDIN]))
             self.assertEqual(1, len(lines))
             self.assertEqual('foo\n', lines[0])
         with intercept_stdin(b'foo\nbar\n', is_bytes=True):
-            self.assertEqual(
-            [b'foo\n',b'bar\n'],
-            list(fileinput(char_mode=BinMode)))
+            self.assertEqual([b'foo\n',b'bar\n'], list(byteinput()))
     
     def test_single_fileoutput(self):
         file1 = self.root.make_file(suffix='.gz')
-        with fileoutput(file1) as o:
+        with textoutput(file1) as o:
             o.writelines(('foo','bar','baz'))
         with gzip.open(file1, 'rt') as i:
             self.assertEqual('foo\nbar\nbaz\n', i.read())
@@ -490,8 +488,8 @@ class UtilsTests(TestCase):
         file1 = self.root.make_file(suffix='.gz')
         file2 = self.root.make_file()
         with self.assertRaises(ValueError):
-            fileoutput((file1,file2), access='z')
-        with fileoutput((file1,file2)) as o:
+            textoutput((file1,file2), access='z')
+        with textoutput((file1,file2)) as o:
             o.writelines(('foo','bar','baz'))
         with gzip.open(file1, 'rt') as i:
             self.assertEqual('foo\nbar\nbaz\n', i.read())
@@ -501,8 +499,8 @@ class UtilsTests(TestCase):
     def test_tee_fileoutput_binary(self):
         file1 = self.root.make_file(suffix='.gz')
         file2 = self.root.make_file()
-        with fileoutput(
-                (file1,file2), char_mode=BinMode,
+        with byteoutput(
+                (file1,file2),
                 file_output_type=TeeFileOutput) as o:
             o.writelines((b'foo',b'bar',b'baz'))
         with gzip.open(file1, 'rb') as i:
@@ -510,18 +508,14 @@ class UtilsTests(TestCase):
         with open(file2, 'rb') as i:
             self.assertEqual(b'foo\nbar\nbaz\n', i.read())
     
-        with fileoutput(
-                (file1,file2), char_mode=TextMode,
-                file_output_type=TeeFileOutput) as o:
+        with textoutput((file1,file2), file_output_type=TeeFileOutput) as o:
             o.writelines((b'foo',b'bar',b'baz'))
         with gzip.open(file1, 'rt') as i:
             self.assertEqual('foo\nbar\nbaz\n', i.read())
         with open(file2, 'rt') as i:
             self.assertEqual('foo\nbar\nbaz\n', i.read())
     
-        with fileoutput(
-                (file1,file2), char_mode=BinMode,
-                file_output_type=TeeFileOutput) as o:
+        with byteoutput((file1,file2), file_output_type=TeeFileOutput) as o:
             o.writelines(('foo',b'bar',b'baz'))
         with gzip.open(file1, 'rb') as i:
             self.assertEqual(b'foo\nbar\nbaz\n', i.read())
@@ -531,7 +525,7 @@ class UtilsTests(TestCase):
     def test_tee_fileoutput_no_newline(self):
         file1 = self.root.make_file(suffix='.gz')
         file2 = self.root.make_file()
-        with fileoutput((file1,file2)) as o:
+        with textoutput((file1,file2)) as o:
             o.writeline('foo')
             o.writeline('bar')
             self.assertEqual(2, o.num_lines)
@@ -543,20 +537,20 @@ class UtilsTests(TestCase):
     def test_fileoutput_stdout(self):
         path = self.root.make_file()
         sys.argv = [self.system_args, path]
-        with fileoutput() as o:
+        with textoutput() as o:
             o.writelines(('foo','bar','baz'))
         with open(path, 'rt') as i:
             self.assertEqual('foo\nbar\nbaz\n', i.read())
         sys.argv = []
         with intercept_stdout(True) as outbuf:
-            with fileoutput(char_mode=BinMode) as o:
+            with byteoutput() as o:
                 o.writelines((b'foo', b'bar', b'baz'))
             self.assertEqual(b'foo\nbar\nbaz\n', outbuf.getvalue())
     
     def test_cycle_fileoutput(self):
         file1 = self.root.make_file(suffix='.gz')
         file2 = self.root.make_file()
-        with fileoutput((file1,file2), file_output_type=CycleFileOutput) as o:
+        with textoutput((file1,file2), file_output_type=CycleFileOutput) as o:
             o.writelines(('foo','bar','baz'))
         with gzip.open(file1, 'rt') as i:
             self.assertEqual('foo\nbaz\n', i.read())
@@ -566,7 +560,7 @@ class UtilsTests(TestCase):
     def test_ncycle_fileoutput(self):
         file1 = self.root.make_file(suffix='.gz')
         file2 = self.root.make_file()
-        with fileoutput(
+        with textoutput(
                 (file1,file2), lines_per_file=2,
                 file_output_type=NCycleFileOutput) as o:
             o.writelines(('foo','bar','baz','blorf','bing'))
@@ -587,7 +581,7 @@ class UtilsTests(TestCase):
     
     def test_fileoutput_with_header(self):
         path = self.root.make_file()
-        with fileoutput(
+        with textoutput(
                 path + '{index}.txt', file_output_type=RollingFileOutput,
                 header="number\n", lines_per_file=3) as out:
             for i in range(6):
@@ -599,7 +593,7 @@ class UtilsTests(TestCase):
     
     def test_rolling_fileoutput_write(self):
         path = self.root.make_file()
-        with fileoutput(
+        with textoutput(
                 path + '{index}.txt', file_output_type=RollingFileOutput,
                 lines_per_file=3) as out:
             for i in range(6):
@@ -620,7 +614,7 @@ class UtilsTests(TestCase):
         path = self.root.make_file()
         def get_tokens(line):
             return dict(zip(('a','b'), line.split(' ')))
-        with fileoutput(
+        with textoutput(
                 path + '{a}.{b}.txt', file_output_type=PatternFileOutput,
                 token_func=get_tokens) as out:
             for a in range(2):

@@ -366,6 +366,9 @@ class PathType(Enum):
     FIFO = '|'
     """Path represents a FIFO."""
 
+AnyChar = Union[bytes, Text]
+"""Similar to AnyStr, but specifies that strings must be unicode."""
+
 FileLike = Union[typing.io.IO, FileLikeInterface]
 """File-like object; either a subclass of :class:`io.IOBase` or a
 :class:`FileLikeInterface`.
@@ -396,7 +399,7 @@ Range = Tuple[int, int]
 Regexp = Union[str, Pattern]
 """A regular expression string or compiled :class:`re`."""
 
-CharMode = TypeVar('CharMode', str, bytes)
+CharMode = TypeVar('CharMode', bytes, Text)
 """Type representing how data should be handled when read from a file.
 If the value is bytes (:attribute:`BinMode`), raw bytes are returned. If the
 value is a string (:attribute:`TextMode`), bytes are decoded using the system

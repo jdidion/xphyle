@@ -5,7 +5,7 @@ managing files. All of these functions are 'safe', meaning that if you pass
 handled gracefully.
 """
 from abc import ABCMeta, abstractmethod
-from collections import OrderedDict
+from collections import OrderedDict, Sized
 import copy
 import csv
 from itertools import cycle
@@ -18,18 +18,18 @@ from xphyle.paths import STDIN, STDOUT
 from xphyle.progress import iter_file_chunked
 from xphyle.types import (
     PathOrFile, PathLike, FileLike, FilesArg, FileMode, ModeAccessArg,
-    Generator, Callable, Dict, Tuple, Any, Sequence, CharMode, TextMode,
-    BinMode, CompressionArg, Generic, Optional, Iterable, Union, AnyStr,
-    is_iterable)
+    Generator, Callable, Dict, List, Tuple, Any, Sequence, CharMode, TextMode,
+    BinMode, CompressionArg, Generic, Optional, Iterable, Union, AnyChar,
+    is_iterable, cast)
 
 # Reading data from/writing data to files
 
 ## Raw data
 
 def read_lines(
-        path_or_file: PathOrFile, convert: Callable[[str], str] = None,
+        path_or_file: PathOrFile, convert: Callable[[str], Any] = None,
         strip_linesep: bool = True, **kwargs
-        ) -> Generator[str, None, Optional[Tuple]]:
+        ) -> Generator[str, None, None]:
     """Iterate over lines in a file.
     
     Args:
@@ -38,12 +38,12 @@ def read_lines(
         strip_linesep: Whether to strip off trailing line separators.
         kwargs: Additional arguments to pass to :method:`xphyle.open_`.
     
-    Returns:
-        Iterator over the lines of a file, with line endings stripped.
+    Yields:
+        Lines of a file, with line endings stripped.
     """
     with open_(path_or_file, **kwargs) as fileobj:
         if fileobj is None:
-            return ()
+            return
         itr = fileobj
         if strip_linesep:
             itr = (line.rstrip() for line in itr)
@@ -53,7 +53,7 @@ def read_lines(
 
 def read_bytes(
         path_or_file: PathOrFile, chunksize: int = 1024, **kwargs
-        ) -> Generator[bytes, None, Optional[Tuple]]:
+        ) -> Generator[bytes, None, None]:
     """Iterate over a file in chunks. The mode will always be overridden
     to 'rb'.
     
@@ -69,12 +69,12 @@ def read_bytes(
     kwargs['mode'] = 'rb'
     with open_(path_or_file, **kwargs) as fileobj:
         if fileobj is None:
-            return ()
+            return
         yield from iter_file_chunked(fileobj, chunksize)
 
 def write_lines(
         iterable: Iterable[str], path_or_file: PathOrFile, linesep: str = '\n',
-        convert: Callable[[str], str] = str, **kwargs) -> int:
+        convert: Callable[[Any], str] = str, **kwargs) -> int:
     """Write delimiter-separated strings to a file.
     
     Args:
@@ -119,7 +119,7 @@ def to_bytes(value: Any, encoding: str = 'utf-8'):
 
 def write_bytes(
         iterable: Iterable[bytes], path_or_file: PathOrFile, sep: bytes = b'',
-        convert: Callable[[bytes], bytes] = to_bytes, **kwargs) -> int:
+        convert: Callable[[Any], bytes] = to_bytes, **kwargs) -> int:
     """Write an iterable of bytes to a file.
     
     Args:
@@ -169,15 +169,15 @@ def read_dict(
     Returns:
         An OrderedDict, if 'ordered' is True, otherwise a dict.
     """
-    def _parse_line(line):
+    def _parse_line(line) -> List[str]:
         line = line.strip()
         if len(line) == 0 or line[0] == "#":
             return None
         return line.split(sep)
-    lines = filter(None, read_lines(
-        path_or_file, convert=_parse_line, **kwargs))
-    if convert:
-        lines = ((k, convert(v)) for k, v in lines)
+    lines = (
+        (line[0], convert(line[1]) if convert else line[1]) 
+        for line in read_lines(path_or_file, convert=_parse_line, **kwargs)
+        if line is not None)
     return OrderedDict(lines) if ordered else dict(lines)
 
 def write_dict(
@@ -203,16 +203,16 @@ def write_dict(
     lines = (
         "{}{}{}".format(key, sep, convert(val))
         for key, val in dictobj.items())
-    write_lines(lines, path, linesep=linesep, **kwargs)
+    return write_lines(lines, path, linesep=linesep, **kwargs)
 
 ## Other delimited files
 
 def read_delimited(
         path: PathLike, sep: str = '\t',
         header: Union[bool, Sequence[str]] = False,
-        converters: Union[FromStrFunc, Sequence[FromStrFunc]] = None,
+        converters: Union[FromStrFunc, Iterable[FromStrFunc]] = None,
         yield_header: bool = True, row_type: Union[str, RowFunc] = 'list',
-        **kwargs) -> Generator[Union[Tuple, Dict, Any], None, Optional[Tuple]]:
+        **kwargs) -> Generator[Union[Tuple, Dict, Any], None, None]:
     """Iterate over rows in a delimited file.
     
     Args:
@@ -237,7 +237,7 @@ def read_delimited(
     
     with open_(path, **kwargs) as fileobj:
         if fileobj is None:
-            return ()
+            return
         
         reader = csv.reader(fileobj, delimiter=sep, **kwargs)
         
@@ -247,15 +247,16 @@ def read_delimited(
                 yield header_row
         
         if converters:
-            if not is_iterable(converters):
-                if callable(converters):
-                    converters = cycle([converters])
-                else:
-                    raise ValueError(
-                        "'converters' must be iterable or callable")
+            if is_iterable(converters):
+                converter_itr = cast(Iterable[FromStrFunc], converters)
+            elif callable(converters):
+                converter_itr = cycle([converters])
+            else:
+                raise ValueError(
+                    "'converters' must be iterable or callable")
             
             reader = (
-                [fn(x) if fn else x for fn, x in zip(converters, row)]
+                [fn(x) if fn else x for fn, x in zip(converter_itr, row)]
                 for row in reader)
         
         if row_type == 'tuple':
@@ -299,8 +300,10 @@ def read_delimited_as_dict(
         if header is True:
             kwargs['yield_header'] = True
             itr = read_delimited(path, sep, True, **kwargs)
-            header = next(itr)
-        key = header.index(key) # pylint: disable=no-member
+            header_seq = tuple(str(h) for h in next(itr))
+        else:
+            header_seq = tuple(cast(Sequence[str], header))
+        key = header_seq.index(key)
     
     # pylint: disable=redefined-variable-type
     if isinstance(key, int):
@@ -315,6 +318,7 @@ def read_delimited_as_dict(
         kwargs['yield_header'] = False
         itr = read_delimited(path, sep, header, **kwargs)
     
+    # PEP526 objects: Dict[Any, Any] = {}
     objects = {}
     for row in itr:
         k = keyfn(row)
@@ -386,9 +390,10 @@ def uncompress_file(
         The path of the uncompressed file.
     """
     if not isinstance(compression, str):
-        source_path = compressed_file
         if not isinstance(compressed_file, str):
             source_path = compressed_file.name
+        else:
+            source_path = cast(str, compressed_file)
         compression = FORMATS.guess_compression_format(source_path)
     fmt = FORMATS.get_compression_format(compression)
     return fmt.uncompress_file(
@@ -434,20 +439,20 @@ def transcode_file(
 
 # EventListeners
 
-class CompressOnClose(EventListener):
+class CompressOnClose(EventListener[FileWrapper]):
     """Compress a file after it is closed.
     """
     compressed_path = None
     def execute(self, file_wrapper: FileWrapper, **kwargs):
         self.compressed_path = compress_file(file_wrapper.path, **kwargs)
 
-class MoveOnClose(EventListener):
+class MoveOnClose(EventListener[FileWrapper]):
     """Move a file after it is closed.
     """
     def execute(self, file_wrapper: FileWrapper, dest: PathLike): # pylint: disable=arguments-differ
         shutil.move(file_wrapper.path, dest)
 
-class RemoveOnClose(EventListener):
+class RemoveOnClose(EventListener[FileWrapper]):
     """Remove a file after it is closed.
     """
     def execute(self, file_wrapper: FileWrapper):
@@ -456,7 +461,7 @@ class RemoveOnClose(EventListener):
 # Processes
 
 def exec_process(
-        *args, inp: AnyStr = None, timeout: int = None, **kwargs) -> Process:
+        *args, inp: AnyChar = None, timeout: int = None, **kwargs) -> Process:
     """Shortcut to execute a process, wait for it to terminate, and return the
     results.
     
@@ -476,7 +481,7 @@ def exec_process(
 
 # Replacement for fileinput, plus fileoutput
 
-class FileManager(object):
+class FileManager(Sized):
     """Dict-like container for files. Files are opened lazily (upon first
     request) using `xopen`.
     
@@ -486,8 +491,10 @@ class FileManager(object):
         header: A header to write when opening writable files.
         kwargs: Default arguments to pass to xopen.
     """
-    def __init__(self, files: FilesArg = None, header=None, **kwargs):
+    def __init__(self, files: FilesArg = None, header=None, **kwargs) -> None:
+        # PEP526 self._files: OrderedDict[Union[str, int], FileLike]
         self._files = OrderedDict()
+        # PEP526 self._paths: Dict[str, str]
         self._paths = {}
         self.header = header
         self.default_open_args = kwargs
@@ -642,9 +649,17 @@ class FileInput(FileManager, Generic[CharMode]):
     Args:
         files: List of files.
         mode: File open mode.
+    
+    Notes:
+        Default values are not allowed for generically typed parameters. In
+        a future version, `char_mode` will default to None and it will be
+        required to specify the mode, or use one of the convenience methods
+        (:method:`textinput` or :method:`byteinput`).
     """
     # pylint: disable=attribute-defined-outside-init
-    def __init__(self, files: FilesArg = None, char_mode: CharMode = TextMode):
+    def __init__(
+            self, files: FilesArg = None, char_mode: CharMode = TextMode
+            ) -> None:
         super().__init__(mode='rt' if char_mode is TextMode else 'rb')
         self.char_mode = char_mode
         self.fileno = -1
@@ -740,8 +755,8 @@ class FileInput(FileManager, Generic[CharMode]):
             return b'' if self.char_mode == BinMode else ''
 
 def fileinput(
-        files: FilesArg = None,
-        char_mode: CharMode = TextMode) -> FileInput[CharMode]:
+        files: FilesArg = None, char_mode: CharMode = TextMode
+        ) -> FileInput[CharMode]:
     """Convenience method that creates a new ``FileInput``.
     
     Args:
@@ -751,12 +766,40 @@ def fileinput(
     
     Returns:
         A FileInput instance.
+    
+    Notes:
+        Default values are not allowed for generically typed parameters.
+        Use :method:`textinput` or :method:`byteinput` instead.
     """
     if not files:
         files = sys.argv[1:] or (STDIN,)
     elif isinstance(files, str):
         files = (files,)
     return FileInput(files, char_mode)
+
+def textinput(files: FilesArg = None):
+    """Convenience method that creates a new ``FileInput`` in text mode.
+    
+    Args:
+        files: The files to open. If None, files passed on the command line are
+            used, or STDIN if there are no command line arguments.
+    
+    Returns:
+        A FileInput[Text] instance.
+    """
+    return fileinput(files, TextMode)
+
+def byteinput(files: FilesArg = None):
+    """Convenience method that creates a new ``FileInput`` in bytes mode.
+    
+    Args:
+        files: The files to open. If None, files passed on the command line are
+            used, or STDIN if there are no command line arguments.
+    
+    Returns:
+        A FileInput[bytes] instance.
+    """
+    return fileinput(files, BinMode)
 
 class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
     """Base class for file manager that writes to multiple files.
@@ -768,11 +811,16 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
         linesep: The line separator (type must match `char_mode`).
         encoding: Default character encoding to use.
         header: Default file header to write when opening output files.
+    
+    Notes:
+        Default values for generically typed parameters are not allowed. In a
+        future version, `char_mode` and `linesep` will default to None and
+        must be explicitly defined.
     """
     def __init__(
             self, files: FilesArg = None, access: ModeAccessArg = 'w',
             char_mode: CharMode = TextMode, linesep: CharMode = os.linesep,
-            encoding: str = 'utf-8', header: CharMode = None):
+            encoding: str = 'utf-8', header: CharMode = None) -> None:
         super().__init__(
             mode=FileMode(
                 access=access, coding='t' if char_mode == TextMode else 'b'),
@@ -807,7 +855,7 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
             result = self.writeline(data)
         return result[1]
     
-    def writelines(self, lines: Iterable[AnyStr]) -> int:
+    def writelines(self, lines: Iterable[AnyChar]) -> Tuple[int, int]:
         """Write an iterable of lines to the output(s).
         
         Args:
@@ -816,10 +864,11 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
         Returns:
             The tuple (lines_written, chars_written).
         """
-        counts = zip(*(self.writeline(line) for line in lines))
-        return tuple(sum(count_list) for count_list in counts)
+        line_counts, char_counts = zip(*list(
+            self.writeline(line) for line in lines))
+        return (sum(line_counts), sum(char_counts))
     
-    def writeline(self, line: AnyStr = None) -> None:
+    def writeline(self, line: AnyChar = None) -> Tuple[int, int]:
         """Write a line to the output(s).
         
         Args:
@@ -845,7 +894,7 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
         """
         pass # pragma: no-cover
     
-    def _encode(self, line: AnyStr) -> CharMode:
+    def _encode(self, line: AnyChar) -> CharMode:
         is_binary = isinstance(line, bytes)
         if self.char_mode is BinMode and not is_binary:
             line = line.encode(self.encoding)
@@ -877,7 +926,7 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
 class TeeFileOutput(FileOutput[CharMode]):
     """Write output to mutliple files simultaneously.
     """
-    def _writeline(self, line: CharMode = None) -> None:
+    def _writeline(self, line: CharMode = None) -> int:
         char_count = None
         for _, fileobj in self.iter_files():
             file_char_count = self._write_to_file(fileobj, line)
@@ -897,10 +946,10 @@ class CycleFileOutput(FileOutput[CharMode]):
     """
     def __init__(
             self, files: FilesArg = None, char_mode: CharMode = TextMode,
-            **kwargs):
+            **kwargs) -> None:
         super().__init__(files=files, char_mode=char_mode, **kwargs)
     
-    def _writeline(self, line: CharMode = None) -> None:
+    def _writeline(self, line: CharMode = None) -> int:
         return self._write_to_file(self.get(self.num_lines % len(self)), line)
 
 
@@ -915,11 +964,11 @@ class NCycleFileOutput(FileOutput[CharMode]):
     """
     def __init__(
             self, files: FilesArg = None, char_mode: CharMode = TextMode,
-            lines_per_file: int = 1, **kwargs):
+            lines_per_file: int = 1, **kwargs) -> None:
         super().__init__(files=files, char_mode=char_mode, **kwargs)
         self.lines_per_file = lines_per_file
     
-    def _writeline(self, line: CharMode = None) -> None:
+    def _writeline(self, line: CharMode = None) -> int:
         file_idx = (self.num_lines // self.lines_per_file) % len(self)
         return self._write_to_file(self.get(file_idx), line)
 
@@ -939,7 +988,7 @@ class TokenFileOutput(FileOutput[CharMode]):
         super().__init__(char_mode=char_mode, **kwargs)
         self.filename_pattern = filename_pattern
     
-    def _writeline(self, line: CharMode = None) -> None:
+    def _writeline(self, line: CharMode = None) -> int:
         tokens = self._get_outfile_tokens(line)
         path = self.filename_pattern.format(**tokens)
         if path not in self:
@@ -973,8 +1022,8 @@ class PatternFileOutput(TokenFileOutput[CharMode]):
     def __init__(
             self, filename_pattern: FilesArg = None,
             char_mode: CharMode = TextMode,
-            token_func: Callable[[AnyStr], Dict[str, Any]] = lambda x: x,
-            **kwargs):
+            token_func: Callable[[AnyChar], Dict[str, Any]] = lambda x: {x: x},
+            **kwargs) -> None:
         if not isinstance(filename_pattern, str):
             filename_pattern = filename_pattern[0]
         super().__init__(filename_pattern, char_mode, **kwargs)
@@ -983,6 +1032,7 @@ class PatternFileOutput(TokenFileOutput[CharMode]):
     def _get_outfile_tokens(self, line: CharMode = None) -> dict:
         return self.token_func(line)
 
+FilePatternArg = Union[str, Iterable[str]]
 
 class RollingFileOutput(TokenFileOutput[CharMode]):
     """Write up to ``num_lines`` lines to a file before opening the next file.
@@ -996,23 +1046,24 @@ class RollingFileOutput(TokenFileOutput[CharMode]):
         kwargs: Additional args.
     """
     def __init__(
-            self, filename_pattern: FilesArg = None,
+            self, filename_pattern: FilePatternArg = None,
             char_mode: CharMode = TextMode,
-            lines_per_file: int = 1, **kwargs):
-        if not isinstance(filename_pattern, str):
-            filename_pattern = filename_pattern[0]
-        super().__init__(filename_pattern, char_mode, **kwargs)
+            lines_per_file: int = 1, **kwargs) -> None:
+        if isinstance(filename_pattern, str):
+            filepat_str = filename_pattern
+        else:
+            filepat_str = tuple(filename_pattern)[0]
+        super().__init__(filepat_str, char_mode, **kwargs)
         self.lines_per_file = lines_per_file
     
     def _get_outfile_tokens(self, line: CharMode = None) -> dict:
         return { 'index' : self.num_lines // self.lines_per_file }
 
-
 def fileoutput(
         files: FilesArg = None, char_mode: CharMode = TextMode,
         linesep: CharMode = None, encoding: str = 'utf-8',
-        file_output_type: Callable[..., FileOutput[CharMode]] = \
-                                                    TeeFileOutput[CharMode],
+        file_output_type: \
+            Callable[..., FileOutput[CharMode]] = TeeFileOutput[CharMode],
         **kwargs) -> FileOutput[CharMode]:
     """Convenience function to create a fileoutput.
     
@@ -1026,6 +1077,10 @@ def fileoutput(
     
     Returns:
         A FileOutput instance.
+    
+    Notes:
+        Default values are not allowed for generically typed parameters.
+        Use :method:`textoutput` or :method:`byteoutput` instead.
     """
     if not files:
         files = sys.argv[1:] or (STDOUT,)
@@ -1040,11 +1095,48 @@ def fileoutput(
         files, char_mode=char_mode, linesep=linesep, encoding=encoding,
         **kwargs)
 
+def textoutput(
+        files: FilesArg = None,
+        file_output_type: Callable[..., FileOutput[str]] = TeeFileOutput[str],
+        **kwargs) -> FileOutput[str]:
+    """Convenience function to create a fileoutput in text mode.
+    
+    Args:
+        files: The files to write to.
+        file_output_type: The specific subclass of FileOutput to create.
+        kwargs: additional arguments to pass to the FileOutput constructor.
+    
+    Returns:
+        A FileOutput instance.
+    """
+    return fileoutput(
+        files, char_mode=TextMode, linesep=os.linesep, 
+        file_output_type=file_output_type, **kwargs)
+
+def byteoutput(
+        files: FilesArg = None,
+        file_output_type: \
+            Callable[..., FileOutput[bytes]] = TeeFileOutput[bytes],
+        **kwargs) -> FileOutput[bytes]:
+    """Convenience function to create a fileoutput in bytes mode.
+    
+    Args:
+        files: The files to write to.
+        file_output_type: The specific subclass of FileOutput to create.
+        kwargs: additional arguments to pass to the FileOutput constructor.
+    
+    Returns:
+        A FileOutput instance.
+    """
+    return fileoutput(
+        files, char_mode=BinMode, linesep=os.linesep.encode(), 
+        file_output_type=file_output_type, **kwargs)
+
 
 # Misc
 
 def linecount(
-        path_or_file: PathOrFile, linesep: str = None,
+        path_or_file: PathOrFile, linesep: bytes = None,
         buffer_size: int = 1024 * 1024, **kwargs) -> int:
     """Fastest pythonic way to count the lines in a file.
     
