@@ -18,8 +18,8 @@ from xphyle.progress import ITERABLE_PROGRESS, PROCESS_PROGRESS
 from xphyle.types import (
     FileType, FileLikeInterface, FileLike, FileMode, ModeArg, ModeAccess,
     ModeCoding, CompressionArg, EventType, EventTypeArg, PathOrFile, Callable,
-    Container, Iterable, Iterator, Union, Sequence, Tuple, Dict, AnyChar, Any, 
-    Generic, TypeVar)
+    Container, Iterable, Iterator, Union, Sequence, List, Tuple, Dict, Set,
+    AnyChar, Any, Generic, TypeVar, Generator, IO, FileLikeBase, cast)
 from xphyle.urls import parse_url, open_url, get_url_file_name
 
 # pylint: disable=protected-access
@@ -66,12 +66,16 @@ class EventListener(Generic[E], metaclass=ABCMeta):
             kwargs: A union of the keyword arguments passed to the constructor
                 and the __call__ method.
         """
-        pass
+        raise NotImplementedError()
 
 
 class EventManager(object):
     """Mixin type for classes that allow registering event listners.
     """
+    def __init__(self, *args, **kwargs):
+        self._listeners = defaultdict(lambda: []) # type: Dict[EventType, List[EventListener]]
+        super().__init__(*args, **kwargs)
+    
     def register_listener(
             self, event: EventTypeArg, listener: EventListener) -> None:
         """Register an event listener.
@@ -81,8 +85,8 @@ class EventManager(object):
             listener: A listener object, which must be callable with a
                 single argument -- this file wrapper.
         """
-        if not hasattr(self, '_listeners'):
-            object.__setattr__(self, '_listeners', defaultdict(lambda: []))
+        #if not hasattr(self, '_listeners'):
+        #    object.__setattr__(self, '_listeners', defaultdict(lambda: []))
         if isinstance(event, str):
             event = EventType(event)
         self._listeners[event].append(listener)
@@ -94,12 +98,12 @@ class EventManager(object):
             event: The event type.
             kwargs: Additional arguments to pass to the listener.
         """
-        if hasattr(self, '_listeners') and event in self._listeners:
+        if event in self._listeners:
             for listener in self._listeners[event]:
                 listener(self, **kwargs)
 
 
-class FileLikeWrapper(EventManager, FileLikeInterface):
+class FileLikeWrapper(EventManager, FileLikeBase):
     """Base class for wrappers around file-like objects. By default, method
     calls are forwarded to the file object. Adds the following:
     
@@ -114,19 +118,18 @@ class FileLikeWrapper(EventManager, FileLikeInterface):
     def __init__(
             self, fileobj: FileLike, compression: CompressionArg = False
             ) -> None:
-        object.__setattr__(self, '_fileobj', fileobj)
-        object.__setattr__(self, 'compression', compression)
+        super().__init__()
+        self._fileobj = fileobj
+        self._iterator = None # type: Iterator
+        self.compression = compression
     
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._fileobj, name)
-    
-    def __next__(self) -> AnyChar:
+    def __next__(self) -> bytes:
         return next(iter(self))
     
     def __iter__(self) -> Iterator:
-        if not hasattr(self, '_iterator'):
-            itr = iter(ITERABLE_PROGRESS.wrap(self._fileobj, desc=self.name))
-            setattr(self, '_iterator', itr)
+        if self._iterator is None:
+            self._iterator = iter(
+                ITERABLE_PROGRESS.wrap(self._fileobj, desc=self.name))
         return self._iterator
     
     def __enter__(self) -> 'FileLikeWrapper':
@@ -134,8 +137,9 @@ class FileLikeWrapper(EventManager, FileLikeInterface):
             raise IOError("I/O operation on closed file.")
         return self
     
-    def __exit__(self, exception_type, exception_value, traceback) -> None:
+    def __exit__(self, exception_type, exception_value, traceback) -> bool:
         self.close()
+        return False
     
     def peek(self, size: int = 1) -> AnyChar:
         """Return bytes/characters from the stream without advancing the
@@ -158,7 +162,7 @@ class FileLikeWrapper(EventManager, FileLikeInterface):
         
         if hasattr(self._fileobj, 'peek'):
             # The underlying file has a peek() method
-            peek = self._fileobj.peek(size)
+            peek = getattr(self._fileobj, 'peek')(size)
             # I don't think the following is a valid state
             # if 't' in self._fileobj.mode:
             #     if isinstance(peek, 'bytes'):
@@ -175,9 +179,8 @@ class FileLikeWrapper(EventManager, FileLikeInterface):
                 peek = self._fileobj.read(size)
             finally:
                 self._fileobj.seek(curpos)
-        else:
+        else: # pragma: no-cover
             # TODO I don't think it's possible to get here, but leaving for now
-            # pragma: no-cover
             raise IOError("Unpeekable file: {}".format(self.name))
         return peek
     
@@ -192,6 +195,62 @@ class FileLikeWrapper(EventManager, FileLikeInterface):
     
     def _close(self) -> None:
         self._fileobj.close()
+    
+    # Pass-through methods
+    
+    @property
+    def name(self) -> str: # pragma: no-cover
+        return self._fileobj.name
+    
+    @property
+    def mode(self) -> str: # pragma: no-cover
+        return self._fileobj.mode
+    
+    @property
+    def closed(self) -> bool: # pragma: no-cover
+        return self._fileobj.closed
+    
+    def readable(self) -> bool: # pragma: no-cover
+        return self._fileobj.readable()
+    
+    def read(self, size: int = -1) -> bytes: # pragma: no-cover
+        return self._fileobj.read(size)
+    
+    def readline(self, size: int = -1) -> AnyChar: # pragma: no-cover
+        return self._fileobj.readline(size)
+    
+    def readlines(self, hint: int = -1) -> List[AnyChar]: # pragma: no-cover
+        return self._fileobj.readlines(hint)
+    
+    def writable(self) -> bool: # pragma: no-cover
+        return self._fileobj.writable()
+    
+    def write(self, string: AnyChar) -> int: # pragma: no-cover
+        return self._fileobj.write(string)
+    
+    def writelines(self, lines: Iterable[AnyChar]) -> None: # pragma: no-cover
+        self._fileobj.writelines(lines)
+    
+    def flush(self) -> None: # pragma: no-cover
+        self._fileobj.flush()
+    
+    def seekable(self) -> bool: # pragma: no-cover
+        return self._fileobj.seekable()
+    
+    def seek(self, offset, whence: int = 0) -> int: # pragma: no-cover
+        return self._fileobj.seek(offset, whence=whence)
+    
+    def tell(self) -> int: # pragma: no-cover
+        return self._fileobj.tell()
+    
+    def isatty(self) -> bool: # pragma: no-cover
+        return self._fileobj.isatty()
+    
+    def fileno(self) -> int: # pragma: no-cover
+        return self._fileobj.fileno()
+    
+    def truncate(self, size: int = None) -> int: # pragma: no-cover
+        return self._fileobj.truncate(size=size)
 
 
 class FileWrapper(FileLikeWrapper):
@@ -209,17 +268,27 @@ class FileWrapper(FileLikeWrapper):
             compression: CompressionArg = False, name: str = None,
             **kwargs) -> None:
         if isinstance(source, str):
-            path = source
-            source = xopen(
+            self._path = str(source)
+            source_fileobj = xopen(
                 source, mode=mode, compression=compression, **kwargs)
-        elif name or not hasattr(source, 'name'):
-            path = name
         else:
-            path = source.name
-        super().__init__(source, compression=compression)
-        object.__setattr__(self, '_path', path)
-        if name:
-            object.__setattr__(self, 'name', name)
+            source_fileobj = cast(FileLike, source)
+            if name or not hasattr(source_fileobj, 'name'):
+                self._path = name
+            else:
+                self._path = getattr(source_fileobj, 'name')
+        super().__init__(source_fileobj, compression=compression)
+        self._name = name
+        if mode or not hasattr(source, 'mode'):
+            self._mode = str(mode)
+        else:
+            self._mode = getattr(source_fileobj, 'mode')
+    
+    @property
+    def name(self) -> str:
+        if hasattr(self, '_name'):
+            return getattr(self, '_name')
+        return super().name
     
     @property
     def path(self):
@@ -237,16 +306,16 @@ class BufferWrapper(FileWrapper):
         compression: Compression type.
     """
     def __init__(
-            self, fileobj: PathOrFile, buffer: FileLike,
-            compression: CompressionArg = False, name: str = None):
+            self, fileobj: PathOrFile, buffer: Union[io.StringIO, io.BytesIO],
+            compression: CompressionArg = False, name: str = None) -> None:
         super().__init__(fileobj, compression=compression, name=name)
-        object.__setattr__(self, 'buffer', buffer)
+        self.buffer = buffer
     
     def getvalue(self) -> AnyChar:
         """Returns the contents of the buffer.
         """
         if hasattr(self, '_value'):
-            return self._value
+            return getattr(self, '_value')
         else:
             return self.buffer.getvalue()
     
@@ -257,7 +326,7 @@ class BufferWrapper(FileWrapper):
         else:
             value = self.getvalue()
             self._fileobj.close()
-        object.__setattr__(self, '_value', value)
+        setattr(self, '_value', value)
 
 
 class StdWrapper(FileLikeWrapper):
@@ -267,18 +336,24 @@ class StdWrapper(FileLikeWrapper):
         stream: The stream to wrap.
         compression: Compression type.
     """
-    def __init__(self, stream: FileLike, compression: CompressionArg = False):
+    def __init__(
+            self, stream: FileLike, compression: CompressionArg = False
+            ) -> None:
         super().__init__(stream, compression=compression)
-        object.__setattr__(self, 'closed', False)
+        self._closed = False
+    
+    @property
+    def closed(self) -> bool:
+        return self._closed
     
     def _close(self):
         self._fileobj.flush()
-        self.closed = True # pylint: disable=attribute-defined-outside-init
+        self._closed = True
 
 
 PopenStdArg = Union[PathOrFile, int] # pylint: disable=invalid-name
 
-class Process(Popen, EventManager, FileLikeInterface):
+class Process(EventManager, Popen, FileLikeBase, Iterable):
     """Subclass of :class:`subprocess.Popen` with the following additions:
     
     * Provides :method:`Process.wrap_pipes` for wrapping stdin/stdout/stderr
@@ -297,19 +372,37 @@ class Process(Popen, EventManager, FileLikeInterface):
             constructor.
     """
     def __init__(
-            self, *args, stdin: PopenStdArg = None, stdout: PopenStdArg = None,
+            self, args, stdin: PopenStdArg = None, stdout: PopenStdArg = None,
             stderr: PopenStdArg = None, **kwargs) -> None:
         super().__init__(
-            *args, stdin=stdin, stdout=stdout, stderr=stderr, **kwargs)
+            args, stdin=stdin, stdout=stdout, stderr=stderr, **kwargs)
         # Construct a dict of name=(stream, wrapper, is_pipe) for std streams
+        self._name = ' '.join(args)
         self._std = dict(
             (name, [stream, None, desc == PIPE])
             for name, desc, stream in zip(
                 ('stdin', 'stdout', 'stderr'),
                 (stdin, stdout, stderr),
                 (self.stdin, self.stdout, self.stderr)))
-        # PEP526 self._iterator: Iterable[str] = None
-        self._iterator = None
+        self._iterator = None # type: Iterator[str]
+    
+    @property
+    def name(self) -> str:
+        return self._name
+    
+    @property
+    def mode(self) -> str:
+        if self.writable():
+            mode = self.get_writer().mode
+            if (
+                    self.readable() and 
+                    ('b' in mode) == ('b' in self.get_reader().mode)):
+                mode += 'r'
+            return mode
+        elif self.readable():
+            return self.get_reader().mode
+        else:
+            raise TypeError("Process is not readable or writable")
     
     def wrap_pipes(self, **kwargs) -> None:
         """Wrap stdin/stdout/stderr PIPE streams using xopen.
@@ -365,7 +458,7 @@ class Process(Popen, EventManager, FileLikeInterface):
         """
         return self.get_reader() is not None
     
-    def read(self, size: int = -1, which: str = None) -> AnyChar:
+    def read(self, size: int = -1, which: str = None) -> bytes:
         """Read `size` bytes/characters from stdout or stderr.
         
         Args:
@@ -399,8 +492,11 @@ class Process(Popen, EventManager, FileLikeInterface):
         """
         return tuple(self.get_reader(std) for std in ('stdout', 'stderr'))
     
+    # ISSUE: No idea why mypy says the type of `inp` is incompatible with
+    # super class.
     def communicate(
-            self, inp: AnyChar = None, timeout: int = None) -> Tuple[str, str]:
+            self, inp: AnyChar = None, timeout: float = None
+            ) -> Tuple[IO, IO]:
         """Send input to stdin, wait for process to terminate, return
         results.
         
@@ -413,13 +509,8 @@ class Process(Popen, EventManager, FileLikeInterface):
         """
         if inp:
             self.write(inp)
-        self.close(timeout, True, True)
+        self.close1(timeout, True, True)
         return (self.stdout, self.stderr)
-    
-    def seekable(self) -> bool: # pylint: disable=no-self-use
-        """Implementing file interface; returns False.
-        """
-        return False
     
     def flush(self) -> None:
         """Flushes stdin if there is one.
@@ -432,29 +523,32 @@ class Process(Popen, EventManager, FileLikeInterface):
         """
         return next(iter(self))
     
-    def __iter__(self) -> Iterable[AnyChar]:
+    def __iter__(self) -> Iterator[AnyChar]:
         """Returns the currently open iterator. If one isn't open,
         :method:`_reader(which=None)` is used to create one.
         """
         if not self._iterator:
             self._iterator = iter(ITERABLE_PROGRESS.wrap(
-                self.get_reader(), desc=str(self)))
+                cast(Iterable[AnyChar], self.get_reader()), desc=str(self)))
         return self._iterator
     
-    def __exit__(self, exception_type, exception_value, traceback) -> None: # pylint: disable=arguments-differ
+    def __enter__(self) -> 'Process':
+        return self
+    
+    def __exit__(self, exception_type, exception_value, traceback) -> bool: # pylint: disable=arguments-differ
         """On exit from a context manager, calls
         :method:`close(raise_on_error=True, record_output=True)`.
         """
         if not self.closed:
-            self.close(raise_on_error=True, record_output=True)
+            self.close1(raise_on_error=True, record_output=True)
+        return False
     
     def __del__(self) -> None:
         if not self.closed:
             try:
-                self.close(1, False, False, True)
+                self.close1(1, False, False, True)
             except IOError: # pragma: no-cover
                 pass
-        super().__del__()
     
     @property
     def closed(self):
@@ -462,8 +556,11 @@ class Process(Popen, EventManager, FileLikeInterface):
         """
         return self._std is None
     
-    def close(
-            self, timeout: int = None, raise_on_error: bool = False,
+    def close(self) -> None:
+        self.close1()
+    
+    def close1(
+            self, timeout: float = None, raise_on_error: bool = False,
             record_output: bool = False, terminate: bool = False) -> int:
         """Close stdin/stdout/stderr streams, wait for process to finish, and
         return the process return code.
@@ -555,9 +652,7 @@ class Process(Popen, EventManager, FileLikeInterface):
 
 # Methods
 
-DEFAULTS = dict(
-    xopen_context_wrapper = False
-)
+DEFAULTS = dict(xopen_context_wrapper=False) # types: Dict[str, Any]
 
 def configure(
         default_xopen_context_wrapper: bool = None,
@@ -585,6 +680,7 @@ def configure(
             executables. These will be searched before the default system path.
     """
     if default_xopen_context_wrapper is not None:
+        # ISSUE: mypy doesn't recognize valid generator statement
         DEFAULTS.update(xopen_context_wrapper=default_xopen_context_wrapper)
     if progress is not None:
         ITERABLE_PROGRESS.update(progress, progress_wrapper)
@@ -604,7 +700,7 @@ def configure(
 def open_(
         path_or_file, #: OpenArg
         mode: ModeArg = None, errors: bool = True,
-        wrap_fileobj: bool = True, **kwargs) -> FileLike:
+        wrap_fileobj: bool = True, **kwargs) -> Generator[FileLike, None, None]:
     """Context manager that frees you from checking if an argument is a path
     or a file object. Calls ``xopen`` to open files.
     
@@ -837,7 +933,8 @@ def xopen(
             validate = False
     
     # The file handle we will open
-    fileobj = None
+    # TODO: figure out the right type
+    fileobj = None # type: Any
     # The name to use for the file
     name = None
     # Guessed compression type, if compression in (None, True)
@@ -845,18 +942,18 @@ def xopen(
     # Whether to try and guess file format
     guess_format = compression in (None, True)
     # Whether to validate that the actually compression format matches expected
-    validate = validate and compression and not guess_format
+    validate = validate and bool(compression) and not guess_format
     
     if file_type is FileType.STDIO:
         use_system = False
         if path == STDERR:
             if not mode.writable:
                 raise ValueError("Mode must be writable for stderr")
-            fileobj = sys.stderr
+            stdobj = sys.stderr
         else:
-            fileobj = sys.stdin if mode.readable else sys.stdout
+            stdobj = sys.stdin if mode.readable else sys.stdout
         # get the underlying binary stream
-        fileobj = fileobj.buffer
+        fileobj = stdobj.buffer
         if mode.readable and (validate or guess_format):
             if not hasattr(fileobj, 'peek'):
                 fileobj = io.BufferedReader(fileobj)
@@ -881,9 +978,8 @@ def xopen(
             fileobj_mode = FileMode(
                 access=access,
                 coding='t' if hasattr(fileobj, 'encoding') else 'b')
-        else:
+        else: # pragma: no-cover
             # TODO I don't think we can actually get here, but leaving for now.
-            # pragma: no-cover
             raise ValueError("Cannot determine file mode")
         
         # make sure modes are compatible
@@ -962,7 +1058,7 @@ def xopen(
             "Could not guess compression format from {}".format(path))
     
     if compression:
-        fmt = FORMATS.get_compression_format(compression)
+        fmt = FORMATS.get_compression_format(str(compression))
         compression = fmt.name
         fileobj = fmt.open_file(
             fileobj or path, mode, use_system=use_system, **kwargs)
@@ -980,7 +1076,8 @@ def xopen(
         elif file_type == FileType.BUFFER:
             fileobj = BufferWrapper(fileobj, buffer, compression=compression)
         else:
-            fileobj = FileWrapper(fileobj, name=name, compression=compression)
+            fileobj = FileWrapper(
+                fileobj, name=name, mode=mode,compression=compression)
     
     return fileobj
 

@@ -7,7 +7,7 @@ xphyle: extraordinarily simple file handling
 
 xphyle is a small python (3.3+) library that makes it easy to open
 compressed files. Most importantly, xphyle will use the appropriate
-program (e.g. 'gzip') to compress/uncompress a file if it is available
+program (e.g. 'gzip') to compress/decompress a file if it is available
 on your system; this is almost always faster than using the
 corresponding python library. xphyle also provides methods that simplify
 common file I/O operations.

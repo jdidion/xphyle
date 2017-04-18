@@ -2,13 +2,15 @@
 """Type checking support. Defines commonly used types.
 """
 # pylint: disable=wildcard-import, unused-wildcard-import, import-error, invalid-name
+from abc import ABCMeta, abstractmethod
 import collections
 from enum import Enum
 import os
 import stat
 import sys
+from types import ModuleType
 from typing import *
-# ISSUE: not sure why this has to be imported separately
+# ISSUE: Not sure why I have to import IO separately
 from typing import IO
 from typing.re import *
 
@@ -341,31 +343,78 @@ class EventType(Enum):
     """
     CLOSE = 'close'
 
-class FileLikeInterface(object):
-    """This is a marker interface for classes that implement method (listed
-    below) to make them behave like python file objects.
+AnyChar = Union[bytes, Text]
+"""Similar to AnyStr, but specifies that strings must be unicode."""
+
+class FileLikeInterface(IO, Iterable[AnyChar], metaclass=ABCMeta):
+    """This is a marker interface for classes that implement methods (listed
+    below) to make them behave like python file objects. Provides a subset of
+    methods from typing.io.IO, plus next() and __iter__.
     
     See Also:
         https://docs.python.org/3/tutorial/inputoutput.html#methods-of-file-objects
     """
-    pass
-    #def flush(self): pass
-    #def close(self): pass
-    #def __enter__(self): pass
-    #def __exit__(self,exc_type,exc_val,exc_tb): pass
-    #def next(self): pass
-    #def __iter__(self): pass
-    #def truncate(self, size=None): pass
-    #def seek(self,offset,whence=0): pass
-    #def seekable(self): pass
-    #def tell(self): pass
-    #def read(self, size=-1): pass
-    #def readable(self): pass
-    #def readline(self, size=-1): pass
-    #def readlines(self, sizehint=-1): pass
-    #def writable(self): pass
-    #def write(self, string): pass
-    #def writelines(self, seq): pass
+    @abstractmethod
+    def next(self) -> AnyChar:
+        raise NotImplementedError()
+
+
+class FileLikeBase(FileLikeInterface):
+    def readable(self) -> bool:
+        return False
+    
+    def read(self, n: int = -1) -> AnyChar:
+        raise NotImplementedError()
+    
+    def readline(self, hint: int = -1) -> AnyChar:
+        raise NotImplementedError()
+    
+    def readlines(self, sizehint: int = -1) -> List[AnyChar]:
+        raise NotImplementedError()
+    
+    def writable(self) -> bool:
+        return False
+    
+    def write(self, string: AnyChar) -> int:
+        raise NotImplementedError()
+    
+    def writelines(self, lines: Iterable[AnyChar]) -> None:
+        raise NotImplementedError()
+    
+    def seek(self, offset, whence: int = 0) -> int:
+        raise NotImplementedError()
+    
+    def seekable(self) -> bool:
+        return False
+    
+    def tell(self) -> int:
+        raise NotImplementedError()
+    
+    def isatty(self) -> bool:
+        return False
+    
+    def fileno(self) -> int:
+        return -1
+    
+    def truncate(self, size: int = None) -> int:
+        raise NotImplementedError()
+    
+    def __enter__(self) -> Any:
+        return self
+    
+    def __exit__(self, exception_type, exception_value, traceback) -> bool:
+        self.close()
+        return False
+    
+    def __iter__(self) -> Iterator[AnyChar]:
+        raise NotImplementedError()
+    
+    def __next__(self) -> AnyChar:
+        raise NotImplementedError()
+    
+    def next(self) -> AnyChar:
+        return self.__next__()
+
 
 class PathType(Enum):
     """Enumeration of supported path types (file, directory, FIFO).
@@ -376,9 +425,6 @@ class PathType(Enum):
     """Path represents a directory."""
     FIFO = '|'
     """Path represents a FIFO."""
-
-AnyChar = Union[bytes, Text]
-"""Similar to AnyStr, but specifies that strings must be unicode."""
 
 FileLike = Union[IO, FileLikeInterface]
 """File-like object; either a subclass of :class:`io.IOBase` or a
@@ -398,7 +444,7 @@ python >= 3.6, path-like means is a subclass of os.PathLike, otherwise means
 is a subclass of pathlib.PurePath.
 """
 
-PathOrFile = Union[str, FileLike]
+PathOrFile = Union[PathLike, FileLike]
 """Either a string or FileLike."""
 
 Url = Tuple[str, str, str, str, str, str]
@@ -437,7 +483,7 @@ PathTypeArg = Union[str, PathType]
 EventTypeArg = Union[str, EventType]
 """An event type name or :class:`EventType`."""
 
-FilesArg = Iterable[Union[str, Tuple[Any, PathOrFile]]]
+FilesArg = Iterable[Union[PathLike, Tuple[Any, PathOrFile]]]
 """Multiple files: an iterable over either strings or (key, PathOrFile)."""
 
 CompressionArg = Union[bool, str]

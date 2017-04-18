@@ -72,8 +72,8 @@ The following are functionally equivalent ways to open a gzip file::
 
 So then why use xphyle? Two reasons:
 
-1. The ``gzip.open`` method of opening a gzip file above requires you to know that you are expecting a gzip file and only a gzip file. If your program optionally accepts either a compressed or an uncompressed file, then you'll need several extra lines of code to either detect the file format or to make the user specify the format of the file they are providing. This becomes increasingly cumbersome with each additional format you want to support. On the other hand, ``xopen`` has the same interface regardless of the compression format. Furthermore, if xphyle doesn't currently support a file format that you would like to use, it enables you to add it via a simple API.
-2. The ``gzip.open`` method of opening a gzip file uses python code to uncompress the file. It's well written, highly optimized python code, but unfortunately it's still slower than your natively compiled system-level applications (e.g. pigz or gzip). The ``xopen`` method of opening a gzip file first tries to use pigz or gzip to uncompress the file and provides access to the resulting stream of uncompressed data (as a file-like object), and only falls back to ``gzip.open`` if neither program is available.
+1. The ``gzip.open`` method of opening a gzip file above requires you to know that you are expecting a gzip file and only a gzip file. If your program optionally accepts either a compressed or a decompressed file, then you'll need several extra lines of code to either detect the file format or to make the user specify the format of the file they are providing. This becomes increasingly cumbersome with each additional format you want to support. On the other hand, ``xopen`` has the same interface regardless of the compression format. Furthermore, if xphyle doesn't currently support a file format that you would like to use, it enables you to add it via a simple API.
+2. The ``gzip.open`` method of opening a gzip file uses python code to decompress the file. It's well written, highly optimized python code, but unfortunately it's still slower than your natively compiled system-level applications (e.g. pigz or gzip). The ``xopen`` method of opening a gzip file first tries to use pigz or gzip to decompress the file and provides access to the resulting stream of decompressed data (as a file-like object), and only falls back to ``gzip.open`` if neither program is available.
 
 If you want to be explicit about whether to expect a compressed file, what type of compression to expect, or whether to try and use system programs, you can::
     
@@ -246,15 +246,15 @@ You can also read from delimited files such as csv and tsv::
                                   row_type=Dog):
     dogs['Barney'].say('Good Boy!')
 
-There are convenience methods for compressing and uncompressing files::
+There are convenience methods for compressing and decompressing files::
     
-    from xphyle.utils import compress_file, uncompress_file, transcode_file
+    from xphyle.utils import compress_file, decompress_file, transcode_file
     
     # Gzip compress recipes.txt, and delete the original
     compress_file('recipes.txt', compression='gzip', keep=False)
     
-    # Uncompress a remote archive to a local file
-    uncompress_file('http://recipes.com/allrecipes.txt.gz',
+    # decompress a remote compressed file to a local file
+    decompress_file('http://recipes.com/allrecipes.txt.gz',
                     'local_recipes.txt')
     
     # Change from gzip to bz2 compression:
@@ -399,7 +399,7 @@ You can add support for another compression format by extending one of the base 
         mime_types = ('application/foo',) # mime type(s) for this format
         
         # build the system command
-        # op = 'c' for compress, 'd' for uncompress
+        # op = 'c' for compress, 'd' for decompress
         # src = the source file, or STDIN if input should be read from stdin
         # stdout = True if output should be written to stdout
         # compresslevel = the compression level

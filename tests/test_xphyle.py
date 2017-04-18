@@ -366,20 +366,20 @@ class XphyleTests(TestCase):
         self.assertFalse(p.closed)
         p.close()
         self.assertTrue(p.closed)
-        self.assertIsNone(p.close(raise_on_error=False))
+        self.assertIsNone(p.close1(raise_on_error=False))
         with self.assertRaises(IOError):
-            p.close(raise_on_error=True)
+            p.close1(raise_on_error=True)
     
     def test_process_close_hung(self):
         p = Process(('sleep', '5'))
         with self.assertRaises(Exception):
             p.close(timeout=1, terminate=False)
         p = Process(('sleep', '5'))
-        p.close(timeout=1, terminate=True)
+        p.close1(timeout=1, terminate=True)
         self.assertTrue(p.closed)
     
     def test_process_error(self):
         p = popen(('exit','2'), shell=True)
         with self.assertRaises(IOError):
-            p.close(raise_on_error=True)
+            p.close1(raise_on_error=True)
         self.assertFalse(p.returncode==0)

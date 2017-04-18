@@ -1,6 +1,9 @@
-v2.2.4 (dev)
-------------
-
+v3.0.0 (2017.04.18)
+-------------------
+* Lots of fixes for bugs and type errors using mypy.
+* Two breakting changes that necessitate the major version bump:
+    * Several methods were erroneously named "uncompress_..." and have been corrected to "decompress_..."
+    * Default values were erroneously used for the char_mode and linesep parameters of fileinput(), fileoutput(), FileInput, FileOutput, and all their subclasses. textinput(), textoutput(), byteinput(), and byteoutput() convenience methods were added, and default values were set to None.
 
 v2.2.3 (2017.04.09)
 -------------------

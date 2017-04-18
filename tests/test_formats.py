@@ -313,15 +313,15 @@ class FileTests(TestCase):
                 with gzip.open(gzfile, 'rt') as i:
                     self.assertEqual(i.read(), 'foo')
     
-    def test_uncompress_path_error(self):
+    def test_decompress_path_error(self):
         path = self.root.make_file()
         with gzip.open(path, 'wt') as o:
             o.write('foo')
         with self.assertRaises(Exception):
             fmt = get_format('.gz')
-            fmt.uncompress_file(path)
+            fmt.decompress_file(path)
     
-    def test_uncompress_path(self):
+    def test_decompress_path(self):
         b = (True, False) if gz_path else (False,)
         for use_system in b:
             with self.subTest(use_system=use_system):
@@ -330,7 +330,7 @@ class FileTests(TestCase):
                 with gzip.open(gzfile, 'wt') as o:
                     o.write('foo')
                 fmt = get_format('.gz')
-                dest = fmt.uncompress_file(gzfile, use_system=use_system)
+                dest = fmt.decompress_file(gzfile, use_system=use_system)
                 self.assertEqual(dest, path)
                 self.assertTrue(os.path.exists(path))
                 self.assertTrue(os.path.exists(gzfile))
@@ -342,7 +342,7 @@ class FileTests(TestCase):
                 with gzip.open(gzfile, 'wt') as o:
                     o.write('foo')
                 fmt = get_format('.gz')
-                dest = fmt.uncompress_file(
+                dest = fmt.decompress_file(
                     gzfile, path, keep=False, use_system=use_system)
                 self.assertEqual(dest, path)
                 self.assertTrue(os.path.exists(path))
@@ -350,7 +350,7 @@ class FileTests(TestCase):
                 with open(path, 'rt') as i:
                     self.assertEqual(i.read(), 'foo')
     
-    def test_uncompress_file(self):
+    def test_decompress_file(self):
         b = (True, False) if gz_path else (False,)
         for use_system in b:
             with self.subTest(use_system=use_system):
@@ -360,7 +360,7 @@ class FileTests(TestCase):
                     o.write('foo')
                 with open(gzfile, 'rb') as i:
                     fmt = get_format('.gz')
-                    dest = fmt.uncompress_file(i, use_system=use_system)
+                    dest = fmt.decompress_file(i, use_system=use_system)
                 self.assertEqual(dest, path)
                 self.assertTrue(os.path.exists(path))
                 self.assertTrue(os.path.exists(gzfile))
@@ -372,7 +372,7 @@ class FileTests(TestCase):
                 dest = self.root.make_file()
                 with open(gzfile, 'rb') as i, open(dest, 'wb') as o:
                     fmt = get_format('.gz')
-                    fmt.uncompress_file(source=i, dest=o, use_system=use_system)
+                    fmt.decompress_file(source=i, dest=o, use_system=use_system)
                 self.assertTrue(os.path.exists(dest))
                 self.assertTrue(os.path.exists(gzfile))
                 with open(dest, 'rt') as i:
@@ -384,7 +384,7 @@ class FileTests(TestCase):
                     o.write('foo')
                 with open(gzfile, 'rb') as i:
                     fmt = get_format('.gz')
-                    dest = fmt.uncompress_file(
+                    dest = fmt.decompress_file(
                         i, path, keep=False, use_system=use_system)
                 self.assertEqual(dest, path)
                 self.assertFalse(os.path.exists(gzfile))

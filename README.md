@@ -10,7 +10,7 @@
      alt="logo" width="200" height="200">
 
 xphyle is a small python (3.3+) library that makes it easy to open compressed
-files. Most importantly, xphyle will use the appropriate program (e.g. 'gzip') to compress/uncompress a file if it is available on your system; this is almost always faster than using the corresponding python library. xphyle also provides methods that simplify common file I/O operations.
+files. Most importantly, xphyle will use the appropriate program (e.g. 'gzip') to compress/decompress a file if it is available on your system; this is almost always faster than using the corresponding python library. xphyle also provides methods that simplify common file I/O operations.
 
 # Installation
 
@@ -82,8 +82,4 @@ Future releases are mapped out using [GitHub Projects](https://github.com/jdidio
 
 # Developers
 
-We welcome any contributions via pull requests. Style-wise, we try to adhere to the Google python style guidelines. We use Google-style docstrings, which are formatted by the [Napoleon Sphinx Plugin](https://pypi.python.org/pypi/sphinxcontrib-napoleon). We run pylint as part of each build and strive to maintain a 10/10 score. However, we disable some pylint checks:
-
-* Function annotations: pylint does not properly handle whitespace around function annotations (https://github.com/PyCQA/pylint/issues/238).
-* White space on empty lines: we use white space as a visual guide to the structure of the code. Each blank line should have whitespace matching the indent level of the next non-blank line.
-* Checks that are arbitrary/overly restrictive (e.g. 'too-many-xxx'; see .pylintrc for full list)
+We welcome any contributions via pull requests. Style-wise, we try to adhere to the Google python style guidelines. We use Google-style docstrings, which are formatted by the [Napoleon Sphinx Plugin](https://pypi.python.org/pypi/sphinxcontrib-napoleon). We run pylint as part of each build and strive to maintain a 10/10 score. We plan to soon enable automated static type checking using mypy.

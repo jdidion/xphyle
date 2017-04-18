@@ -235,7 +235,7 @@ class UtilsTests(TestCase):
         gzfile = gzip.open(gzpath, 'w')
         try:
             self.assertEquals(
-                gzfile, compress_file(path, gzfile, compression=True))
+                gzpath, compress_file(path, gzfile, compression=True))
         finally:
             gzfile.close()
         self.assertTrue(os.path.exists(path))
@@ -255,13 +255,13 @@ class UtilsTests(TestCase):
         with gzip.open(gzfile, 'rt') as i:
             self.assertEqual(i.read(), 'foo')
     
-    def test_uncompress_file(self):
+    def test_decompress_file(self):
         path = self.root.make_file()
         gzfile = path + '.gz'
         with gzip.open(gzfile, 'wt') as o:
             o.write('foo')
     
-        path2 = uncompress_file(gzfile, keep=True)
+        path2 = decompress_file(gzfile, keep=True)
         self.assertEqual(path, path2)
         self.assertTrue(os.path.exists(gzfile))
         self.assertTrue(os.path.exists(path))
@@ -269,21 +269,21 @@ class UtilsTests(TestCase):
             self.assertEqual(i.read(), 'foo')
     
         with open(gzfile, 'rb') as i:
-            path2 = uncompress_file(i, keep=True)
+            path2 = decompress_file(i, keep=True)
             self.assertEqual(path, path2)
             self.assertTrue(os.path.exists(gzfile))
             self.assertTrue(os.path.exists(path))
             with open(path, 'rt') as i:
                 self.assertEqual(i.read(), 'foo')
     
-    def test_uncompress_file_compression(self):
+    def test_decompress_file_compression(self):
         path = self.root.make_file()
         gzfile = path + '.foo'
         with gzip.open(gzfile, 'wt') as o:
             o.write('foo')
         with self.assertRaises(ValueError):
-            uncompress_file(gzfile)
-        path2 = uncompress_file(gzfile, compression='gz', keep=False)
+            decompress_file(gzfile)
+        path2 = decompress_file(gzfile, compression='gz', keep=False)
         self.assertEqual(path, path2)
         self.assertFalse(os.path.exists(gzfile))
         self.assertTrue(os.path.exists(path))
@@ -571,7 +571,9 @@ class UtilsTests(TestCase):
     
     def test_rolling_fileoutput(self):
         path = self.root.make_file()
-        with RollingFileOutput(path + '{index}.txt', lines_per_file=3) as out:
+        with RollingFileOutput(
+                path + '{index}.txt', char_mode=TextMode, linesep=os.linesep,
+                lines_per_file=3) as out:
             for i in range(6):
                 out.write(str(i))
         with open(path + '0.txt', 'rt') as infile:
