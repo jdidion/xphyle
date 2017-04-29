@@ -82,4 +82,4 @@ Future releases are mapped out using [GitHub Projects](https://github.com/jdidio
 
 # Developers
 
-We welcome any contributions via pull requests. Style-wise, we try to adhere to the Google python style guidelines. We use Google-style docstrings, which are formatted by the [Napoleon Sphinx Plugin](https://pypi.python.org/pypi/sphinxcontrib-napoleon). We run pylint as part of each build and strive to maintain a 10/10 score. We plan to soon enable automated static type checking using mypy.
+We welcome any contributions via pull requests. Style-wise, we try to adhere to the Google python style guidelines. We use Google-style docstrings, which are formatted by the [Napoleon Sphinx Plugin](https://pypi.python.org/pypi/sphinxcontrib-napoleon). We run pylint as part of each build and strive to maintain a 10/10 score. We enforce the [Contributor Covenant](http://contributor-covenant.org/) code of conduct.

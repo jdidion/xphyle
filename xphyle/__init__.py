@@ -19,7 +19,7 @@ from xphyle.types import (
     FileType, FileLikeInterface, FileLike, FileMode, ModeArg, ModeAccess,
     ModeCoding, CompressionArg, EventType, EventTypeArg, PathOrFile, Callable,
     Container, Iterable, Iterator, Union, Sequence, List, Tuple, Dict, Set,
-    AnyChar, Any, Generic, TypeVar, Generator, IO, FileLikeBase, cast)
+    AnyChar, Any, Generic, TypeVar, Generator, IO, FileLikeBase, Type, cast)
 from xphyle.urls import parse_url, open_url, get_url_file_name
 
 # pylint: disable=protected-access
@@ -117,7 +117,7 @@ class FileLikeWrapper(EventManager, FileLikeBase):
     """
     def __init__(
             self, fileobj: FileLike, compression: CompressionArg = False
-            ) -> None:
+        ) -> None:
         super().__init__()
         self._fileobj = fileobj
         self._iterator = None # type: Iterator
@@ -338,7 +338,7 @@ class StdWrapper(FileLikeWrapper):
     """
     def __init__(
             self, stream: FileLike, compression: CompressionArg = False
-            ) -> None:
+        ) -> None:
         super().__init__(stream, compression=compression)
         self._closed = False
     
@@ -496,7 +496,7 @@ class Process(EventManager, Popen, FileLikeBase, Iterable):
     # super class.
     def communicate(
             self, inp: AnyChar = None, timeout: float = None
-            ) -> Tuple[IO, IO]:
+        ) -> Tuple[IO, IO]:
         """Send input to stdin, wait for process to terminate, return
         results.
         
@@ -535,7 +535,7 @@ class Process(EventManager, Popen, FileLikeBase, Iterable):
     def __enter__(self) -> 'Process':
         return self
     
-    def __exit__(self, exception_type, exception_value, traceback) -> bool: # pylint: disable=arguments-differ
+    def __exit__(self, exception_type, exception_value, traceback) -> bool:
         """On exit from a context manager, calls
         :method:`close(raise_on_error=True, record_output=True)`.
         """
@@ -694,11 +694,11 @@ def configure(
 
 # The following doesn't work due to a known bug
 # https://github.com/python/typing/issues/266
-# OpenArg = Union[PathOrFile, bytes, Type[Union[bytes, str]]] # pylint: disable=invalid-name
+#OpenArg = Union[PathOrFile, bytes, Type[Union[bytes, str]]]
 
 @contextmanager
 def open_(
-        path_or_file, #: OpenArg
+        path_or_file, #: OpenArg,
         mode: ModeArg = None, errors: bool = True,
         wrap_fileobj: bool = True, **kwargs) -> Generator[FileLike, None, None]:
     """Context manager that frees you from checking if an argument is a path
@@ -757,7 +757,7 @@ def open_(
 
 
 def xopen(
-        path, #: OpenArg
+        path, #: OpenArg,
         mode: ModeArg = None,
         compression: CompressionArg = None, use_system: bool = True,
         context_wrapper: bool = None, file_type: FileType = None,
@@ -870,7 +870,6 @@ def xopen(
         else:
             mode = FileMode('wb')
     elif isinstance(mode, str):
-        # pylint: disable=redefined-variable-type
         if ('U' in mode
                 and 'newline' in kwargs and
                 kwargs['newline'] is not None):
