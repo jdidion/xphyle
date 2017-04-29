@@ -1,0 +1,15 @@
+{
+  "@context": "https://raw.githubusercontent.com/codemeta/codemeta/master/codemeta.jsonld",
+  "@type": "Code",
+  "author": ["John P Didion"],
+  "identifier": "http://dx.doi.org/10.5281/zenodo.569933",
+  "codeRepository": "https://github.com/jdidion/xphyle",
+  "datePublished": "2017-04-29",
+  "dateModified": "2017-04-29",
+  "dateCreated": "2017-04-29",
+  "description": "xphyle: extraordinarily simple file handling",
+  "keywords": "python, io, file",
+  "license": "CC0",
+  "title": "xphyle",
+  "version": "3.0.1"
+}
