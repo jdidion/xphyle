@@ -1,3 +1,12 @@
+v3.0.2 (dev)
+------------
+
+
+v3.0.1 (2017.04.29)
+-------------------
+* Added a paper for submission to JOSS.
+* Enabled DOI generation using Zenodo.
+
 v3.0.0 (2017.04.18)
 -------------------
 * Lots of fixes for bugs and type errors using mypy.
