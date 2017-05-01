@@ -160,7 +160,7 @@ As of xphyle 2.0.0, you can easily open subprocesses using the ``xphyle.popen`` 
     from xphyle.utils import exec_process
     exec_process('cat', 'foo', stdout='myfile.gz')
 
-In addition, ``open_`` and ``xopen`` can open subprocesses. The primariy difference is that ``popen`` enables customization of stdin, stdout, and stderr, whereas opening a process through ``open_`` or ``xopen`` uses default behavior of opening PIPEs for all of the streams, and wrapping the PIPE indicated by the file mode. For example::
+In addition, ``open_`` and ``xopen`` can open subprocesses. The primary difference is that ``popen`` enables customization of stdin, stdout, and stderr, whereas opening a process through ``open_`` or ``xopen`` uses default behavior of opening PIPEs for all of the streams, and wrapping the PIPE indicated by the file mode. For example::
     
     # write to the process stdin
     with open_('|cat', 'wt') as proc:
@@ -181,7 +181,7 @@ Note that with ``open_`` and ``xopen``, the system command must be specified as 
 Buffers
 ~~~~~~~
 
-As of xphyle 2.1.0, ``open_`` and ``xopen`` can also open buffer types. A buffer is an instance of ``io.StringIO`` or ``io.BytesIO`` (or similar) -- basically an in memory read/write buffer. Passing open buffer objects worked before (they were treated as file-like), but now there is a special file type -- ``FileType.BUFFER`` -- that will cause them to be handeled  a bit differently. In addition, you can now pass ``str`` or ``bytes`` (the type objects) to automatically create the corresponding buffer type::
+As of xphyle 2.1.0, ``open_`` and ``xopen`` can also open buffer types. A buffer is an instance of ``io.StringIO`` or ``io.BytesIO`` (or similar) -- basically an in memory read/write buffer. Passing open buffer objects worked before (they were treated as file-like), but now there is a special file type -- ``FileType.BUFFER`` -- that will cause them to be handled  a bit differently. In addition, you can now pass ``str`` or ``bytes`` (the type objects) to automatically create the corresponding buffer type::
 
     with open_(str) as buf:
         buf.write('foo')
@@ -191,6 +191,11 @@ As of xphyle 2.1.0, ``open_`` and ``xopen`` can also open buffer types. A buffer
     with open_(bytes, compression='gzip') as buf:
         buf.write('foo')
     compressed_foo = buf.getvalue()
+
+You can also create readable buffers by passing the string/bytes to read instead of a path, and explicitly specifying the file type::
+
+    with open_("This is a string I want to read", file_type=FileType.BUFFER) as buf:
+        buf_str = buf.read()
 
 Reading/writing data
 ~~~~~~~~~~~~~~~~~~~~
@@ -220,30 +225,37 @@ There are pairs of methods for reading/writing text and binary data using iterat
 
 There's another pair of methods for reading/writing key=value files::
     
+    from collections import OrderedDict
     from xphyle.utils import read_dict, write_dict
-    cats = dict(fluffy='calico', droopy='tabby', sneezy='siamese')
+    cats = OrderedDict((fluffy,'calico'), (droopy,'tabby'), (sneezy,'siamese'))
     write_dict(cats, 'cats.txt.gz')
-    # change from '=' to '\t' delimited
+    # change from '=' to '\t' delimited; preserve the order of the items
     write_dict(
-        read_dict(cats, 'cats.txt.gz'),
+        read_dict(cats, 'cats.txt.gz', ordered=True),
         'cats.tsv', sep='\t')
 
 You can also read from delimited files such as csv and tsv::
     
     from xphyle.utils import read_delimited, read_delimited_as_dict
+    
     class Dog(object):
         def __init__(self, name, age, breed):
             self.name = name
             self.age = age
             self.breed = breed
-    for dog in read_delimited('dogs.txt.gz', header=True,
-                              converters=(str,int,str),
-                              row_type=Dog):
+        def pet(self): ...
+        def say(self, message): ...
+    
+    for dog in read_delimited(
+            'dogs.txt.gz', header=True,
+            converters=(str,int,str),
+            row_type=Dog):
         dog.pet()
     
-    dogs = read_delimited_as_dict('dogs.txt.gz', header=True,
-                                  key='name', converters=(str,int,str),
-                                  row_type=Dog):
+    dogs = read_delimited_as_dict(
+            'dogs.txt.gz', header=True,
+            key='name', converters=(str,int,str),
+            row_type=Dog):
     dogs['Barney'].say('Good Boy!')
 
 There are convenience methods for compressing and decompressing files::
@@ -281,22 +293,28 @@ There's also a set of classes for writing to multiple files::
     from xphyle.utils import TeeFileOutput, CycleFileOutput, NCycleFileOutput
     
     # write all lines in sourcefile.txt to both file1 and file2.gz
-    with fileoutput(('file1', 'file2.gz'), type=TeeFileOutput) as out:
+    with fileoutput(
+            ('file1', 'file2.gz'), 
+            file_output_type=TeeFileOutput) as out:
         out.writelines(read_lines('sourcefile.txt'))
     
     # Alternate writing each line in sourcefile.txt to file1 and file2.gz
-    with fileoutput(('file1', 'file2.gz'), type=CycleFileOutput) as out:
+    with fileoutput(
+            ('file1', 'file2.gz'), 
+            file_output_type=CycleFileOutput) as out:
         out.writelines(read_lines('sourcefile.txt'))
     
     # Alternate writing four lines in sourcefile.txt to file1 and file2.gz
-    with fileoutput(('file1', 'file2.gz'), type=NCycleFileOutput, n=4) as out:
+    with fileoutput(
+            ('file1', 'file2.gz'), 
+            file_output_type=NCycleFileOutput, n=4) as out:
         out.writelines(read_lines('sourcefile.txt'))
     
     # Write up to 10,000 lines in each file before opening the next file
     with RollingFileOutput('file{}.gz', n=10000) as out:
         out.writelines(read_lines('sourcefile.txt'))
     
-And finally, there's some miscelanenous methods such as linecount::
+And finally, there's some miscellaneous methods such as linecount::
     
     from xphyle.utils import linecount
     print("There are {} lines in file {}".format(
@@ -368,7 +386,7 @@ Another useful set of classes is `FileSpec <api/modules.html#xphyle.paths.FileSp
         else:
             process_binary_file(f)
 
-A FileSpec or DirSpec has two related fields: a template, which is a python `fstring<https://www.python.org/dev/peps/pep-0498>`_ and is used for constructing filenames from component pieces; and a pattern, which is a regular expression and is used for matching to path strings. The named components of the template correspond to path variables (instances of the `PathVar<api/modules.html#xphyle.paths.PathVar>`_ class). Each PathVar can provide its own pattern, as well as lists of valid or invalid values. If a pattern is not specified during FileSpec/DirSpec creation, the pattern is automatically created by simply substituting the PathVar patterns for the corresponding components in the template string ('.*' by default).
+A FileSpec or DirSpec has two related fields: a template, which is a python `fstring <https://www.python.org/dev/peps/pep-0498>`_ and is used for constructing filenames from component pieces; and a pattern, which is a regular expression and is used for matching to path strings. The named components of the template correspond to path variables (instances of the `PathVar <api/modules.html#xphyle.paths.PathVar>`_ class). Each PathVar can provide its own pattern, as well as lists of valid or invalid values. If a pattern is not specified during FileSpec/DirSpec creation, the pattern is automatically created by simply substituting the PathVar patterns for the corresponding components in the template string ('.*' by default).
 
 Note that a DirSpec is only able to construct/match directory paths, and a FileSpec is only able to construct/match file names. A PathSpec is simply a composite type of a DirSpec and a FileSpec that can be used to construct/match full paths.
 
@@ -390,13 +408,33 @@ You can add support for another compression format by extending one of the base 
     class FooFormat(xphyle.formats.SingleExeCompressionFormat):
         """Implementation of CompressionFormat for foo files.
         """
-        name = 'foo' # name of the python library
-        exts = ('foo',) # file extension(s) (without the separator)
-        system_commands = ('foo',) # name of the system command(s)
-        compresslevel_range = (1, 9) # optional, if the level is configurable
-        default_compresslevel = 6 # optional
-        magic_bytes = ((0xB0, 0x0B, 0x55),) # format-specific header bytes
-        mime_types = ('application/foo',) # mime type(s) for this format
+        @property
+        def name(self) -> str:
+            return 'foo'
+        
+        @property
+        def exts(self) -> Tuple[str, ...]:
+            return ('foo',)
+        
+        @property
+        def system_commands(self) -> Tuple[str, ...]:
+            return ('foo',)
+        
+        @property
+        def compresslevel_range(self) -> Tuple[int, int]:
+            return (1, 11)
+        
+        @property
+        def default_compresslevel(self) -> int:
+            return 6
+            
+        @property
+        def magic_bytes(self) -> Tuple[Tuple[int, ...], ...]:
+            return ((0x0F, 0x00),)
+        
+        @property
+        def mime_types(self) -> Tuple[str, ...]:
+            return ('application/foo',)
         
         # build the system command
         # op = 'c' for compress, 'd' for decompress
