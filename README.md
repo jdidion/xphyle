@@ -83,4 +83,11 @@ Future releases are mapped out using [GitHub Projects](https://github.com/jdidio
 
 # Developers
 
-We welcome any contributions via pull requests. Style-wise, we try to adhere to the Google python style guidelines. We use Google-style docstrings, which are formatted by the [Napoleon Sphinx Plugin](https://pypi.python.org/pypi/sphinxcontrib-napoleon). We run pylint as part of each build and strive to maintain a 10/10 score. We enforce the [Contributor Covenant](http://contributor-covenant.org/) code of conduct.
+We welcome any contributions via pull requests.
+
+All code must be written in idiomatic python 3. Note that we use [PEP484](https://www.python.org/dev/peps/pep-0484/) type hits. Variable annotations are
+defined where needed using the comment syntax. Static code analysis is performed usying [mypy](http://mypy-lang.org/) and pylint.
+
+Style-wise, we try to adhere to the Google python style guidelines. We use Google-style docstrings, which are formatted by the [Napoleon Sphinx Plugin](https://pypi.python.org/pypi/sphinxcontrib-napoleon). 
+
+We enforce the [Contributor Covenant](http://contributor-covenant.org/) code of conduct.
