@@ -14,14 +14,15 @@ install:
 test:
 	$(TEST)
 
+clean:
+	rm -Rf __pycache__
+	rm -Rf **/__pycache__/*
+	rm -Rf dist
+	rm -Rf build
+	rm -Rf *.egg-info
+
 release:
-	# make sure required variables set via commandline
-	ifndef version
-		$(error version is not set)
-	endif
-	ifndef token
-		$(error token is not set)
-	endif
+	$(clean)
 	# tag
 	git tag $(version)
 	# build

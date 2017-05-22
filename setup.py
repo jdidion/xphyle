@@ -6,9 +6,11 @@ requirements = []
 if sys.version_info < (3, 3):
     sys.stdout.write("At least Python 3.3 is required.\n")
     sys.exit(1)
-elif sys.version_info < (3, 5):
-    # typing was added in 3.5, but a backport is available for 3.3+
-    requirements.append('typing')
+elif sys.version_info < (3, 6):
+    # typing was added in 3.5, and we rely on critical features that were
+    # introduced in 3.5.2+, so for versions older than 3.6 we rely on
+    # a backport
+    requirements.append('backports.typing')
 
 import versioneer
 
@@ -30,9 +32,11 @@ setup(
         'Topic :: Software Development :: Libraries :: Python Modules',
         'License :: MIT',
         'License :: Public Domain',
+        'Programming Language :: Python :: 3 :: Only',
         'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6'
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.6',
     ],
 )
