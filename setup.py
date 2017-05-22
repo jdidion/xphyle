@@ -30,7 +30,7 @@ setup(
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'Topic :: Software Development :: Libraries :: Python Modules',
-        'License :: MIT',
+        'License :: MIT License',
         'License :: Public Domain',
         'Programming Language :: Python :: 3 :: Only',
         'Programming Language :: Python :: 3.3',
