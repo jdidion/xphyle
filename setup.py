@@ -7,7 +7,7 @@ if sys.version_info < (3, 3):
     sys.stdout.write("At least Python 3.3 is required.\n")
     sys.exit(1)
 elif sys.version_info < (3, 5):
-    # typing was added in 3.5, but a backport is avaialble for 3.3+
+    # typing was added in 3.5, but a backport is available for 3.3+
     requirements.append('typing')
 
 import versioneer
