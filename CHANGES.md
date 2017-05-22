@@ -1,6 +1,6 @@
 v3.0.2 (dev)
 ------------
-
+* Forcing use of backports.typing for python < 3.6.
 
 v3.0.1 (2017.04.29)
 -------------------
