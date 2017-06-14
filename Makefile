@@ -1,8 +1,9 @@
 tests = tests
 desc = ''
+#pytestopts = '--full-trace'
 
 BUILD = python setup.py install
-TEST  = python -m pytest -m "not perf" --cov --cov-report term-missing $(tests)
+TEST  = python -m pytest -m "not perf" --cov --cov-report term-missing $(pytestopts) $(tests)
 
 all:
 	$(BUILD)
