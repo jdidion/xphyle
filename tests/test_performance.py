@@ -21,7 +21,7 @@ class TimeKeeper():
         self.stop = time.clock()
         self.duration = self.stop - self.start
         print(self.msg.format(
-            duration=self.duration / 1000,
+            duration=self.duration,
             **self.msg_args))
 
 def perftest(name, text_generator, num_iter=10):
