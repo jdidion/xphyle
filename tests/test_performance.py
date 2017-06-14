@@ -28,7 +28,7 @@ def perftest(name, text_generator, num_iter=10):
     # generate a big text
     msg = """
     Timing of {iter} {name} tests with total size {size:,d} characters and 
-    use_system = {use_system}: {duration:0.4f} sec"""
+    use_system = {use_system}: {duration:0.2f} sec"""
     total_size = 0
     
     with TempDir() as root:
