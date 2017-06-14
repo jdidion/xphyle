@@ -1,6 +1,7 @@
 v3.0.2 (dev)
 ------------
-
+* Forcing use of backports.typing for python < 3.6.
+* Added basic performance testing.
 
 v3.0.1 (2017.04.29)
 -------------------
