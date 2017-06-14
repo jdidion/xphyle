@@ -1,8 +1,14 @@
-v3.0.2 (2017.06.14)
+v3.0.4 (dev)
+------------
+
+v3.0.3 (2017.06.14)
 -------------------
-* Forcing use of backports.typing for python < 3.6.
 * Added basic performance testing.
 * Fixed #12: xphyle not recognizing when system-level lzma not installed.
+
+v3.0.2 (2017.05.23)
+-------------------
+* Forcing use of backports.typing for python < 3.6.
 
 v3.0.1 (2017.04.29)
 -------------------
