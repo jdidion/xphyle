@@ -3,7 +3,6 @@
 from contextlib import contextmanager
 import gzip
 import time
-from tqdm import tqdm
 from xphyle.utils import read_lines
 from xphyle.paths import TempDir
 import pytest
@@ -36,7 +35,7 @@ def perftest(name, text_generator, num_iter=10):
         paths = tuple(
             root.make_file(suffix='.gz')
             for _ in range(num_iter))
-        for path in tqdm(paths):
+        for path in paths:
             txt = text_generator()
             total_size += len(txt)
             with gzip.open(path, 'wt') as out:
