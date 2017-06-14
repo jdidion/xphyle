@@ -2,7 +2,7 @@ tests = tests
 desc = ''
 
 BUILD = python setup.py install
-TEST  = py.test --cov --cov-report term-missing $(tests)
+TEST  = py.test -m "not perf" --cov --cov-report term-missing $(tests)
 
 all:
 	$(BUILD)
@@ -13,6 +13,9 @@ install:
 
 test:
 	$(TEST)
+
+perftest:
+	py.test -m "perf" $(tests)
 
 release:
 	# make sure required variables set via commandline
