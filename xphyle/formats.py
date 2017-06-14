@@ -675,6 +675,7 @@ class SingleExeCompressionFormat(CompressionFormat): # pylint: disable=abstract-
     def __init__(self):
         self._executable_path = None
         self._executable_name = None
+        self._resolved = False
     
     @property
     def executable_path(self) -> PathLike:
@@ -707,13 +708,11 @@ class SingleExeCompressionFormat(CompressionFormat): # pylint: disable=abstract-
         return self.executable_name
     
     def _resolve_executable(self) -> None:
-        if self._executable_path is None:
+        if not self._resolved:
             exe = EXECUTABLE_CACHE.resolve_exe(self.system_commands)
             if exe:
                 self._executable_path, self._executable_name = exe
-            else:
-                self._executable_path = self._executable_name = ''
-
+            self._resolved = True
 
 class GzipBase(SingleExeCompressionFormat):
     """Base class for gzip and bgzip files.
