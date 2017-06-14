@@ -128,7 +128,7 @@ Supported file formats
 
 Currently, xphyle supports the most commonly used file formats: gzip, bzip2/7zip, and lzma/xz.
 
-Also supported is block-based gzip (bgzip), a format commonly used in bioinformatics. Somewhat confusingly, '.gz' is an acceptable extension for bgzip files, and gzip will decompress bgzip files. Thus, to specifically use bgzip, either use a '.bgz' file exteionsion or specify 'bgzip' as the compression format::
+Also supported is block-based gzip (bgzip), a format commonly used in bioinformatics. Somewhat confusingly, '.gz' is an acceptable extension for bgzip files, and gzip will decompress bgzip files. Thus, to specifically use bgzip, either use a '.bgz' file extension or specify 'bgzip' as the compression format::
 
     f = xopen('input.gz', 'rt', compression='bgzip', validate=False)
 
@@ -137,8 +137,8 @@ Additional compression formats may be added in the future. To get the most up-to
     from xphyle.formats import FORMATS
     print(', '.join(FORMATS.list_compression_formats())
 
-Processess
-~~~~~~~~~~
+Processes
+~~~~~~~~~
 
 As of xphyle 2.0.0, you can easily open subprocesses using the ``xphyle.popen`` method. This method is similar to python ``subprocess.Popen``, except that it uses ``xopen`` to open files passed to stdin, stdout, and stderr, and/or to wrap subprocess PIPEs. ``xphyle.popen`` returns an ``xphyle.Process`` object, which is a subclass of ``subprocess.Popen`` but adds additional functionality, essentially making a Process behave like a regular file. Writing to a process writes to its stdin PIPE, and reading from a process reads from its stdout or stderr PIPE::
 

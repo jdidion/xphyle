@@ -2,7 +2,7 @@ tests = tests
 desc = ''
 
 BUILD = python setup.py install
-TEST  = py.test -m "not perf" --cov --cov-report term-missing $(tests)
+TEST  = python -m pytest -m "not perf" --cov --cov-report term-missing $(tests)
 
 all:
 	$(BUILD)
