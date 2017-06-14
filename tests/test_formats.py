@@ -77,7 +77,8 @@ class CompressionTests(TestCase):
         self.assertEqual(fmt.default_compresslevel, fmt._get_compresslevel(None))
         self.assertEqual(fmt.compresslevel_range[0], fmt._get_compresslevel(-1))
         self.assertEqual(fmt.compresslevel_range[1], fmt._get_compresslevel(100))
-            
+    
+    @skipIf(gz_path is None, "'gzip' not available")
     def test_gzip(self):
         gz = get_format('gz')
         self._test_format(gz)
@@ -131,6 +132,7 @@ class CompressionTests(TestCase):
             bgz.get_command('d', 'foo.gz'),
             [bgz_path, '-d', '-c', '-@', '2', 'foo.gz'])
     
+    @skipIf(bz_path is None, "'bzip2' not available")
     def test_bzip2(self):
         bz = get_format('bz2')
         self._test_format(bz)
@@ -166,6 +168,7 @@ class CompressionTests(TestCase):
             bz.get_command('d', 'foo.bz2'),
             [bz_path, '-d', '-c', '-p2', 'foo.bz2'])
     
+    @skipIf(xz_path is None, "'xz' not available")
     def test_lzma(self):
         xz = get_format('xz')
         self._test_format(xz)
