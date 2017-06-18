@@ -4,6 +4,7 @@
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/b2c0baa52b604e39a09ed108ac2f53ee)](https://www.codacy.com/app/jdidion/xphyle?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=jdidion/xphyle&amp;utm_campaign=Badge_Grade)
 [![Documentation Status](https://readthedocs.org/projects/xphyle/badge/?version=latest)](http://xphyle.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/71260678.svg)](https://zenodo.org/badge/latestdoi/71260678)
+[![JOSS](http://joss.theoj.org/papers/10.21105/joss.00255/status.svg)](http://joss.theoj.org/papers/10.21105/joss.00255)
 
 # xphyle: extraordinarily simple file handling
 

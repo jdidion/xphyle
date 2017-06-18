@@ -1,7 +1,10 @@
 """Self-contained performance tests.
 """
+from bisect import bisect
 from contextlib import contextmanager
 import gzip
+from itertools import accumulate
+from random import random, randint
 import time
 from xphyle.utils import read_lines
 from xphyle.paths import TempDir
@@ -23,6 +26,26 @@ class TimeKeeper():
         print(self.msg.format(
             duration=self.duration,
             **self.msg_args))
+
+def choices(population, weights=None, *, cum_weights=None, k=1):
+    """Return a k sized list of population elements chosen with replacement.
+    If the relative weights or cumulative weights are not specified,
+    the selections are made with equal probability.
+    
+    This function is borrowed from the python 3.6 'random' package.
+    """
+    if cum_weights is None:
+        if weights is None:
+            _int = int
+            total = len(population)
+            return [population[_int(random() * total)] for i in range(k)]
+        cum_weights = list(accumulate(weights))
+    elif weights is not None:
+        raise TypeError('Cannot specify both weights and cumulative weights')
+    if len(cum_weights) != len(population):
+        raise ValueError('The number of weights does not match the population')
+    total = cum_weights[-1]
+    return [population[bisect(cum_weights, random() * total)] for i in range(k)]
 
 def perftest(name, text_generator, num_iter=10):
     # generate a big text
@@ -62,7 +85,6 @@ def test_lorem_ipsum():
 
 @pytest.mark.perf
 def test_fastq():
-    from random import randint, choices
     def generate_fastq(seqlen=100):
         num_records = randint(100000, 500000)
         qualspace = list(chr(i + 33) for i in range(60))
