@@ -247,6 +247,8 @@ class XphyleTests(TestCase):
             self.assertEqual('foo\n', i.read())
     
     def test_open_process(self):
+        with self.assertRaises(ValueError):
+            xopen('|cat', 'wt', allow_subprocesses=False)
         with open_('|cat', 'wt') as p:
             p.write('foo\n')
         self.assertEquals(b'foo\n', p.stdout)

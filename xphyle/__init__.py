@@ -699,8 +699,8 @@ def configure(
 @contextmanager
 def open_(
         path_or_file, #: OpenArg,
-        mode: ModeArg = None, errors: bool = True,
-        wrap_fileobj: bool = True, **kwargs) -> Generator[FileLike, None, None]:
+        mode: ModeArg = None, errors: bool = True, wrap_fileobj: bool = True, 
+        **kwargs) -> Generator[FileLike, None, None]:
     """Context manager that frees you from checking if an argument is a path
     or a file object. Calls ``xopen`` to open files.
     
@@ -760,8 +760,9 @@ def xopen(
         path, #: OpenArg,
         mode: ModeArg = None,
         compression: CompressionArg = None, use_system: bool = True,
-        context_wrapper: bool = None, file_type: FileType = None,
-        validate: bool = True, **kwargs) -> FileLike:
+        allow_subprocesses: bool = True, context_wrapper: bool = None, 
+        file_type: FileType = None, validate: bool = True, **kwargs
+        ) -> FileLike:
     """
     Replacement for the builtin `open` function that can also open URLs and
     subprocessess, and automatically handles compressed files.
@@ -781,6 +782,9 @@ def xopen(
             '-' (stdin).
         use_system: Whether to attempt to use system-level compression
             programs.
+        allow_subprocesses: Whether to allow `path` to be a subprocess (e.g. 
+            '|cat'). There are security risks associated with allowing
+            users to run arbitrary system commands.
         context_wrapper: If True, the file is wrapped in a `FileLikeWrapper`
             subclass before returning (`FileWrapper` for files/URLs,
             `StdWrapper` for STDIN/STDOUT/STDERR). If None, the default value
@@ -883,6 +887,8 @@ def xopen(
     
     # Return early if opening a process
     if file_type is FileType.PROCESS:
+        if not allow_subprocesses:
+            raise ValueError("Subprocesses are disallowed")
         if path.startswith('|'):
             path = path[1:]
         popen_args = dict(kwargs)
