@@ -1,6 +1,8 @@
 from unittest import TestCase, skipIf
 import gzip
 import os
+import string
+import sys
 from xphyle.formats import *
 from xphyle.paths import TempDir, EXECUTABLE_CACHE
 from . import *
@@ -15,6 +17,16 @@ def write_file(fmt, path, use_system, content, mode='wt'):
 def read_file(fmt, path, use_system, mode='rt'):
     with fmt.open_file(path, mode=mode, use_system=use_system) as f:
         return f.read()
+
+def create_truncated_file(path, fmt):
+    # Random text
+    text = ''.join(random.choice(string.ascii_lowercase) for _ in range(200))
+    f = fmt.open_file(path, 'w')
+    f.write(text)
+    f.close()
+    f = open(path, 'a')
+    f.truncate(os.stat(path).st_size - 10)
+    f.close()
 
 gz_path = get_format('gz').executable_path
 no_pigz = gz_path is None or get_format('gz').executable_name != 'pigz'
@@ -394,6 +406,18 @@ class FileTests(TestCase):
                 self.assertTrue(os.path.exists(path))
                 with open(path, 'rt') as i:
                     self.assertEqual(i.read(), 'foo')
+    
+    # Disable this test in python 3.3
+    @skipIf(sys.version_info[:2] <= (3, 3), "Incompatible test")
+    def test_truncated_gz(self):
+        fmt = get_format('.gz')
+        for use_system in (True, False):
+            with self.subTest(use_system=use_system):
+                path = self.root.make_path()
+                gzfile = path + ".gz"
+                create_truncated_file(gzfile, fmt)
+                with self.assertRaises(IOError):
+                    fmt.decompress_file(gzfile, use_system=use_system)
 
 class StringTests(TestCase):
     def test_compress(self):

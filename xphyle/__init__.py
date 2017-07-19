@@ -696,6 +696,9 @@ def configure(
 # https://github.com/python/typing/issues/266
 #OpenArg = Union[PathOrFile, bytes, Type[Union[bytes, str]]]
 
+# TODO: interesting idea from a reddit user - have open_ return an object
+# that overloads the | operator.
+
 @contextmanager
 def open_(
         path_or_file, #: OpenArg,

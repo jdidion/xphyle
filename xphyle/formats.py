@@ -7,7 +7,7 @@ from collections import defaultdict
 from importlib import import_module
 import io
 import os
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, CalledProcessError
 
 from xphyle.paths import (
     STDIN, EXECUTABLE_CACHE, check_readable_file, check_writable_file,
@@ -443,6 +443,27 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
         """
         raise NotImplementedError()
     
+    def handle_command_return(
+            self, returncode: int, cmd: List[str], stderr: str = None
+            ) -> None:
+        """Handle the returned values from executing a system-level command.
+        
+        Args:
+            returncode: The returncode from the command (typically, anything
+                other than 0 is an error).
+            cmd: The command that generated the return value.
+            stderr: The standard error from the command. 
+        
+        Raises:
+            IOError if the command output represents an error.
+        """
+        if returncode != 0:
+            # Wrap the CalledProcessError in an IOError, to be
+            # compatible with errors that arise from using the
+            # python library equivalents
+            raise IOError from CalledProcessError(
+                returncode, " ".join(cmd), stderr=stderr)
+    
     def open_file(
             self, path: str, mode: ModeArg, use_system: bool = True,
             **kwargs) -> FileLike:
@@ -467,9 +488,9 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
         
         if use_system:
             # pylint: disable=redefined-variable-type
-            gzfile = None # type: FileLikeInterface
+            compressed_file = None # type: FileLikeInterface
             if mode.readable and self.can_use_system_compression:
-                gzfile = SystemReader(
+                compressed_file = SystemReader(
                     self.compress_path,
                     path,
                     self.get_command('d', src=path),
@@ -477,17 +498,17 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
             elif not mode.readable and self.can_use_system_decompression:
                 bin_mode = FileMode(
                     access=mode.access, coding=ModeCoding.BINARY)
-                gzfile = SystemWriter(
+                compressed_file = SystemWriter(
                     self.decompress_path,
                     path,
                     bin_mode,
                     self.get_command('c'),
                     self.decompress_name)
-            if gzfile:
+            if compressed_file:
                 if mode.text:
-                    return io.TextIOWrapper(gzfile)
+                    return io.TextIOWrapper(compressed_file)
                 else:
-                    return gzfile
+                    return compressed_file
         
         return self.open_file_python(path, mode, **kwargs)
     
@@ -518,14 +539,17 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
             source: Source file, either a path or an open file-like object.
             dest: Destination file, either a path or an open file-like object.
                 If None, the file name is determined from ``source``.
-            keep: Whether to keep the source file
-            compresslevel: Compression level
-            use_system: Whether to try to use system-level compression
+            keep: Whether to keep the source file.
+            compresslevel: Compression level.
+            use_system: Whether to try to use system-level compression.
             kwargs: Additional arguments to pass to the open method when opening
-                the destination file
+                the destination file.
         
         Returns:
             Path to the destination file.
+        
+        Raises:
+            IOError if there is an error compressing the file.
         """
         source_is_path = isinstance(source, str)
         if source_is_path:
@@ -565,8 +589,9 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
                 cmd = self.get_command(
                     'c', src=cmd_src, compresslevel=compresslevel)
                 proc = PROCESS_PROGRESS.wrap(
-                    cmd, stdin=prc_src, stdout=dest_file)
-                proc.communicate()
+                    cmd, stdin=prc_src, stdout=dest_file, stderr=PIPE)
+                _, stderr = proc.communicate()
+                self.handle_command_return(proc.returncode, cmd, stderr)
             else:
                 if source_is_path:
                     source_file = open(str(source), 'rb')
@@ -579,6 +604,8 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
                     # file might be quite large
                     for chunk in iter_file_chunked(source_file):
                         dest_file.write(chunk)
+                except EOFError as err:
+                    raise IOError from err
                 finally:
                     if source_is_path:
                         source_file.close()
@@ -602,13 +629,16 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
             source: Source file, either a path or an open file-like object.
             dest: Destination file, either a path or an open file-like object.
                 If None, the file name is determined from ``source``.
-            keep: Whether to keep the source file
-            use_system: Whether to try to use system-level compression
+            keep: Whether to keep the source file.
+            use_system: Whether to try to use system-level compression.
             kwargs: Additional arguments to passs to the open method when
-                opening the compressed file
+                opening the compressed file.
         
         Returns:
-            Path to the destination file
+            Path to the destination file.
+        
+        Raises:
+            IOError if there is an error decompressing the file.
         """
         source_is_path = isinstance(source, str)
         if source_is_path:
@@ -645,8 +675,10 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
                 src = str(source) if source_is_path else STDIN
                 cmd = self.get_command('d', src=src)
                 psrc = None if source_is_path else cast(FileLike, source)
-                proc = PROCESS_PROGRESS.wrap(cmd, stdin=psrc, stdout=dest_file)
-                proc.communicate()
+                proc = PROCESS_PROGRESS.wrap(
+                    cmd, stdin=psrc, stdout=dest_file, stderr=PIPE)
+                _, stderr = proc.communicate()
+                self.handle_command_return(proc.returncode, cmd, stderr)
             else:
                 source_file = self.open_file_python(source, 'rb', **kwargs)
                 try:
@@ -654,6 +686,8 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
                     # file might be quite large
                     for chunk in iter_file_chunked(source_file):
                         dest_file.write(chunk)
+                except EOFError as err:
+                    raise IOError from err
                 finally:
                     if source_is_path:
                         source_file.close()
@@ -745,7 +779,7 @@ class Gzip(GzipBase):
     
     @property
     def system_commands(self) -> Tuple[str, ...]:
-        return ('pigz','gzip')
+        return ('pigz', 'gzip')
     
     @property
     def default_compresslevel(self) -> int:
@@ -785,12 +819,23 @@ class Gzip(GzipBase):
         if stdout:
             cmd.append('-c')
         threads = THREADS.threads
-        if self.executable_name == 'pigz' and threads > 1:
-            cmd.extend(('-p', str(threads)))
+        if self.executable_name == 'pigz':
+            #cmd.append('-t')
+            if threads > 1:
+                cmd.extend(('-p', str(threads)))
         if src != STDIN:
             cmd.append(src)
         return cmd
-
+    
+    def handle_command_return(
+            self, returncode: int, cmd: List[str], stderr: str = None
+            ) -> None:
+        # pigz fails silently when the file is corrupt
+        if (
+                returncode == 0 and 'pigz' in cmd[0] and stderr and 
+                b'skipping' in stderr):
+            returncode = 1
+        super().handle_command_return(returncode, cmd, stderr)
 
 class BGzip(GzipBase):
     """bgzip is block gzip. bgzip files are compatible with gzip. Typically,
