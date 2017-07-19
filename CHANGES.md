@@ -1,7 +1,7 @@
-v3.0.5 (dev)
+v3.0.6 (dev)
 ------------
 
-v3.0.4 (2017.07.19)
+v3.0.5 (2017.07.19)
 -------------------
 * Fixed #13: opening corrupt gzip file fails silently.
 

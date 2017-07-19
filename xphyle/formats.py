@@ -444,7 +444,7 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
         raise NotImplementedError()
     
     def handle_command_return(
-            self, returncode: int, cmd: List[str], stderr: str = None
+            self, returncode: int, cmd: List[str], stderr: bytes = None
             ) -> None:
         """Handle the returned values from executing a system-level command.
         
@@ -461,8 +461,9 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
             # Wrap the CalledProcessError in an IOError, to be
             # compatible with errors that arise from using the
             # python library equivalents
-            raise IOError from CalledProcessError(
-                returncode, " ".join(cmd), stderr=stderr)
+            cpe = CalledProcessError(returncode, " ".join(cmd))
+            cpe.stderr = stderr
+            raise IOError from cpe
     
     def open_file(
             self, path: str, mode: ModeArg, use_system: bool = True,
@@ -828,7 +829,7 @@ class Gzip(GzipBase):
         return cmd
     
     def handle_command_return(
-            self, returncode: int, cmd: List[str], stderr: str = None
+            self, returncode: int, cmd: List[str], stderr: bytes = None
             ) -> None:
         # pigz fails silently when the file is corrupt
         if (
