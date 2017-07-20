@@ -1,5 +1,6 @@
 v3.0.6 (dev)
 ------------
+* Added 'list_extensions' method to xphyle.formats.Formats
 
 v3.0.5 (2017.07.19)
 -------------------

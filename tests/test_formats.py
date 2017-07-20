@@ -64,6 +64,13 @@ class CompressionTests(TestCase):
             set(('gzip','gz','pigz')),
             set(get_format('gzip').aliases))
     
+    def test_list_extensions(self):
+        self.assertSetEqual(
+            set((
+                '.gz', '.bgz', '.bz2', '.bzip', '.bzip2', '.xz', '.lzma', 
+                '.7z', '.7zip')),
+            set(FORMATS.list_extensions(True)))
+    
     def test_guess_format(self):
         self.assertEqual('gzip', FORMATS.guess_compression_format('gz'))
         self.assertEqual('gzip', FORMATS.guess_compression_format('.gz'))

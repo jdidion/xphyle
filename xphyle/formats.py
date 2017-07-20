@@ -15,8 +15,8 @@ from xphyle.paths import (
 from xphyle.progress import PROCESS_PROGRESS, iter_file_chunked
 from xphyle.types import (
     FileMode, ModeCoding, ModeArg, PathOrFile, FileLike, Union, Callable,
-    Iterable, Iterator, List, Tuple, ModuleType, PathLike, FileLikeInterface,
-    FileLikeBase, AnyStr, AnyChar, IO, cast)
+    Iterable, Iterator, List, Tuple, Set, ModuleType, PathLike, 
+    FileLikeInterface, FileLikeBase, AnyStr, AnyChar, IO, cast)
 
 class ThreadsVar(object):
     """Maintain ``threads`` variable.
@@ -1117,6 +1117,19 @@ class Formats(object):
         """
         return tuple(self.compression_formats.keys())
     
+    def list_extensions(self, with_sep: bool = False) -> Iterable[str]:
+        """Returns an iterable with all valid extensions.
+        
+        Args:
+            with_sep: Add separator prefix to each extension.
+        """
+        exts = set() # type: Set[str]
+        for fmt in self.compression_formats.values():
+            exts.update(fmt.exts)
+        if with_sep:
+            exts = set("{}{}".format(os.extsep, ext) for ext in exts)
+        return exts
+        
     def get_compression_format(self, name: str) -> CompressionFormat:
         """Returns the CompressionFormat associated with the given name.
         
