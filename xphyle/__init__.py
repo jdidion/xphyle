@@ -837,6 +837,8 @@ def xopen(
     
     # Whether the file object is stdin/stdout/stderr
     is_std = path in (STDIN, STDOUT, STDERR)
+    # Whether 'path' is currently a file-like object in binary mode
+    is_bin = False
     # Whether path is a string or fileobj
     is_str = isinstance(path, str)
     # Whether path is a class indicating a buffer type
@@ -917,6 +919,7 @@ def xopen(
             path = io.StringIO()
         elif path == bytes:
             path = io.BytesIO()
+            is_bin = True
         elif is_str or isinstance(path, bytes):
             if not mode.readable:
                 raise ValueError(
@@ -930,6 +933,7 @@ def xopen(
                 if mode.coding != ModeCoding.BINARY:
                     raise ValueError("Must use binary mode with a bytes buffer")
                 path = io.BytesIO(path)
+                is_bin = True
         if context_wrapper:
             buffer = path
         if not mode.readable:
@@ -960,9 +964,18 @@ def xopen(
             stdobj = sys.stderr
         else:
             stdobj = sys.stdin if mode.readable else sys.stdout
-        # get the underlying binary stream
-        fileobj = stdobj.buffer
-        if mode.readable and (validate or guess_format):
+        
+        # whether we need the underlying byte stream regardless of the mode
+        check_readable = mode.readable and (validate or guess_format)
+        
+        if mode.binary or compression or check_readable:
+            # get the underlying binary stream
+            fileobj = stdobj.buffer
+            is_bin = True
+        else:
+            fileobj = stdobj
+        
+        if check_readable:
             if not hasattr(fileobj, 'peek'):
                 fileobj = io.BufferedReader(fileobj)
             guess = FORMATS.guess_format_from_buffer(fileobj)
@@ -998,7 +1011,8 @@ def xopen(
                     mode, fileobj_mode))
         
         # compression/decompression only possible for binary files
-        if fileobj_mode.text:
+        is_bin = fileobj_mode.binary
+        if not is_bin:
             if compression:
                 raise ValueError(
                     "Cannot compress to/decompress from a text-mode "
@@ -1073,8 +1087,7 @@ def xopen(
         is_std = False
     elif not fileobj:
         fileobj = open(path, mode.value, **kwargs)
-    elif mode.text and (is_std or (
-            file_type is FileType.FILELIKE and not fileobj_mode.text)):
+    elif mode.text and is_bin and (is_std or file_type is FileType.FILELIKE):
         fileobj = io.TextIOWrapper(fileobj)
         fileobj.mode = mode.value
     
