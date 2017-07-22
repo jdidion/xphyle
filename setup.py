@@ -2,11 +2,16 @@ from setuptools import setup
 import sys
 
 requirements = []
+version_info = sys.version_info
 
-if sys.version_info < (3, 3):
+if version_info < (3, 3):
     sys.stdout.write("At least Python 3.3 is required.\n")
     sys.exit(1)
-elif sys.version_info < (3, 6):
+
+if version_info < (3, 4):
+    requirements.append('pathlib')
+
+if version_info < (3, 6):
     # typing was added in 3.5, and we rely on critical features that were
     # introduced in 3.5.2+, so for versions older than 3.6 we rely on
     # a backport

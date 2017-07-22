@@ -1,7 +1,10 @@
+v3.0.7 (dev)
+------------
+
 v3.0.6 (2017.07.22)
 -------------------
-* Added 'list_extensions' method to xphyle.formats.Formats
-* Fixed subtle bug that would cause failure when calling xopen on stdout that has been monkeypatched (as is done by pytest)
+* Added 'list_extensions' method to xphyle.formats.Formats.
+* Fixed subtle bug that would cause failure when calling xopen on stdout that has been monkeypatched (as is done by pytest).
 
 v3.0.5 (2017.07.19)
 -------------------
