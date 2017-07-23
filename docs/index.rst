@@ -5,7 +5,7 @@ xphyle: extraordinarily simple file handling
    :height: 200px
    :width: 200 px
 
-xphyle is a small python (3.3+) library that makes it easy to open compressed
+xphyle is a small python (3.4+) library that makes it easy to open compressed
 files and URLs for the highest possible performance available on your system.
 
 * `API <api/modules.html>`_

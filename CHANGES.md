@@ -1,5 +1,9 @@
-v3.0.8 (dev)
+v3.0.9 (dev)
 ------------
+
+v3.0.8 (2017.07.23)
+-------------------
+* *Possible breaking change*: We discovered that python 3.3 support never fully worked due to some incompatibilities in the backported libraries for features we rely on that were introduced in 3.4. Thus, we are officially dropping support for python 3.3. This also reverts the change made in 3.0.7.
 
 v3.0.7 (2017.07.22)
 -------------------
