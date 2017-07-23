@@ -16,6 +16,7 @@ class MockStdout(object):
         self.as_bytes = as_bytes
     
     def getvalue(self):
+        self.wrapper.flush()
         val = self.bytes_io.getvalue()
         if not self.as_bytes:
             val = val.decode()
