@@ -1,13 +1,10 @@
 tests = tests
 desc = ''
 # Use this option to show full stack trace for errors
-#pytestopts = '--full-trace'
-# Use these options to measure test coverage (requires python >= 3.5 and 
-# pytest-cov package)
-pytestopts = '--cov --cov-report term-missing'
+#pytestopts = "--full-trace"
 
 BUILD = python setup.py install
-TEST  = python -m pytest -m "not perf" $(pytestopts) $(tests)
+TEST  = py.test -m "not perf" --cov --cov-report term-missing $(pytestopts) $(tests)
 
 all:
 	$(BUILD)
