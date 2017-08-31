@@ -3,6 +3,7 @@ from io import BytesIO, TextIOWrapper
 import random
 import socket
 from threading import Thread
+import time
 from unittest.mock import patch
 import urllib.request
 
@@ -73,6 +74,12 @@ class EchoServer(Thread):
         finally:
             conn.shutdown(1)
             conn.close()
+    
+    # work around bug in python 3.4 where connect will raise an error
+    # if the server isn't immediately ready to accept the connection
+    def start(self):
+        super().start()
+        time.sleep(1)
     
     def run(self, chunk_size=2048):
         connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
