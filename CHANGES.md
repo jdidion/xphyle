@@ -1,3 +1,6 @@
+v3.1.1 (dev)
+------------
+
 v3.1.0 (2017.08.31)
 -------------------
 * Added support for socket-based files.
