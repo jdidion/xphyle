@@ -15,6 +15,8 @@ from xphyle.types import (
     PathType, PathTypeArg, PathLike, PathLikeClass, Sequence, List, Tuple, 
     Callable, Union, Iterable, Dict, Regexp, Pattern, Match, Any, cast)
 
+# https://github.com/jaraco/path.py
+
 STDIN = STDOUT = '-'
 """Placeholder for `sys.stdin` or `sys.stdout` (depending on access mode)"""
 STDERR = '_'

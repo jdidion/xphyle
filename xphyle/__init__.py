@@ -20,7 +20,13 @@ from xphyle.types import (
     ModeCoding, CompressionArg, EventType, EventTypeArg, PathOrFile, Callable,
     Container, Iterable, Iterator, Union, Sequence, List, Tuple, Dict, Set,
     AnyChar, Any, Generic, TypeVar, Generator, IO, FileLikeBase, Type, cast)
-from xphyle.urls import parse_url, open_url, get_url_file_name
+from xphyle.urls import (
+    parse_url, open_url, get_url_file_name, parse_socket, open_socket)
+
+# Look at these cf subprocess
+# https://github.com/kennethreitz/delegator.py
+# http://sarge.readthedocs.io/en/latest/
+# https://github.com/amoffat/sh
 
 # pylint: disable=protected-access
 from xphyle._version import get_versions
@@ -772,8 +778,8 @@ def xopen(
     
     Args:
         path: A relative or absolute path, a URL, a system command, a
-            file-like object, or :class:`bytes` or :class:`str` to
-            indicate a writeable byte/string buffer.
+            file-like object, a socket descriptor, or :class:`bytes` or 
+            :class:`str` to indicate a writeable byte/string buffer.
         mode: Some combination of the access mode ('r', 'w', 'a', or 'x')
             and the open mode ('b' or 't'). If the later is not given, 't'
             is used by default.
@@ -835,40 +841,59 @@ def xopen(
         else:
             compression = cannonical_fmt_name
     
-    # Whether the file object is stdin/stdout/stderr
-    is_std = path in (STDIN, STDOUT, STDERR)
-    # Whether 'path' is currently a file-like object in binary mode
-    is_bin = False
     # Whether path is a string or fileobj
     is_str = isinstance(path, str)
+    # Whether the file object is stdin/stdout/stderr
+    is_std = False
     # Whether path is a class indicating a buffer type
-    is_buffer = path in (str, bytes)
+    is_buffer = False
+    # Whether the path is a process descriptor
+    is_process = False
+    # The parts of the parsed URL
+    url_info = None
+    # The parts of the parsed socket descriptor
+    socket_info = None
+    # Whether 'path' is currently a file-like object in binary mode
+    is_bin = False
     
-    if not file_type:
+    if not is_str:
+        is_buffer = path in (str, bytes)
+    elif path in (STDIN, STDOUT, STDERR):
+        is_std = True
+    elif path.startswith('|'):
+        is_process = True
+    else:
+        url_info = parse_url(path)
+        if url_info is None:
+            socket_info = parse_socket(path)
+    
+    if file_type is None:
         if is_std:
             file_type = FileType.STDIO
         elif is_buffer:
             file_type = FileType.BUFFER
         elif not is_str:
             file_type = FileType.FILELIKE
-        elif path.startswith('|'):
+        elif is_process:
             file_type = FileType.PROCESS
+        elif url_info:
+            file_type = FileType.URL
+        elif socket_info:
+            file_type = FileType.SOCKET
+        else:
+            file_type = FileType.LOCAL
     elif file_type == FileType.BUFFER and (is_str or isinstance(path, bytes)):
         if not mode:
             mode = FileMode(access='r', coding='t' if is_str else 'b')
         is_buffer = True
     elif (is_str == (file_type is FileType.FILELIKE) or
           is_std != (file_type is FileType.STDIO) or
-          is_buffer != (file_type is FileType.BUFFER)):
+          is_buffer != (file_type is FileType.BUFFER) or
+          is_process != (file_type is FileType.PROCESS) or
+          bool(url_info) != (file_type is FileType.URL) or
+          bool(socket_info) != (file_type is FileType.SOCKET)):
         raise ValueError("file_type = {} does not match path {}".format(
             file_type, path))
-    
-    if file_type in (FileType.URL, None):
-        url_parts = parse_url(path)
-        if not file_type:
-            file_type = FileType.URL if url_parts else FileType.LOCAL
-        elif not url_parts:
-            raise ValueError("{} is not a valid URL".format(path))
     
     if not mode:
         # set to default
@@ -890,8 +915,20 @@ def xopen(
     if context_wrapper is None:
         context_wrapper = DEFAULTS['xopen_context_wrapper']
     
-    # Return early if opening a process
+    def check_write_only_compression(compression, msg='write-only buffer'):
+        """Check that 'compression' is not True when the file is write-only,
+        and thus cannot be autodetected from the file contents.
+        """
+        if compression is True:
+            raise ValueError(
+                "Can determine compression automatically from {}".format(msg))
+        elif compression is None:
+            return False
+        else:
+            return compression
+    
     if file_type is FileType.PROCESS:
+        # Return early if opening a process
         if not allow_subprocesses:
             raise ValueError("Subprocesses are disallowed")
         if path.startswith('|'):
@@ -900,12 +937,7 @@ def xopen(
         for std in ('stdin', 'stdout', 'stderr'):
             popen_args[std] = PIPE
         if mode.writable:
-            if compression is True:
-                raise ValueError(
-                    "Can determine compression automatically when writing to "
-                    "process stdin")
-            elif compression is None:
-                compression = False
+            compression = check_write_only_compression(compression, 'stdin')
             target = 'stdin'
         else:
             target = 'stdout'
@@ -913,8 +945,8 @@ def xopen(
             mode=mode, compression=compression, validate=validate,
             context_wrapper=context_wrapper)
         return popen(path, **popen_args)
-    
-    if file_type is FileType.BUFFER:
+    elif file_type is FileType.BUFFER:
+        # substitute 'path' for an open buffer
         if path == str:
             path = io.StringIO()
         elif path == bytes:
@@ -931,18 +963,28 @@ def xopen(
                 path = io.StringIO(path)
             else:
                 if mode.coding != ModeCoding.BINARY:
-                    raise ValueError("Must use binary mode with a bytes buffer")
+                    raise ValueError(
+                        "Must use binary mode with a bytes buffer")
                 path = io.BytesIO(path)
                 is_bin = True
         if context_wrapper:
             buffer = path
         if not mode.readable:
-            if compression is True:
-                raise ValueError(
-                    "Cannot guess compression for a write-only buffer")
-            elif compression is None:
-                compression = False
+            compression = check_write_only_compression(compression)
             validate = False
+    elif file_type is FileType.SOCKET:
+        # substitute 'path' for an open socket
+        # we always open the socket in binary mode
+        is_bin = True
+        mode_str = ['b']
+        if mode.readable:
+            mode_str.append('r')
+        else:
+            compression = check_write_only_compression(compression)
+            validate = False
+        if mode.writable:
+            mode_str.append('w')
+        path = open_socket(socket_info, ''.join(mode_str))
     
     # The file handle we will open
     # TODO: figure out the right type
@@ -981,7 +1023,7 @@ def xopen(
             guess = FORMATS.guess_format_from_buffer(fileobj)
         else:
             validate = False
-    elif file_type in (FileType.FILELIKE, FileType.BUFFER):
+    elif file_type in (FileType.FILELIKE, FileType.BUFFER, FileType.SOCKET):
         fileobj = path
         use_system = False
         
@@ -1011,7 +1053,9 @@ def xopen(
                     mode, fileobj_mode))
         
         # compression/decompression only possible for binary files
-        is_bin = fileobj_mode.binary
+        if not is_bin and fileobj_mode.binary:
+            is_bin = True
+        
         if not is_bin:
             if compression:
                 raise ValueError(
@@ -1038,7 +1082,7 @@ def xopen(
             raise ValueError("Could not open URL {}".format(path))
         
         use_system = False
-        name = get_url_file_name(fileobj, url_parts)
+        name = get_url_file_name(fileobj, url_info)
         
         # Get compression format if not specified
         if validate or guess_format:
@@ -1075,9 +1119,8 @@ def xopen(
             "format {}".format(guess, compression))
     elif guess:
         compression = guess
-    elif compression is True:
-        raise ValueError(
-            "Could not guess compression format from {}".format(path))
+    else:
+        compression = check_write_only_compression(compression, path)
     
     if compression:
         fmt = FORMATS.get_compression_format(str(compression))
@@ -1087,7 +1130,8 @@ def xopen(
         is_std = False
     elif not fileobj:
         fileobj = open(path, mode.value, **kwargs)
-    elif mode.text and is_bin and (is_std or file_type is FileType.FILELIKE):
+    elif mode.text and is_bin and (
+            is_std or file_type in (FileType.FILELIKE, FileType.SOCKET)):
         fileobj = io.TextIOWrapper(fileobj)
         fileobj.mode = mode.value
     

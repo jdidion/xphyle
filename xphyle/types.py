@@ -44,14 +44,14 @@ class ModeAccess(Enum):
     See Also:
         https://docs.python.org/3/library/functions.html#open
     """
-    READ = 'r'
-    """Read from file."""
-    WRITE = 'w'
-    """Write to file, overwriting any existing file."""
     READWRITE = 'r+'
     """Open file for reading and writing."""
+    READ = 'r'
+    """Read from file."""
     TRUNCATE_READWRITE = 'w+'
     """Open file for reading and writing, first truncating the file to 0."""
+    WRITE = 'w'
+    """Write to file, overwriting any existing file."""
     APPEND = 'a'
     """Create file if it doesn't exist, else append to existing file."""
     EXCLUSIVE = 'x'
@@ -343,6 +343,8 @@ class FileType(Enum):
     :class:`xphyle.types.FileLikeInterface`."""
     BUFFER = 'buffer'
     """A StringIO or BytesIO."""
+    SOCKET = 'socket'
+    """A low-level (tcp or udp) network socket."""
 
 class EventType(Enum):
     """Enumeration of event types that can be registered on an

@@ -102,7 +102,7 @@ class XphyleTests(TestCase):
             xopen(STDOUT, file_type=FileType.LOCAL)
         with self.assertRaises(ValueError):
             xopen('foo', file_type=FileType.URL)
-        with self.assertRaises(IOError):
+        with self.assertRaises(ValueError):
             xopen('http://foo.com', file_type=FileType.LOCAL)
         with self.assertRaises(ValueError):
             xopen('xyz', file_type=FileType.FILELIKE)
@@ -246,12 +246,26 @@ class XphyleTests(TestCase):
             self.assertEqual('gzip', i.compression)
             self.assertEqual('foo\n', i.read())
     
-    def test_open_process(self):
+    def test_xopen_process(self):
         with self.assertRaises(ValueError):
             xopen('|cat', 'wt', allow_subprocesses=False)
         with open_('|cat', 'wt') as p:
             p.write('foo\n')
         self.assertEquals(b'foo\n', p.stdout)
+    
+    def test_xopen_socket(self):
+        server = EchoServer()
+        server.start()
+        sock = None
+        try:
+            with open_('>:5555', 'r+t', compression=False) as sock:
+                sock.write('foo\n')
+                sock.flush()
+                assert sock.readline() == 'foo\n'
+        finally:
+            if sock is not None:
+                sock.close()
+            server.kill()
     
     def test_peek(self):
         path = self.root.make_file()

@@ -1,6 +1,8 @@
 from contextlib import contextmanager
 from io import BytesIO, TextIOWrapper
 import random
+import socket
+from threading import Thread
 from unittest.mock import patch
 import urllib.request
 
@@ -57,3 +59,41 @@ def no_internet():
         return False
     except:
         return True
+
+# A simple socket-based server that echoes back any sent data.
+class EchoServer(Thread):
+    def __init__(self, port=5555):
+        super().__init__()
+        self.port = port
+    
+    def kill(self):
+        conn = socket.create_connection(('0.0.0.0', self.port))
+        try:
+            conn.send(b'quit')
+        finally:
+            conn.shutdown(1)
+            conn.close()
+    
+    def run(self, chunk_size=2048):
+        connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        connection.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        connection.bind(('0.0.0.0', self.port))
+        connection.listen(10)
+        while True:
+            current_connection, address = connection.accept()
+            try:
+                while True:
+                    data = current_connection.recv(chunk_size)
+                    if data:
+                        if data == b'quit':
+                            return
+                        else:
+                            current_connection.send(data)
+                    else:
+                        break
+            finally:
+                try:
+                    current_connection.shutdown(1)
+                except:
+                    pass
+                current_connection.close()

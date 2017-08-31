@@ -197,6 +197,31 @@ You can also create readable buffers by passing the string/bytes to read instead
     with open_("This is a string I want to read", file_type=FileType.BUFFER) as buf:
         buf_str = buf.read()
 
+Sockets
+~~~~~~~
+
+As of xphyle 3.1.0, ``open_`` and ``xopen`` can also open sockets. A socket is a direct (transport layer) connection to another device on the network. Sockets can be opened as read-only (accept connection from remote device), write-only (write to remote device), or read-write (two-way connection to remote device).
+
+Sockets are specified using the following schema:
+
+[protocol][<local address][>remote address]
+
+where protocol can be 'tcp' or 'udp' (tcp by default), local address is the address to read from, and remote address is the address to write to. Addresses are specified as:
+
+[hostname:]port
+
+where hostname is required for the remote address and defaults to 'localhost' for the local address. For example::
+
+    with open_('tcp>floof.com:8080', 'w') as socket:
+        socket.write('hello')
+
+Note that socket communication is done with blocking I/O. If you create a readable connection to a service that does not immediately send data (e.g. a read-write socket on which the client is required to initiate), you MUST explicitly specify the value of the 'compression' argument::
+
+    with open_('tcp<192.168.1.1:8080>floof.com:8080', 'r+', compression=False) as socket:
+        socket.write('hello')
+        answer = socket.read()
+        print(answer)
+
 Reading/writing data
 ~~~~~~~~~~~~~~~~~~~~
 

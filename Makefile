@@ -4,7 +4,7 @@ desc = ''
 #pytestopts = "--full-trace"
 
 BUILD = python setup.py install
-TEST  = py.test -m "not perf" --cov --cov-report term-missing $(pytestopts) $(tests)
+TEST  = py.test -s -m "not perf" --cov --cov-report term-missing $(pytestopts) $(tests)
 
 all:
 	$(BUILD)
