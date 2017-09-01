@@ -1,4 +1,4 @@
-![https://pypi.python.org/pypi/xphyle](https://img.shields.io/pypi/v/xphyle.svg?branch=master)
+[![PyPI](https://img.shields.io/pypi/v/xphyle.svg?branch=master)](https://pypi.python.org/pypi/xphyle)
 [![Travis CI](https://travis-ci.org/jdidion/xphyle.svg?branch=master)](https://travis-ci.org/jdidion/xphyle)
 [![Coverage Status](https://img.shields.io/coveralls/jdidion/xphyle/master.svg)](https://coveralls.io/github/jdidion/xphyle?branch=master)
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/b2c0baa52b604e39a09ed108ac2f53ee)](https://www.codacy.com/app/jdidion/xphyle?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=jdidion/xphyle&amp;utm_campaign=Badge_Grade)
