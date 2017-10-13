@@ -185,6 +185,12 @@ class XphyleTests(TestCase):
         with self.assertRaises(ValueError):
             with xopen(path, 'rt', compression='bz2', validate=True):
                 pass
+        existing_file = self.root.make_file(contents='abc')
+        with xopen(existing_file, 'wt', overwrite=True) as out:
+            out.write('def')
+        with self.assertRaises(ValueError):
+            with xopen(existing_file, 'wt', overwrite=False):
+                pass
     
     def test_xopen_fileobj(self):
         path = self.root.make_file(suffix='.gz')

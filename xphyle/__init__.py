@@ -764,7 +764,8 @@ def xopen(
         mode: ModeArg = None,
         compression: CompressionArg = None, use_system: bool = True,
         allow_subprocesses: bool = True, context_wrapper: bool = None, 
-        file_type: FileType = None, validate: bool = True, **kwargs
+        file_type: FileType = None, validate: bool = True, 
+        overwrite: bool = True, **kwargs
         ) -> FileLike:
     """
     Replacement for the builtin `open` function that can also open URLs and
@@ -797,6 +798,8 @@ def xopen(
             a local file contains a colon (':') in the name.
         validate: Ensure that the user-specified compression format matches the
             format guessed from the file extension or magic bytes.
+        overwrite: For files opened in write mode, whether to overwrite
+            existing files (True).
         kwargs: Additional keyword arguments to pass to ``open``.
     
     `path` is interpreted as follows:
@@ -1066,6 +1069,9 @@ def xopen(
                 guess = FORMATS.guess_format_from_file_header(path)
         else:
             path = check_writable_file(path)
+            # If overwrite=False, check that the file doesn't already exist
+            if not overwrite and os.path.exists(path):
+                raise ValueError("File already exists: {}".format(path))
             if validate or guess_format:
                 guess = FORMATS.guess_compression_format(path)
     
