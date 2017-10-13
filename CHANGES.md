@@ -1,13 +1,14 @@
-v3.0.10 (dev)
+v3.1.2 (dev)
 -------------
 
-v3.0.9 (2017.10.13)
+v3.1.1 (2017.10.13)
 -------------------
 * Added 'overwrite' parameter to xopen (defaults to True).
 
-v3.0.8 (2017.07.23)
+v3.1.0 (2017.08.31)
 -------------------
 * *Possible breaking change*: We discovered that python 3.3 support never fully worked due to some incompatibilities in the backported libraries for features we rely on that were introduced in 3.4. Thus, we are officially dropping support for python 3.3. This also reverts the change made in 3.0.7.
+* Please ignore releases 3.0.8 and 3.0.9.
 
 v3.0.7 (2017.07.22)
 -------------------
