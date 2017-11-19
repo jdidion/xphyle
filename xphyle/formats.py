@@ -884,7 +884,9 @@ class Gzip(GzipBase):
         return [str(self.executable_path), '-l', path]
 
     def parse_file_listing(self, listing: str) -> Tuple[int, int, float]:
+        print(listing)
         parsed = re.split(' +', listing.splitlines(keepends=False)[1].strip())
+        print(parsed)
         if self.executable_name != 'pigz':
             parsed = parsed[5:8]
         ratio = float(parsed[2][:-1]) / 100
