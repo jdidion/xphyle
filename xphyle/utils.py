@@ -452,10 +452,14 @@ def uncompressed_size(
     Raises:
         ValueError if the compression format is not supported.
     """
-    if not isinstance(compression, str):
-        compression = FORMATS.guess_compression_format(path)
-    fmt = FORMATS.get_compression_format(compression)
-    return fmt.uncompressed_size(path)
+    if compression is not False:
+        if not isinstance(compression, str):
+            compression = FORMATS.guess_compression_format(path)
+        if compression is not None:
+            fmt = FORMATS.get_compression_format(compression)
+            return fmt.uncompressed_size(path)
+    # Assume the file is not compressed to begin with
+    return os.stat(path).st_size
 
 # EventListeners
 
