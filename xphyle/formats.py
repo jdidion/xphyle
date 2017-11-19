@@ -898,7 +898,7 @@ class BGzip(GzipBase):
         return 'bgzip'
     
     # TODO: This is a bug: bgzip doesn't actually allow bgz extension, but the
-    # way Formats currently works does not support on extension being used with
+    # way Formats currently works does not support an extension being used with
     # multiple formats.
     
     @property
@@ -1068,9 +1068,9 @@ class Lzma(SingleExeCompressionFormat):
 
     def parse_file_listing(self, listing: str) -> Tuple[int, int, float]:
         parsed = listing.splitlines(keepends=False)
-        print(parsed)
         compressed, uncompressed = (
-            int(re.match(r'.+?(\d+) B\)?', size).group(1))
+            int(re.sub('[\.,]', '', re.match(
+                r'.+?([\d\.,]+) B\)?', size).group(1)))
             for size in parsed[3:5])
         ratio = float(parsed[5][22:])
         return (compressed, uncompressed, ratio)
