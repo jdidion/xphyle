@@ -370,7 +370,7 @@ def decompress_file(
         compressed_file: PathOrFile, dest_file: PathOrFile = None,
         compression: CompressionArg = None, keep: bool = True,
         use_system: bool = True, **kwargs) -> PathLike:
-    """decompress an existing file, either in-place or to a separate file.
+    """Decompress an existing file, either in-place or to a separate file.
     
     Args:
         compressed_file: Path or file-like object to decompress.
@@ -435,6 +435,27 @@ def transcode_file(
             use_system=use_system, **dst_args) as dst:
         for chunk in iter_file_chunked(src):
             dst.write(chunk)
+
+def uncompressed_size(
+        path: PathLike, compression: CompressionArg = None) -> Tuple[int, None]:
+    """Get the uncompressed size of the compressed file.
+
+    Args:
+        path: The path to the compressed file.
+        compression: None or True, to guess compression format from the file
+            name, or the name of any supported compression format.
+
+    Returns:
+        The uncompressed size of the file in bytes, or None if the uncompressed
+        size could not be determined (without actually decompressing the file).
+
+    Raises:
+        ValueError if the compression format is not supported.
+    """
+    if not isinstance(compression, str):
+        compression = FORMATS.guess_compression_format(path)
+    fmt = FORMATS.get_compression_format(compression)
+    return fmt.uncompressed_size(path)
 
 # EventListeners
 

@@ -7,3 +7,4 @@ xphyle.egg-info/
 docs/_build/
 .vscode*
 .mypy_cache/
+.idea/

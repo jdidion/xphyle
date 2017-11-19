@@ -299,7 +299,15 @@ class UtilsTests(TestCase):
         transcode_file(gzfile, bzfile)
         with bz2.open(bzfile, 'rt') as i:
             self.assertEqual('foo', i.read())
-    
+
+    def test_uncompressed_size(self):
+        for ext in ('.gz', '.xz'):
+            with self.subTest(ext):
+                raw = self.root.make_file(contents=random_text(1000))
+                compressed = self.root.make_file(suffix=ext)
+                compress_file(raw, compressed)
+                self.assertEquals(1000, uncompressed_size(compressed))
+
     def test_exec_process(self):
         inp = self.root.make_file(suffix='.gz')
         with gzip.open(inp, 'wt') as o:

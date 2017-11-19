@@ -114,7 +114,7 @@ class CompressionTests(TestCase):
         self.assertEqual(
             gz.get_command('d', 'foo.gz'),
             [gz_path, '-d', '-c', 'foo.gz'])
-    
+
     @skipIf(no_pigz, "'pigz' not available")
     def test_pigz(self):
         THREADS.update(2)
@@ -454,3 +454,14 @@ class StringTests(TestCase):
                 decompressed = fmt.decompress_string(compressed)
                 self.assertListEqual(strings, decompressed.split('|'))
         
+class UncompressedSizeTests(TestCase):
+    @skipIf(gz_path is None, "'gzip' not available")
+    def test_get_uncompressed_size(self):
+        for ext in ('.gz', '.xz'):
+            with self.subTest(ext=ext):
+                with TempDir() as temp:
+                    raw = temp.make_file(contents=random_text(1000))
+                    compressed = temp.make_file(suffix=ext)
+                    fmt = get_format(ext)
+                    fmt.compress_file(raw, compressed)
+                    self.assertEquals(1000, fmt.uncompressed_size(compressed))

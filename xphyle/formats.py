@@ -7,7 +7,8 @@ from collections import defaultdict
 from importlib import import_module
 import io
 import os
-from subprocess import Popen, PIPE, CalledProcessError
+import re
+from subprocess import Popen, PIPE, CalledProcessError, check_output
 
 from xphyle.paths import (
     STDIN, EXECUTABLE_CACHE, check_readable_file, check_writable_file,
@@ -284,7 +285,7 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
         """The path of the decompression program.
         """
         raise NotImplementedError()
-    
+
     @property
     def compress_name(self) -> str:
         """The name of the compression program.
@@ -351,7 +352,7 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
         resolves to an existing, executable file.
         """
         return self.decompress_path is not None
-    
+
     def compress(self, raw_bytes: bytes, **kwargs) -> bytes:
         """Compress bytes.
         
@@ -464,7 +465,7 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
             cpe = CalledProcessError(returncode, " ".join(cmd))
             cpe.stderr = stderr
             raise IOError from cpe
-    
+
     def open_file(
             self, path: str, mode: ModeArg, use_system: bool = True,
             **kwargs) -> FileLike:
@@ -703,6 +704,48 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
         
         return dest_name
 
+    def get_list_command(self, path: str) -> List[str]:
+        """Get the command to list contents of a compressed file.
+
+        Args:
+            path: Path to the compressed file.
+
+        Returns:
+            List of command arguments, or None if the uncompressed size
+            cannot be determined (without actually decompressing the file).
+        """
+        return None
+
+    def parse_file_listing(self, listing: str) -> Tuple[int, int, float]:
+        """Parse the result of the list command.
+
+        Args:
+            listing: The output of executing the list command.
+
+        Returns:
+            A tuple (<compressed size in bytes>, <uncompressed size in bytes>,
+            <compression ratio>).
+        """
+        raise NotImplementedError()
+
+    def uncompressed_size(self, path: str) -> Union[int, None]:
+        """Get the uncompressed size of a compressed file.
+
+        Args:
+            path: Path to the compressed file.
+
+        Returns:
+            The uncompressed size of the file in bytes, or None if the
+            uncompressed size cannot be determined (without actually
+            decompressing the file).
+        """
+        list_command = self.get_list_command(path)
+        if list_command is None:
+            return None
+        listing = check_output(list_command, universal_newlines=True)
+        _, uncompressed, _ = self.parse_file_listing(listing)
+        return uncompressed
+
 class SingleExeCompressionFormat(CompressionFormat): # pylint: disable=abstract-method
     """Base class form ``CompressionFormat``s that use the same executable for
     compressing and decompressing.
@@ -766,7 +809,6 @@ class GzipBase(SingleExeCompressionFormat):
                 compressed_file = io.BufferedWriter(compressed_file)
         return compressed_file
 
-
 class Gzip(GzipBase):
     """Implementation of CompressionFormat for gzip files.
     """
@@ -827,7 +869,7 @@ class Gzip(GzipBase):
         if src != STDIN:
             cmd.append(src)
         return cmd
-    
+
     def handle_command_return(
             self, returncode: int, cmd: List[str], stderr: bytes = None
             ) -> None:
@@ -837,6 +879,19 @@ class Gzip(GzipBase):
                 b'skipping' in stderr):
             returncode = 1
         super().handle_command_return(returncode, cmd, stderr)
+
+    def get_list_command(self, path: str) -> List[str]:
+        return [str(self.executable_path), '-l', path]
+
+    def parse_file_listing(self, listing: str) -> Tuple[int, int, float]:
+        parsed = re.split(' +', listing.splitlines(keepends=False)[1])
+        if parsed[0] == '':
+            parsed = parsed[1:]
+        if self.executable_name != 'pigz':
+            parsed = parsed[5:8]
+        ratio = float(parsed[2][:-1]) / 100
+        return (int(parsed[0]), int(parsed[1]), ratio)
+
 
 class BGzip(GzipBase):
     """bgzip is block gzip. bgzip files are compatible with gzip. Typically,
@@ -1012,7 +1067,19 @@ class Lzma(SingleExeCompressionFormat):
         if src != STDIN:
             cmd.append(src)
         return cmd
-    
+
+    def get_list_command(self, path: str) -> List[str]:
+        return [str(self.executable_path), '-lv', path]
+
+    def parse_file_listing(self, listing: str) -> Tuple[int, int, float]:
+        parsed = listing.splitlines(keepends=False)
+        print(parsed)
+        compressed, uncompressed = (
+            int(re.match('.+?(\d+) B\)?', size).group(1))
+            for size in parsed[3:5])
+        ratio = float(parsed[5][22:])
+        return (compressed, uncompressed, ratio)
+
     def compress(self, raw_bytes, **kwargs) -> bytes:
         kwargs = dict(
             (k, kwargs[k])
