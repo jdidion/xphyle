@@ -884,9 +884,7 @@ class Gzip(GzipBase):
         return [str(self.executable_path), '-l', path]
 
     def parse_file_listing(self, listing: str) -> Tuple[int, int, float]:
-        parsed = re.split(' +', listing.splitlines(keepends=False)[1])
-        if parsed[0] == '':
-            parsed = parsed[1:]
+        parsed = re.split(' +', listing.splitlines(keepends=False)[1].strip())
         if self.executable_name != 'pigz':
             parsed = parsed[5:8]
         ratio = float(parsed[2][:-1]) / 100
@@ -1075,7 +1073,7 @@ class Lzma(SingleExeCompressionFormat):
         parsed = listing.splitlines(keepends=False)
         print(parsed)
         compressed, uncompressed = (
-            int(re.match('.+?(\d+) B\)?', size).group(1))
+            int(re.match(r'.+?(\d+) B\)?', size).group(1))
             for size in parsed[3:5])
         ratio = float(parsed[5][22:])
         return (compressed, uncompressed, ratio)

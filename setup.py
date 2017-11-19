@@ -17,7 +17,7 @@ if version_info < (3, 6):
     # typing was added in 3.5, and we rely on critical features that were
     # introduced in 3.5.2+, so for versions older than 3.6 we rely on
     # a backport
-    install_requirements.append('backports.typing')
+    install_requirements.append('typing')
 
 import versioneer
 
