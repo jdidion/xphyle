@@ -9,17 +9,10 @@ import os
 import stat
 import sys
 from types import ModuleType
-# HACK: critical features were introduced in python 3.5.2, so we force use
-# of backports.typing even in 3.5
-if sys.version_info < (3, 6):
-    from backports.typing import *
-    from backports.typing import IO
-    from backports.typing.re import *
-else:
-    from typing import *
-    # ISSUE: Not sure why I have to import IO separately
-    from typing import IO
-    from typing.re import *
+from typing import *
+# ISSUE: Not sure why I have to import IO separately
+from typing import IO
+from typing.re import *
 
 # ISSUE: there are several mypy errors due to incomplete enum support.
 # enums should be fully suported in the next version of mypy (>0.501).
