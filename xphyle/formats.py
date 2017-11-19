@@ -1069,7 +1069,7 @@ class Lzma(SingleExeCompressionFormat):
     def parse_file_listing(self, listing: str) -> Tuple[int, int, float]:
         parsed = listing.splitlines(keepends=False)
         compressed, uncompressed = (
-            int(re.sub('[\.,]', '', re.match(
+            int(re.sub(r'[\.,]', '', re.match(
                 r'.+?([\d\.,]+) B\)?', size).group(1)))
             for size in parsed[3:5])
         ratio = float(parsed[5][22:])
