@@ -1,5 +1,12 @@
-v3.1.3 (dev)
+v3.1.5 (dev)
 ------------
+
+v3.1.4 (2017.12.11)
+-------------------
+* Added `close_fileobj` parameter support for buffers as well.
+
+v3.1.3 (2017.12.11)
+-------------------
 * Added `close_fileobj` parameters to `xopen()` to allow user to specify whether the file should be closed when the wrapper is closed.
 
 v3.1.2 (2017.11.18)

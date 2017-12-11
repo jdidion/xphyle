@@ -114,14 +114,17 @@ class FileLikeWrapper(EventManager, FileLikeBase):
     Args:
         fileobj: The file-like object to wrap.
         compression: Whether the wrapped file is compressed.
+        close_fileobj: Whether to close the wrapped file object when closing
+            this wrapper.
     """
     def __init__(
-            self, fileobj: FileLike, compression: CompressionArg = False
-        ) -> None:
+            self, fileobj: FileLike, compression: CompressionArg = False,
+            close_fileobj: bool = True) -> None:
         super().__init__()
         self._fileobj = fileobj
         self._iterator = None # type: Iterator
         self.compression = compression
+        self.close_fileobj = close_fileobj
     
     def __next__(self) -> bytes:
         return next(iter(self))
@@ -194,7 +197,8 @@ class FileLikeWrapper(EventManager, FileLikeBase):
         self._fire_listeners(EventType.CLOSE)
     
     def _close(self) -> None:
-        self._fileobj.close()
+        if self.close_fileobj:
+            self._fileobj.close()
     
     # Pass-through methods
     
@@ -297,13 +301,6 @@ class FileWrapper(FileLikeWrapper):
         return getattr(self, '_path', None)
 
 
-class OpenFileWrapper(FileWrapper):
-    """FileWrapper that does not close its underlying file.
-    """
-    def _close(self) -> None:
-        pass
-
-
 class BufferWrapper(FileWrapper):
     """Wrapper around a string/bytes buffer.
     
@@ -311,13 +308,15 @@ class BufferWrapper(FileWrapper):
         fileobj: The fileobj to wrap (the raw or wrapped buffer).
         buffer: The raw buffer.
         compression: Compression type.
+        close_buffer: Whether to close the buffer when closing this wrapper.
     """
     def __init__(
             self, fileobj: PathOrFile, buffer: Union[io.StringIO, io.BytesIO],
-            compression: CompressionArg = False, name: str = None) -> None:
-        super().__init__(fileobj, compression=compression, name=name)
+            compression: CompressionArg = False, name: str = None, **kwargs
+            ) -> None:
+        super().__init__(fileobj, compression=compression, name=name, **kwargs)
         self.buffer = buffer
-    
+
     def getvalue(self) -> AnyChar:
         """Returns the contents of the buffer.
         """
@@ -329,11 +328,11 @@ class BufferWrapper(FileWrapper):
     def _close(self):
         if self.compression:
             self._fileobj.close()
-            value = self.getvalue()
-        else:
-            value = self.getvalue()
+            setattr(self, '_value', self.buffer.getvalue())
+        elif self.close_fileobj:
+            setattr(self, '_value', self.buffer.getvalue())
             self._fileobj.close()
-        setattr(self, '_value', value)
+
 
 
 class StdWrapper(FileLikeWrapper):
@@ -1111,13 +1110,13 @@ def xopen(
         if is_std:
             fileobj = StdWrapper(fileobj, compression=compression)
         elif file_type == FileType.BUFFER:
-            fileobj = BufferWrapper(fileobj, buffer, compression=compression)
+            fileobj = BufferWrapper(
+                fileobj, buffer, compression=compression,
+                close_fileobj=close_fileobj)
         else:
-            file_wrapper_class = FileWrapper
-            if file_type == FileType.FILELIKE and not close_fileobj:
-                file_wrapper_class = OpenFileWrapper
-            fileobj = file_wrapper_class(
-                fileobj, name=name, mode=mode,compression=compression)
+            fileobj = FileWrapper(
+                fileobj, name=name, mode=mode, compression=compression,
+                close_fileobj=close_fileobj)
     
     return fileobj
 
