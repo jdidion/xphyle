@@ -270,7 +270,7 @@ class FileWrapper(FileLikeWrapper):
     def __init__(
             self, source: PathOrFile, mode: ModeArg = 'w',
             compression: CompressionArg = False, name: str = None,
-            **kwargs) -> None:
+            close_fileobj: bool = True, **kwargs) -> None:
         if isinstance(source, str):
             self._path = str(source)
             source_fileobj = xopen(
@@ -281,7 +281,9 @@ class FileWrapper(FileLikeWrapper):
                 self._path = name
             else:
                 self._path = getattr(source_fileobj, 'name')
-        super().__init__(source_fileobj, compression=compression)
+        super().__init__(
+            source_fileobj, compression=compression,
+            close_fileobj=close_fileobj)
         self._name = name
         if mode or not hasattr(source, 'mode'):
             self._mode = str(mode)
@@ -753,8 +755,7 @@ def open_(
                 raise ValueError(
                     "'wrap_fileobj must be True if 'path' is not file-like")
         else:
-            if not is_fileobj:
-                kwargs['context_wrapper'] = True
+            kwargs['context_wrapper'] = True
             try:
                 with xopen(path_or_file, mode, **kwargs) as fileobj:
                     yield fileobj
