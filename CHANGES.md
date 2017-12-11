@@ -1,5 +1,6 @@
 v3.1.3 (dev)
 ------------
+* Added `close_fileobj` parameters to `xopen()` to allow user to specify whether the file should be closed when the wrapper is closed.
 
 v3.1.2 (2017.11.18)
 ------------------- 

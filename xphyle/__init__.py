@@ -297,6 +297,13 @@ class FileWrapper(FileLikeWrapper):
         return getattr(self, '_path', None)
 
 
+class OpenFileWrapper(FileWrapper):
+    """FileWrapper that does not close its underlying file.
+    """
+    def _close(self) -> None:
+        pass
+
+
 class BufferWrapper(FileWrapper):
     """Wrapper around a string/bytes buffer.
     
@@ -765,7 +772,7 @@ def xopen(
         compression: CompressionArg = None, use_system: bool = True,
         allow_subprocesses: bool = True, context_wrapper: bool = None, 
         file_type: FileType = None, validate: bool = True, 
-        overwrite: bool = True, **kwargs
+        overwrite: bool = True, close_fileobj: bool = True, **kwargs
         ) -> FileLike:
     """
     Replacement for the builtin `open` function that can also open URLs and
@@ -800,6 +807,9 @@ def xopen(
             format guessed from the file extension or magic bytes.
         overwrite: For files opened in write mode, whether to overwrite
             existing files (True).
+        close_fileobj: When `path` is a file-like object / `file_type` is
+            FILELIKE, and `context_wrapper` is True, this determines whether to
+            close the underlying file object when closing the wrapper.
         kwargs: Additional keyword arguments to pass to ``open``.
     
     `path` is interpreted as follows:
@@ -1103,7 +1113,10 @@ def xopen(
         elif file_type == FileType.BUFFER:
             fileobj = BufferWrapper(fileobj, buffer, compression=compression)
         else:
-            fileobj = FileWrapper(
+            file_wrapper_class = FileWrapper
+            if file_type == FileType.FILELIKE and not close_fileobj:
+                file_wrapper_class = OpenFileWrapper
+            fileobj = file_wrapper_class(
                 fileobj, name=name, mode=mode,compression=compression)
     
     return fileobj
