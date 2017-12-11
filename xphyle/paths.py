@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
 """Convenience functions for working with file paths.
+
+Stdin, stdout, and stderr are treated as acceptable paths in most cases, which
+is why the PathLike type (Union[str, os.PathLike]) is used. String paths are
+still accepted as inputs, but all outputs will subclasses of os.PathLike.
 """
 from abc import ABCMeta, abstractmethod
 import errno
@@ -10,15 +14,18 @@ import shutil
 import stat
 import sys
 import tempfile
+from xphyle.urls import parse_url
 from xphyle.types import (
     ModeAccess, Permission, PermissionSet, PermissionArg, PermissionSetArg, 
-    PathType, PathTypeArg, PathLike, PathLikeClass, Sequence, List, Tuple, 
-    Callable, Union, Iterable, Dict, Regexp, Pattern, Match, Any, cast)
+    PathType, PathTypeArg, PathLike, Sequence, List, Tuple, Union, Iterable,
+    Dict, Regexp, Pattern, Match, Any, cast)
+
 
 STDIN = STDOUT = '-'
 """Placeholder for `sys.stdin` or `sys.stdout` (depending on access mode)"""
 STDERR = '_'
 """Placeholder for `sys.stderr`"""
+
 
 def get_permissions(path: PathLike) -> PermissionSet:
     """Get the permissions of a file/directory.
@@ -32,7 +39,8 @@ def get_permissions(path: PathLike) -> PermissionSet:
     Raises:
         IOError if the file/directory doesn't exist.
     """
-    return PermissionSet(os.stat(str(path)).st_mode)
+    return PermissionSet(os.stat(path).st_mode)
+
 
 def set_permissions(
         path: PathLike, permissions: PermissionSetArg) -> PermissionSet:
@@ -48,8 +56,9 @@ def set_permissions(
     """
     if not isinstance(permissions, PermissionSet):
         permissions = PermissionSet(permissions)
-    os.chmod(str(path), permissions.stat_flags)
+    os.chmod(path, permissions.stat_flags)
     return permissions
+
 
 def check_access(
         path: PathLike, 
@@ -68,16 +77,61 @@ def check_access(
     else:
         permission_set = PermissionSet(
             cast(Union[PermissionArg, Sequence[PermissionArg]], permissions))
-    if path in (STDOUT, STDERR):
+    if check_std(path):
         if path == STDOUT and not any(flag in permission_set for flag in (
                 Permission.READ, Permission.WRITE)):
             raise IOError(
                 errno.EACCES, "STDOUT permissions must be r or w", path)
         elif path == STDERR and Permission.WRITE not in permission_set:
             raise IOError(errno.EACCES, "STDERR permissions must be w", path)
-    elif not os.access(str(path), permission_set.os_flags):
+    elif not os.access(path, permission_set.os_flags):
         raise IOError(errno.EACCES, "{} not accessable".format(path), path)
     return permission_set
+
+
+def check_std(path: PathLike, error: bool = False) -> bool:
+    """Check whether the path is '-' (stdout) or '_' (stderr).
+
+    Args:
+        path: The path to check.
+        error: Whether an error should be raised if `path` is stdout or stderr.
+
+    Returns:
+        True if path is stdout or stderr.
+
+    Raises:
+        ValueError if path is stdout or stderr and `error` is True.
+    """
+    if path in (STDOUT, STDERR):
+        if error:
+            raise ValueError("Invalid path: {}".format(path))
+        else:
+            return True
+    return False
+
+
+def as_path(path: PathLike) -> pathlib.Path:
+    """Convert a string path to a Path object.
+
+    Args:
+        path: The path to convert. If already os.PathLike, it is returned
+            without modification. Stdout and stderr are not valid arguments.
+
+    Returns:
+        A PathLike - typically a pathlib.Path, but may be STDOUT or STDERR.
+    """
+    check_std(path, error=True)
+    if not isinstance(path, pathlib.Path):
+        url = parse_url(path)
+        if url:
+            if url.scheme == 'file':
+                path = url.path
+            else:
+                raise IOError(
+                    "Cannot convert URL {} to path".format(path), path)
+        path = pathlib.Path(str(path))
+    return path
+
 
 def abspath(path: PathLike) -> PathLike:
     """Returns the fully resolved path associated with `path`.
@@ -86,31 +140,34 @@ def abspath(path: PathLike) -> PathLike:
         path: Relative or absolute path
     
     Returns:
-        Fully resolved path
+        A PathLike - typically a pathlib.Path, but may be STDOUT or STDERR.
     
     Examples:
         abspath('foo') # -> /path/to/curdir/foo
         abspath('~/foo') # -> /home/curuser/foo
     """
-    if path in (STDOUT, STDERR):
+    if check_std(path):
         return path
-    return os.path.abspath(os.path.expanduser(str(path)))
+    return as_path(path).expanduser().resolve()
 
-def get_root(path: PathLike = None) -> PathLike:
+
+def get_root(path: PathLike = None) -> str:
     """Get the root directory.
-    
+
     Args:
-        str: A path, or '.' to get the root of the working directory, or None
-            to get the root of the path to the script.
-    
+        path: A path, or '.' to get the root of the working directory, or None
+            to get the root of the path to the script. Stdout and stderr are
+            not valid arguments.
+
     Returns:
-        A path to the root directory.
+        A string path to the root directory.
     """
-    path = str(path) if path else sys.executable
-    root = os.path.splitdrive(str(abspath(path)))[0]
-    if root == '':
-        root = os.sep
-    return root
+    if path is None:
+        path = sys.executable
+    else:
+        check_std(path, error=True)
+    return as_path(path).anchor
+
 
 def split_path(
         path: PathLike, keep_seps: bool = True,
@@ -118,7 +175,7 @@ def split_path(
     """Splits a path into a (parent_dir, name, *ext) tuple.
     
     Args:
-        path: The path
+        path: The path. Stdout and stderr are not valid arguments.
         keep_seps: Whether the extension separators should be kept as part
             of the file extensions
         resolve: Whether to resolve the path before splitting
@@ -134,19 +191,21 @@ def split_path(
         split_path('/usr/local/foobar.gz', True)
         # -> ('/usr/local', 'foobar', '.gz')
     """
+    check_std(path, error=True)
+    path = as_path(path)
     if resolve:
-        path = abspath(path)
-    parent = os.path.dirname(str(path))
-    file_parts = tuple(os.path.basename(str(path)).split(os.extsep))
+        path = path.resolve()
+    file_parts = tuple(path.name.split(os.extsep))
     if len(file_parts) == 1:
-        seps = () # type: Tuple[str, ...]
+        seps = ()  # type: Tuple[str, ...]
     else:
         seps = file_parts[1:]
         if keep_seps:
             seps = tuple(
                 '{}{}'.format(os.extsep, ext)
                 for ext in file_parts[1:])
-    return (parent, file_parts[0]) + seps
+    return (path.parent, file_parts[0]) + seps
+
 
 def filename(path: PathLike) -> str:
     """Equivalent to `split_path(path)[1]`.
@@ -158,6 +217,7 @@ def filename(path: PathLike) -> str:
         The filename part of `path`
     """
     return split_path(path)[1]
+
 
 def resolve_path(path: PathLike, parent: PathLike = None) -> PathLike:
     """Resolves the absolute path of the specified file and ensures that the
@@ -173,15 +233,17 @@ def resolve_path(path: PathLike, parent: PathLike = None) -> PathLike:
     Raises:
         IOError: if the path does not exist or is invalid.
     """
-    if path in (STDOUT, STDERR):
+    if check_std(path):
         return path
     if parent:
-        path = os.path.join(str(abspath(parent)), str(path))
+        check_std(parent, error=True)
+        path = cast(pathlib.Path, abspath(parent)) / path
     else:
         path = abspath(path)
-    if not os.path.exists(str(path)):
+    if not path.exists():
         raise IOError(errno.ENOENT, "{} does not exist".format(path), path)
     return path
+
 
 def check_path(
         path: PathLike, path_type: PathTypeArg = None,
@@ -206,15 +268,19 @@ def check_path(
     if path_type:
         if isinstance(path_type, str):
             path_type = PathType(path_type)
-        if path_type == PathType.FILE and not (
-                path in (STDOUT, STDERR) or os.path.isfile(str(path))):
+        if not check_std(path):
+            path = cast(pathlib.Path, path)
+            if path_type == PathType.FILE and not path.is_file():
+                raise IOError(errno.EISDIR, "{} not a file".format(path), path)
+            elif path_type == PathType.DIR and not path.is_dir():
+                raise IOError(
+                    errno.ENOTDIR, "{} not a directory".format(path), path)
+        elif not PathType.FILE:
             raise IOError(errno.EISDIR, "{} not a file".format(path), path)
-        elif path_type == PathType.DIR and not os.path.isdir(str(path)):
-            raise IOError(
-                errno.ENOTDIR, "{} not a directory".format(path), path)
     if permissions is not None:
         check_access(path, permissions)
     return path
+
 
 def check_readable_file(path: PathLike) -> PathLike:
     """Check that `path` exists and is readable.
@@ -227,6 +293,7 @@ def check_readable_file(path: PathLike) -> PathLike:
     """
     return check_path(path, PathType.FILE, ModeAccess.READ)
 
+
 def check_writable_file(path: PathLike, mkdirs: bool = True) -> PathLike:
     """If `path` exists, check that it is writable, otherwise check that
     its parent directory exists and is writable.
@@ -238,21 +305,27 @@ def check_writable_file(path: PathLike, mkdirs: bool = True) -> PathLike:
     Returns:
         The fully resolved path.
     """
-    if os.path.exists(str(path)):
+    if check_std(path):
+        return check_path(path, PathType.FILE, Permission.WRITE)
+
+    path = as_path(path)
+    if path.exists():
         return check_path(path, PathType.FILE, Permission.WRITE)
     else:
-        path = abspath(path)
-        dirpath = os.path.dirname(str(path))
-        if os.path.exists(str(dirpath)):
+        path = cast(pathlib.Path, abspath(path))
+        dirpath = path.parent
+        if dirpath.exists():
             check_path(dirpath, PathType.DIR, Permission.WRITE)
         elif mkdirs:
-            os.makedirs(str(dirpath))
+            dirpath.mkdir(parents=True)
         return path
+
 
 # "Safe" versions of the check methods, meaning they return None
 # instead of throwing exceptions
 
-def safe_check_path(path: PathLike, *args, **kwargs) -> PathLike:
+
+def safe_check_path(path: PathLike, *args, **kwargs) -> Union[PathLike, None]:
     """Safe vesion of `check_path`. Returns None rather than throw an
     exception.
     """
@@ -261,7 +334,8 @@ def safe_check_path(path: PathLike, *args, **kwargs) -> PathLike:
     except IOError:
         return None
 
-def safe_check_readable_file(path: PathLike) -> PathLike:
+
+def safe_check_readable_file(path: PathLike) -> Union[PathLike, None]:
     """Safe vesion of `check_readable_file`. Returns None rather than throw an
     exception.
     """
@@ -270,7 +344,8 @@ def safe_check_readable_file(path: PathLike) -> PathLike:
     except IOError:
         return None
 
-def safe_check_writable_file(path: PathLike) -> PathLike:
+
+def safe_check_writable_file(path: PathLike) -> Union[PathLike, None]:
     """Safe vesion of `check_writable_file`. Returns None rather than throw
     an exception.
     """
@@ -279,11 +354,12 @@ def safe_check_writable_file(path: PathLike) -> PathLike:
     except IOError:
         return None
 
+
 def find(
         root: PathLike, pattern: Regexp,
         path_types: Sequence[PathTypeArg] = 'f',
         recursive: bool = True, return_matches: bool = False
-        ) -> Union[Sequence[PathLike], Sequence[Tuple[PathLike, Match]]]:
+        ) -> Union[Sequence[os.PathLike], Sequence[Tuple[os.PathLike, Match]]]:
     """Find all paths under `root` that match `pattern`.
     
     Args:
@@ -299,6 +375,8 @@ def find(
         List of matching paths. If `return_matches` is True, each item will be
         a (path, Match) tuple.
     """
+    check_std(root, error=True)
+
     if isinstance(pattern, str):
         pat = re.compile(pattern)
     else:
@@ -312,20 +390,22 @@ def find(
     fullmatch = os.sep in pat.pattern
     
     def get_matching(
-            names: Iterable[str], parent) -> List[Tuple[str, Match[str]]]:
+            names: Iterable[str], parent
+            ) -> List[Tuple[pathlib.Path, Match[str]]]:
         """Get all names that match the pattern."""
+        parent = as_path(parent)
         if fullmatch:
-            names = (os.path.join(parent, name) for name in names)
+            names = (parent / name for name in names)
         matching = []
         for name in names:
-            match = pat.fullmatch(name)
+            match = pat.fullmatch(str(name))
             if match:
-                path = name if fullmatch else os.path.join(parent, name)
+                path = pathlib.Path(name) if fullmatch else (parent / name)
                 matching.append((path, match))
         return matching
     
-    found = [] # type: List[Tuple[str, Match[str]]]
-    for parent, dirs, files in os.walk(str(root)):
+    found = []  # type: List[Tuple[pathlib.Path, Match[str]]]
+    for parent, dirs, files in os.walk(root):
         if PathType.DIR in path_type_set:
             found.extend(get_matching(dirs, parent))
         if any(t in path_type_set for t in (PathType.FILE, PathType.FIFO)):
@@ -340,9 +420,10 @@ def find(
             break
     
     if return_matches:
-       return tuple(found)
+        return tuple(found)
     else:
         return tuple(f[0] for f in found)
+
 
 class ExecutableCache(object):
     """Lookup and cache executable paths.
@@ -353,8 +434,8 @@ class ExecutableCache(object):
     def __init__(
             self, default_path: Iterable[PathLike] = os.get_exec_path()
             ) -> None:
-        self.cache = {} # type: Dict[str, PathLike]
-        self.search_path = None # type: Tuple[str, ...]
+        self.cache = {}  # type: Dict[str, pathlib.Path]
+        self.search_path = None  # type: Tuple[pathlib.Path, ...]
         self.reset_search_path(default_path)
 
     def add_search_path(
@@ -368,9 +449,19 @@ class ExecutableCache(object):
         # pylint: disable=global-statement,invalid-name
         if isinstance(paths, str):
             paths = paths.split(os.pathsep)
-        elif isinstance(paths, PathLikeClass):
+        elif isinstance(paths, os.PathLike):
             paths = [paths]
-        self.search_path = tuple(str(p) for p in paths) + self.search_path
+
+        def _as_path(p):
+            check_std(p, error=True)
+            s = str(p)
+            if '"' in s:
+                p = s.strip('"')
+            return as_path(p)
+
+        self.search_path = tuple(
+            _as_path(p)
+            for p in cast(Iterable, paths)) + self.search_path
     
     def reset_search_path(
             self, default_path: Iterable[PathLike] = os.get_exec_path()
@@ -384,7 +475,7 @@ class ExecutableCache(object):
         if default_path:
             self.add_search_path(default_path)
     
-    def get_path(self, executable: str) -> PathLike:
+    def get_path(self, executable: PathLike) -> pathlib.Path:
         """Get the full path of `executable`.
         
         Args:
@@ -394,24 +485,33 @@ class ExecutableCache(object):
             The full path of `executable`, or None if the path cannot be
             found.
         """
-        exe_name = os.path.basename(executable)
-        if exe_name in self.cache:
-            return self.cache[exe_name]
-        
+        if executable in self.cache:
+            return self.cache[executable]
+
+        check_std(executable, error=True)
         exe_file = safe_check_path(
             executable, PathType.FILE, Permission.EXECUTE)
+
         if not exe_file:
             for path in self.search_path:
                 exe_file = safe_check_path(
-                    os.path.join(path.strip('"'), executable),
-                    PathType.FILE, Permission.EXECUTE)
+                    path / executable, PathType.FILE, Permission.EXECUTE)
                 if exe_file:
                     break
-        
+
+        exe_name = executable
+        if exe_file:
+            exe_file = cast(pathlib.Path, exe_file)
+            exe_name = exe_file.name
+            if exe_name not in self.cache:
+                self.cache[exe_name] = exe_file
+
         self.cache[exe_name] = exe_file
         return exe_file
     
-    def resolve_exe(self, names: Iterable[str]) -> Tuple:
+    def resolve_exe(
+            self, names: Iterable[str]
+            ) -> Union[Tuple[pathlib.Path, str], None]:
         """Given an iterable of command names, find the first that resolves to
         an executable.
         
@@ -425,13 +525,16 @@ class ExecutableCache(object):
         for cmd in names:
             exe = self.get_path(cmd)
             if exe:
-                return (exe, cmd)
+                return exe, cmd
         return None
+
 
 EXECUTABLE_CACHE = ExecutableCache()
 """Singleton instance of ExecutableCache."""
 
+
 # Temporary files and directories
+
 
 class TempPath(metaclass=ABCMeta):
     """Base class for temporary files/directories.
@@ -449,20 +552,20 @@ class TempPath(metaclass=ABCMeta):
         if isinstance(path_type, str):
             path_type = PathType(path_type)
         self.path_type = path_type
-        self._permissions = None # type: PermissionSet
+        self._permissions = None  # type: PermissionSet
         if permissions:
             self._set_permissions_value(permissions)
     
     @property
     @abstractmethod
-    def absolute_path(self) -> PathLike:
+    def absolute_path(self) -> pathlib.Path:
         """The absolute path.
         """
         raise NotImplementedError()
     
     @property
     @abstractmethod
-    def relative_path(self) -> PathLike:
+    def relative_path(self) -> pathlib.Path:
         """The relative path.
         """
         raise NotImplementedError()
@@ -472,7 +575,7 @@ class TempPath(metaclass=ABCMeta):
         """Whether the directory exists.
         """
         # pylint: disable=no-member
-        return os.path.exists(str(self.absolute_path))
+        return self.absolute_path.exists()
     
     @property
     def permissions(self) -> PermissionSet:
@@ -487,7 +590,8 @@ class TempPath(metaclass=ABCMeta):
     
     def set_permissions(
             self, permissions: PermissionSetArg = None,
-            set_parent: bool = False, additive: bool = False) -> PermissionSet:
+            set_parent: bool = False, additive: bool = False
+            ) -> Union[PermissionSet, None]:
         """Set the permissions for the path.
         
         Args:
@@ -529,6 +633,7 @@ class TempPath(metaclass=ABCMeta):
             self._permissions = permissions
         return permissions
 
+
 class TempPathDescriptor(TempPath):
     """Describes a temporary file or directory within a TempDir.
     
@@ -554,11 +659,11 @@ class TempPathDescriptor(TempPath):
         self.prefix = prefix
         self.suffix = suffix
         self.contents = contents
-        self._abspath = None # type: str
-        self._relpath = None # type: str
+        self._abspath = None  # type: pathlib.Path
+        self._relpath = None  # type: pathlib.Path
     
     @property
-    def absolute_path(self) -> str:
+    def absolute_path(self) -> pathlib.Path:
         """The absolute path.
         """
         if self._abspath is None:
@@ -566,7 +671,7 @@ class TempPathDescriptor(TempPath):
         return self._abspath
     
     @property
-    def relative_path(self) -> str:
+    def relative_path(self) -> pathlib.Path:
         """The relative path.
         """
         if self._relpath is None:
@@ -576,8 +681,8 @@ class TempPathDescriptor(TempPath):
     def _init_path(self) -> None:
         if self.parent is None:
             raise IOError("Cannot determine absolute path without 'root'")
-        self._relpath = os.path.join(str(self.parent.relative_path), self.name)
-        self._abspath = os.path.join(str(self.parent.absolute_path), self.name)
+        self._relpath = self.parent.relative_path / self.name
+        self._abspath = self.parent.absolute_path / self.name
     
     def create(self, apply_permissions: bool = True) -> None:
         """Create the file/directory.
@@ -588,9 +693,9 @@ class TempPathDescriptor(TempPath):
         """
         if self.path_type != PathType.DIR:
             if self.path_type == PathType.FIFO:
-                if os.path.exists(self.absolute_path):
-                    os.remove(self.absolute_path)
-                os.mkfifo(self.absolute_path)
+                if self.absolute_path.exists():
+                    self.absolute_path.unlink()
+                os.mkfifo(str(self.absolute_path))
             # TODO: Opening a FIFO for write blocks. It's possible to get around
             # this using a subprocess to pipe through a buffering program (such
             # as pv) to the FIFO instead
@@ -598,12 +703,13 @@ class TempPathDescriptor(TempPath):
                 with open(self.absolute_path, 'wt') as outfile:
                     outfile.write(self.contents or '')
         elif not os.path.exists(self.absolute_path):
-            os.mkdir(self.absolute_path)
+            self.absolute_path.mkdir()
         if apply_permissions:
             self.set_permissions()
     
     def __str__(self):
         return "TempPathDescriptor({}, {})".format(self.name, self.path_type)
+
 
 class TempDir(TempPath):
     """Context manager that creates a temporary directory and cleans it up
@@ -625,21 +731,22 @@ class TempDir(TempPath):
             path_descriptors: Iterable[TempPathDescriptor] = None, 
             **kwargs) -> None:
         super().__init__(permissions=permissions)
-        self._absolute_path = abspath(tempfile.mkdtemp(**kwargs))
-        self._relative_path = '' # type: PathLike
-        self.paths = {} # type: Dict[PathLike, TempPathDescriptor]
+        self._absolute_path = cast(
+            pathlib.Path, abspath(tempfile.mkdtemp(**kwargs)))
+        self._relative_path = pathlib.Path('')
+        self.paths = {}  # type: Dict[pathlib.Path, TempPathDescriptor]
         if path_descriptors:
             self.make_paths(*path_descriptors)
         self.set_permissions()
     
     @property
-    def absolute_path(self) -> PathLike:
+    def absolute_path(self) -> pathlib.Path:
         return self._absolute_path
-    
+
     @property
-    def relative_path(self) -> PathLike:
+    def relative_path(self) -> pathlib.Path:
         return self._relative_path
-    
+
     def __enter__(self) -> 'TempDir':
         return self
     
@@ -647,7 +754,7 @@ class TempDir(TempPath):
         self.close()
     
     def __getitem__(self, path: PathLike) -> TempPathDescriptor:
-        return self.paths[path]
+        return self.paths[as_path(path)]
     
     def __contains__(self, path: PathLike) -> bool:
         return path in self.paths
@@ -756,23 +863,26 @@ class TempDir(TempPath):
         """Create randomly-named empty files.
         
         Args:
-            n: The number of files to create.
+            num_files: The number of files to create.
             kwargs: Arguments to pass to TempPathDescriptor.
         
         Returns:
             A sequence of paths.
         """
-        desc = list(TempPathDescriptor(**kwargs) for i in range(num_files))
+        desc = list(TempPathDescriptor(**kwargs) for _ in range(num_files))
         return self.make_paths(*desc)
+
 
 # User-defined path specifications
 
+
 PATH_CLASS = pathlib.WindowsPath if os.name == 'nt' else pathlib.PosixPath
+
 
 class PathInst(PATH_CLASS):
     """A path-like that has a slot for variable values.
     """
-    __slots__ = ('values')
+    __slots__ = 'values'
     
     def joinpath(self, *other: PathLike) -> 'PathInst':
         """Join two path-like objects, including merging 'values' dicts.
@@ -793,6 +903,7 @@ class PathInst(PATH_CLASS):
             super(PathInst, self).__eq__(other) and
             self.values == other.values)
 
+
 def path_inst(path: PathLike, values: dict = None) -> PathInst:
     """Create a PathInst from a path and values dict.
     
@@ -804,10 +915,11 @@ def path_inst(path: PathLike, values: dict = None) -> PathInst:
         A PathInst.
     """
     pathinst = PathInst(path)
-    pathinst.values = values or {} # pylint: disable=attribute-defined-outside-init
+    pathinst.values = values or {}  # pylint: disable=attribute-defined-outside-init
     return pathinst
 
-class PathVar(object):
+
+class PathVar:
     """Describes part of a path, used in PathSpec.
     
     Args:
@@ -880,9 +992,10 @@ class PathVar(object):
         return "PathVar<{}, optional={}, default={}>".format(
             self.name, self.optional, self.default)
 
+
 def match_to_dict(
         match: Match, path_vars: Dict[str, PathVar],
-        errors: bool = True) -> Dict[str, Any]:
+        errors: bool = True) -> Union[Dict[str, Any], None]:
     """Convert a regular expression Match to a dict of (name, value) for
     all PathVars.
     
@@ -908,6 +1021,7 @@ def match_to_dict(
             raise
         else:
             return None
+
 
 # pylint: disable=no-member
 class SpecBase(metaclass=ABCMeta):
@@ -999,13 +1113,15 @@ class SpecBase(metaclass=ABCMeta):
         
         Args:
             path: The path to parse.
+            fullpath: Whether to extract the fully-resolved path.
         
         Returns: a PathInst.
         """
-        path = str(path)
+        check_std(path, error=True)
+        path = as_path(path)
         if fullpath:
-            path = self.path_part(os.path.expanduser(path))
-        match = self.pattern.fullmatch(path)
+            path = self.path_part(path.expanduser())
+        match = self.pattern.fullmatch(str(path))
         if not match:
             raise ValueError("{} does not match {}".format(path, self))
         return path_inst(path, self._match_to_dict(match))
@@ -1061,12 +1177,12 @@ class SpecBase(metaclass=ABCMeta):
             self.template, self.pattern)
     
     @abstractmethod
-    def path_part(self, path) -> str:
+    def path_part(self, path: pathlib.Path) -> str:
         """Return the part of the absolute path corresponding to the spec type.
         """
         pass
     
-    def default_search_root(self) -> PathLike: # pylint: disable=no-self-use
+    def default_search_root(self) -> PathLike:  # pylint: disable=no-self-use
         """Get the default root directory for searcing.
         """
         raise ValueError("'root' must be specified for FileSpec.find()")
@@ -1087,8 +1203,8 @@ class DirSpec(SpecBase):
     def path_type(self) -> PathType:
         return PathType.DIR
     
-    def path_part(self, path) -> str:
-        return os.path.dirname(path)
+    def path_part(self, path: pathlib.Path) -> str:
+        return path.parent
     
     def default_search_root(self) -> PathLike:
         try:
@@ -1134,11 +1250,11 @@ class FileSpec(SpecBase):
     def path_type(self) -> PathType:
         return PathType.FILE
     
-    def path_part(self, path) -> str:
-        return os.path.basename(path)
+    def path_part(self, path: pathlib.Path) -> str:
+        return path.name
 
 
-class PathSpec(object):
+class PathSpec:
     """Specifies a path in terms of a template with named components ("path
     variables").
     
@@ -1166,10 +1282,10 @@ class PathSpec(object):
             if dir_spec_str.endswith('$'):
                 dir_spec_str = dir_spec_str[:-1]
         self.pattern = os.path.join(
-            dir_spec_str,
-            str(file_spec) if self.fixed_file else file_spec.pattern.pattern)
+            dir_spec_str /
+            file_spec if self.fixed_file else file_spec.pattern.pattern)
         
-        self.path_vars = {} # type: Dict[str, PathVar]
+        self.path_vars = {}  # type: Dict[str, PathVar]
         if not self.fixed_dir:
             self.path_vars.update(self.dir_spec.path_vars)
         if not self.fixed_file:

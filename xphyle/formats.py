@@ -1210,12 +1210,13 @@ class Formats(object):
             return alias
         return self.compression_format_aliases.get(alias, None)
     
-    def guess_compression_format(self, name: str) -> str:
+    def guess_compression_format(self, name: PathLike) -> [str, None]:
         """Guess the compression format by name or file extension.
         
         Returns:
             The format name, or ``None`` if it could not be guessed.
         """
+        name = str(name)
         if name in self.compression_format_aliases:
             return self.compression_format_aliases[name]
         i = name.rfind(os.extsep)

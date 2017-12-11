@@ -7,7 +7,6 @@ import collections
 from enum import Enum
 import os
 import stat
-import sys
 from types import ModuleType
 from typing import *
 # ISSUE: Not sure why I have to import IO separately
@@ -431,14 +430,7 @@ FileLike = Union[IO, FileLikeInterface]
 :class:`FileLikeInterface`.
 """
 
-# pragma: no-cover
-if sys.version_info >= (3, 6):
-    PathLikeClass = os.PathLike # pylint: disable=no-member
-else:
-    import pathlib
-    PathLikeClass = pathlib.PurePath
-
-PathLike = Union[str, PathLikeClass]
+PathLike = Union[str, os.PathLike]
 """Either a string path or a path-like object. In
 python >= 3.6, path-like means is a subclass of os.PathLike, otherwise means
 is a subclass of pathlib.PurePath.
