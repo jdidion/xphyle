@@ -35,7 +35,7 @@ release:
 	$(TEST)
 	python setup.py sdist bdist_wheel
 	# release
-	twine upload dist/xphyle-$(version).tar.gz
+	python setup.py sdist upload -r pypi
 	# push new tag after successful build
 	git push origin --tags
 	# create release in GitHub
