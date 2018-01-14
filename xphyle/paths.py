@@ -655,9 +655,9 @@ class TempDir(TempPath):
     def close(self) -> None:
         """Delete the temporary directory and all files/subdirectories within.
         """
-        # First need to make all paths removable
         if not self.exists:
             return
+        # First need to make all paths removable
         for path in self.paths.values():
             path.set_permissions('rwx', True)
         shutil.rmtree(str(self.absolute_path))
