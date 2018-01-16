@@ -870,7 +870,7 @@ def xopen(
         if not mode:
             mode = FileMode(access='r', coding='t' if is_str else 'b')
         is_buffer = True
-    elif (is_str == (file_type is FileType.FILELIKE) or
+    elif ((is_str or is_buffer) == (file_type is FileType.FILELIKE) or
           is_std != (file_type is FileType.STDIO) or
           is_buffer != (file_type is FileType.BUFFER)):
         raise ValueError("file_type = {} does not match path {}".format(
