@@ -6,29 +6,19 @@ from abc import ABCMeta, abstractmethod
 import collections
 from enum import Enum
 import os
+from os import PathLike
 import stat
-from types import ModuleType
-from typing import *
-# ISSUE: Not sure why I have to import IO separately
-from typing import IO
-from typing.re import *
+from typing import (
+    Dict, Sequence, List, Tuple, Set, Iterator, Iterable, Text, Union, Any, IO,
+    Pattern, TypeVar, cast)
 
-# ISSUE: there are several mypy errors due to incomplete enum support.
-# enums should be fully suported in the next version of mypy (>0.501).
 
-def is_iterable(obj: Any, include_str: bool = False) -> bool:
-    """Test whether an object is iterable.
-    
-    Args:
-        x: The object to test.
-        include_str: Whether a string should be considered an iterable
-            (default: False).
-    
-    Returns:
-        True if the object is iterable.
+class UnsupportedMethodError(Exception):
+    """Error raised when calling methods on interfaces that are not supported
+    for a particular subclass.
     """
-    return (isinstance(obj, collections.Iterable) and
-            (include_str or not isinstance(obj, str)))
+    pass
+
 
 class ModeAccess(Enum):
     """Enumeration of the access modes allowed when opening files.
@@ -61,7 +51,9 @@ class ModeAccess(Enum):
         """
         return any(char in self.value for char in ('w', '+', 'a', 'x'))
 
+
 ModeAccessArg = Union[str, ModeAccess]
+
 
 class ModeCoding(Enum):
     """Enumeration of file open modes (text or binary).
@@ -74,10 +66,13 @@ class ModeCoding(Enum):
     BINARY = 'b'
     """Binary mode."""
 
+
 ModeCodingArg = Union[str, ModeCoding]
 
-FILE_MODE_CACHE = {} # type: Dict[Tuple[str, ModeAccessArg, ModeCodingArg], FileMode]
+
+FILE_MODE_CACHE: Dict[Tuple[str, ModeAccessArg, ModeCodingArg], 'FileMode'] = {}
 """Cache of FileMode objects."""
+
 
 class FileMode(object):
     """Definition of a file mode as composed of a :class:`ModeAccess` and a
@@ -93,7 +88,7 @@ class FileMode(object):
             cls, mode: str = None, access: ModeAccessArg = None,
             coding: ModeCodingArg = None) -> 'FileMode':
         key = (mode, access, coding)
-        if not key in FILE_MODE_CACHE:
+        if key not in FILE_MODE_CACHE:
             FILE_MODE_CACHE[key] = super().__new__(cls)
         return FILE_MODE_CACHE[key]
     
@@ -161,18 +156,20 @@ class FileMode(object):
         elif isinstance(value, ModeCoding):
             return self.coding == value
         else:
-            for v in value:
+            for v in cast(str, value):
                 if v not in self.access.value and v not in self.coding.value:
                     return False
             return True
     
     def __eq__(self, other):
-        return (isinstance(other, FileMode) and
+        return (
+            isinstance(other, FileMode) and
             self.access == other.access and
             self.coding == other.coding)
     
     def __repr__(self):
         return self.value
+
 
 OS_ALIASES = dict(
     r=os.R_OK,
@@ -181,6 +178,7 @@ OS_ALIASES = dict(
     t=0
 )
 """Dictionary mapping mode characters to :module:`os` flags"""
+
 
 STAT_ALIASES = dict(
     r=stat.S_IREAD,
@@ -192,6 +190,7 @@ STAT_ALIASES = dict(
     fifo=stat.S_IFIFO
 )
 """Dictionary mapping mode characters to :module:`stat` flags"""
+
 
 class Permission(Enum):
     """Enumeration of file permission flags ('r', 'w', 'x', 't'). Note that
@@ -219,10 +218,14 @@ class Permission(Enum):
         """
         return OS_ALIASES[self.value]
 
+
 PermissionArg = Union[str, int, Permission, ModeAccess]
 """Types from which an Permission can be inferred."""
 
-PERMISSION_SET_CACHE = {} # type: Dict[Union[PermissionArg, Iterable[PermissionArg]], PermissionSet]
+
+PERMISSION_SET_CACHE: \
+    Dict[Union[PermissionArg, Iterable[PermissionArg]], 'PermissionSet'] = {}
+
 
 class PermissionSet(object):
     """A set of :class:`Permission`s.
@@ -234,14 +237,14 @@ class PermissionSet(object):
     def __new__(
             cls, flags: Union[PermissionArg, Iterable[PermissionArg]] = None
             ) -> 'PermissionSet':
-        if not flags in PERMISSION_SET_CACHE:
+        if flags not in PERMISSION_SET_CACHE:
             PERMISSION_SET_CACHE[flags] = super().__new__(cls)
         return PERMISSION_SET_CACHE[flags]
     
     def __init__(
             self, flags: Union[PermissionArg, Iterable[PermissionArg]] = None
             ) -> None:
-        self.flags = set() # type: Set[Permission]
+        self.flags: Set[Permission] = set()
         if flags:
             if isinstance(flags, str) or is_iterable(flags):
                 self.update(cast(Iterable[PermissionArg], flags))
@@ -318,6 +321,7 @@ class PermissionSet(object):
     def __repr__(self) -> str:
         return ''.join(f.value for f in Permission if f in self.flags)
 
+
 class FileType(Enum):
     """Enumeration of types of files that can be opened by
     :method:`xphyle.xopen`.
@@ -336,14 +340,17 @@ class FileType(Enum):
     BUFFER = 'buffer'
     """A StringIO or BytesIO."""
 
+
 class EventType(Enum):
     """Enumeration of event types that can be registered on an
     :class:`EventManager`.
     """
     CLOSE = 'close'
 
+
 AnyChar = Union[bytes, Text]
 """Similar to AnyStr, but specifies that strings must be unicode."""
+
 
 class FileLikeInterface(IO, Iterable[AnyChar], metaclass=ABCMeta):
     """This is a marker interface for classes that implement methods (listed
@@ -355,39 +362,53 @@ class FileLikeInterface(IO, Iterable[AnyChar], metaclass=ABCMeta):
     """
     @abstractmethod
     def next(self) -> AnyChar:
-        raise NotImplementedError()
+        pass
 
 
+# noinspection PyTypeChecker
 class FileLikeBase(FileLikeInterface):
+    def flush(self) -> None:
+        pass
+
+    def close(self) -> None:
+        pass
+
     def readable(self) -> bool:
         return False
     
     def read(self, n: int = -1) -> AnyChar:
-        raise NotImplementedError()
+        raise UnsupportedMethodError()
     
     def readline(self, hint: int = -1) -> AnyChar:
-        raise NotImplementedError()
+        raise UnsupportedMethodError()
     
     def readlines(self, sizehint: int = -1) -> List[AnyChar]:
-        raise NotImplementedError()
+        raise UnsupportedMethodError()
     
     def writable(self) -> bool:
         return False
     
     def write(self, string: AnyChar) -> int:
-        raise NotImplementedError()
+        raise UnsupportedMethodError()
     
     def writelines(self, lines: Iterable[AnyChar]) -> None:
-        raise NotImplementedError()
-    
+        raise UnsupportedMethodError()
+
+    # noinspection PyTypeChecker
     def seek(self, offset, whence: int = 0) -> int:
-        raise NotImplementedError()
+        if self.seekable():
+            raise UnsupportedMethodError()
+        else:
+            raise ValueError("Cannot call seek on a non-seekable object")
     
     def seekable(self) -> bool:
         return False
     
     def tell(self) -> int:
-        raise NotImplementedError()
+        if self.seekable():
+            raise UnsupportedMethodError()
+        else:
+            raise ValueError("Cannot call tell on a non-seekable object")
     
     def isatty(self) -> bool:
         return False
@@ -396,7 +417,10 @@ class FileLikeBase(FileLikeInterface):
         return -1
     
     def truncate(self, size: int = None) -> int:
-        raise NotImplementedError()
+        if self.seekable():
+            raise UnsupportedMethodError()
+        else:
+            raise ValueError("Cannot call truncate on a non-seekable object")
     
     def __enter__(self) -> Any:
         return self
@@ -406,10 +430,10 @@ class FileLikeBase(FileLikeInterface):
         return False
     
     def __iter__(self) -> Iterator[AnyChar]:
-        raise NotImplementedError()
+        raise UnsupportedMethodError()
     
     def __next__(self) -> AnyChar:
-        raise NotImplementedError()
+        raise UnsupportedMethodError()
     
     def next(self) -> AnyChar:
         return self.__next__()
@@ -425,28 +449,31 @@ class PathType(Enum):
     FIFO = '|'
     """Path represents a FIFO."""
 
+
 FileLike = Union[IO, FileLikeInterface]
 """File-like object; either a subclass of :class:`io.IOBase` or a
 :class:`FileLikeInterface`.
 """
 
-PathLike = Union[str, os.PathLike]
-"""Either a string path or a path-like object. In
-python >= 3.6, path-like means is a subclass of os.PathLike, otherwise means
-is a subclass of pathlib.PurePath.
-"""
-
 PathOrFile = Union[PathLike, FileLike]
-"""Either a string or FileLike."""
+"""Either a PathLike or FileLike."""
+
+
+PathOrStd = Union[str, os.PathLike]
+"""Either a PathLike or one of '-', '_'."""
+
 
 Url = Tuple[str, str, str, str, str, str]
 """URL tuple (result of urllib.parse.urlparse)."""
 
+
 Range = Tuple[int, int]
 """Two-integer tuple representing a range."""
 
+
 Regexp = Union[str, Pattern]
 """A regular expression string or compiled :class:`re`."""
+
 
 CharMode = TypeVar('CharMode', bytes, Text)
 """Type representing how data should be handled when read from a file.
@@ -455,28 +482,52 @@ value is a string (:attribute:`TextMode`), bytes are decoded using the system
 default encoding.
 """
 
+
 BinMode = b'b'
 """Value representing binary mode to use for an argument of type CharMode."""
+
 
 TextMode = 't'
 """Value representing text mode to use for an argument of type CharMode."""
 
+
 # Aliases for commonly used compound argument types
+
 
 PermissionSetArg = Union[PermissionSet, Sequence[PermissionArg]]
 """Sequence of stat flags (string, int, or :class:`Permission`)."""
 
+
 ModeArg = Union[str, FileMode]
 """A file mode; string, or :class:`FileMode`."""
+
 
 PathTypeArg = Union[str, PathType]
 """A path type string or :class:`PathType`."""
 
+
 EventTypeArg = Union[str, EventType]
 """An event type name or :class:`EventType`."""
+
 
 FilesArg = Iterable[Union[PathLike, Tuple[Any, PathOrFile]]]
 """Multiple files: an iterable over either strings or (key, PathOrFile)."""
 
+
 CompressionArg = Union[bool, str]
 """Compression can be True, False, or the name of a compression format."""
+
+
+def is_iterable(obj: Any, include_str: bool = False) -> bool:
+    """Test whether an object is iterable.
+
+    Args:
+        obj: The object to test.
+        include_str: Whether a string should be considered an iterable
+            (default: False).
+
+    Returns:
+        True if the object is iterable.
+    """
+    return (isinstance(obj, collections.Iterable) and
+            (include_str or not isinstance(obj, str)))

@@ -2,24 +2,30 @@
 """Interfaces to compression file formats.
 Magic numbers from: https://en.wikipedia.org/wiki/List_of_file_signatures
 """
-from abc import ABCMeta, abstractmethod
+from abc import ABC, ABCMeta, abstractmethod
 from collections import defaultdict
 from importlib import import_module
 import io
 import os
+from os import PathLike
+from pathlib import Path
 import re
 from subprocess import Popen, PIPE, CalledProcessError, check_output
+from typing import (
+    Callable, Iterable, Iterator, List, Tuple, Set, IO, Optional, Union, cast)
+# noinspection PyUnresolvedReferences
+from types import ModuleType
 
 from xphyle.paths import (
     STDIN, EXECUTABLE_CACHE, check_readable_file, check_writable_file,
     split_path)
 from xphyle.progress import PROCESS_PROGRESS, iter_file_chunked
 from xphyle.types import (
-    FileMode, ModeCoding, ModeArg, PathOrFile, FileLike, Union, Callable,
-    Iterable, Iterator, List, Tuple, Set, ModuleType, PathLike, 
-    FileLikeInterface, FileLikeBase, AnyStr, AnyChar, IO, cast)
+    FileMode, ModeCoding, ModeArg, PathOrFile, FileLike,
+    FileLikeInterface, FileLikeBase, UnsupportedMethodError)
 
-class ThreadsVar(object):
+
+class ThreadsVar:
     """Maintain ``threads`` variable.
     """
     def __init__(self, default_value: int = 1) -> None:
@@ -44,23 +50,31 @@ class ThreadsVar(object):
         elif threads < 1:
             self.threads = 1
         else:
-            self.threads = threads # pylint: disable=redefined-variable-type
+            self.threads = threads  # pylint: disable=redefined-variable-type
+
 
 THREADS = ThreadsVar()
 """Number of concurrent threads that can be used by formats that support 
 parallelization.
 """
 
+
 # File formats
 # pylint: disable=no-member
 
-class FileFormat(object):
+
+class FileFormat(ABC):
     """Base class for classes that wrap built-in python file format libraries.
     The subclass must provide the ``name`` member.
     """
     # ISSUE: types is in mypy
-    _lib = None # type: ModuleType
-    
+    _lib: ModuleType = None
+
+    @property
+    @abstractmethod
+    def name(self):
+        pass
+
     @property
     def lib(self):
         """Caches and returns the python module assocated with this file format.
@@ -75,13 +89,15 @@ class FileFormat(object):
             self._lib = import_module(self.name)
         return self._lib
 
+
 # Wrappers around system-level compression executables
 
-class SystemIO(FileLikeBase):
+
+class SystemIO(FileLikeBase, metaclass=ABCMeta):
     """Base class for SystemReader and SystemWriter.
     
     Args:
-        name: The file name.
+        path: The file path.
     """
     def __init__(self, path: PathLike) -> None:
         self._name = str(path)
@@ -117,7 +133,7 @@ class SystemReader(SystemIO):
         self.process = Popen(self.command, stdout=PIPE)
     
     @property
-    def mode(self): # pragma: no-cover
+    def mode(self):  # pragma: no-cover
         return 'rb'
     
     def readable(self) -> bool:
@@ -137,7 +153,7 @@ class SystemReader(SystemIO):
         retcode = self.process.poll()
         if retcode is None:
             # still running
-            self.process.terminate() # pragma: no-cover
+            self.process.terminate()  # pragma: no-cover
         self._raise_if_error()
 
     def __iter__(self) -> Iterator:
@@ -150,7 +166,7 @@ class SystemReader(SystemIO):
         exit code is nonzero.
         """
         retcode = self.process.poll()
-        if retcode is not None and retcode != 0: # pragma: no-cover
+        if retcode is not None and retcode != 0:  # pragma: no-cover
             raise EOFError(
                 "{} process returned non-zero exit code {}. "
                 "Is the input file truncated or corrupt?".format(
@@ -196,13 +212,13 @@ class SystemWriter(SystemIO):
             self.process = Popen(
                 self.command, stdin=PIPE, stdout=self.outfile,
                 stderr=self.devnull)
-        except IOError: # pragma: no-cover
+        except IOError:  # pragma: no-cover
             self.outfile.close()
             self.devnull.close()
             raise
     
     @property
-    def mode(self): # pragma: no-cover
+    def mode(self):  # pragma: no-cover
         return 'wb'
     
     def writable(self) -> bool:
@@ -228,13 +244,13 @@ class SystemWriter(SystemIO):
         retcode = self.process.wait()
         self.outfile.close()
         self.devnull.close()
-        if retcode != 0: # pragma: no-cover
+        if retcode != 0:  # pragma: no-cover
             raise IOError(
                 "Output {} process terminated with exit code {}".format(
                     self.executable_name, retcode))
 
 
-class CompressionFormat(FileFormat, metaclass=ABCMeta):
+class CompressionFormat(FileFormat):
     """Base class for classes that provide access to system-level and
     python-level implementations of compression formats.
     """
@@ -260,14 +276,14 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
         raise NotImplementedError()
     
     @property
-    def default_compresslevel(self) -> int: # pragma: no-cover
+    def default_compresslevel(self) -> Optional[int]:  # pragma: no-cover
         """The default compression level, if compression is supported and is
         user-configurable, otherwise None.
         """
         return None
     
     @property
-    def compresslevel_range(self) -> Tuple[int, int]: # pragma: no-cover
+    def compresslevel_range(self) -> Optional[Tuple[int, int]]:  # pragma: no-cover
         """The range of valid compression levels: (lowest, highest).
         """
         return None
@@ -317,9 +333,9 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
         """All of the aliases by which this format is known.
         """
         aliases = set(self.exts)
-        #if isinstance(fmt.system_commands, dict):
-        #    aliases = aliases | set(fmt.system_commands.values())
-        #else:
+        # if isinstance(fmt.system_commands, dict):
+        #     aliases = aliases | set(fmt.system_commands.values())
+        # else:
         aliases.update(self.system_commands)
         aliases.add(self.name)
         return tuple(aliases)
@@ -428,8 +444,8 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
     
     @abstractmethod
     def get_command(
-            self, operation: str, src: str = STDIN, stdout: bool = True,
-            compresslevel: int = None) -> List[str]:
+            self, operation: str, src: Union[str, PathLike] = STDIN,
+            stdout: bool = True, compresslevel: int = None) -> List[str]:
         """Build the command for the system executable.
         
         Args:
@@ -467,7 +483,7 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
             raise IOError from cpe
 
     def open_file(
-            self, path: str, mode: ModeArg, use_system: bool = True,
+            self, path: PathLike, mode: ModeArg, use_system: bool = True,
             **kwargs) -> FileLike:
         """Opens a compressed file for reading or writing.
         
@@ -490,7 +506,7 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
         
         if use_system:
             # pylint: disable=redefined-variable-type
-            compressed_file = None # type: FileLikeInterface
+            compressed_file = None  # type: FileLikeInterface
             if mode.readable and self.can_use_system_compression:
                 compressed_file = SystemReader(
                     self.compress_path,
@@ -508,6 +524,7 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
                     self.decompress_name)
             if compressed_file:
                 if mode.text:
+                    # noinspection PyTypeChecker
                     return io.TextIOWrapper(compressed_file)
                 else:
                     return compressed_file
@@ -520,7 +537,7 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
         """Open a file using the python library.
         
         Args:
-            f: The file to open -- a path or open file object.
+            path_or_file: The file to open -- a path or open file object.
             mode: The file open mode.
             kwargs: Additional arguments to pass to the open method.
         
@@ -553,13 +570,13 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
         Raises:
             IOError if there is an error compressing the file.
         """
-        source_is_path = isinstance(source, str)
+        source_is_path = isinstance(source, PathLike)
         if source_is_path:
-            source_path = str(source)
-            check_readable_file(source_path)
+            source_path = source
+            check_readable_file(source)
         else:
             source_io = cast(IO, source)
-            source_path = source_io.name
+            source_path = Path(source_io.name)
             # pragma: no-cover
             try:
                 source_io.fileno()
@@ -572,8 +589,10 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
         else:
             dest_is_path = isinstance(dest, str)
         if dest_is_path:
-            check_writable_file(str(dest))
-        
+            check_writable_file(dest)
+
+        dest_file = None
+
         try:
             if use_system and self.can_use_system_compression:
                 if source_is_path:
@@ -615,9 +634,9 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
             if not keep:
                 if not source_is_path:
                     cast(FileLike, source).close()
-                os.remove(source_path)
+                source_path.unlink()
         finally:
-            if dest_is_path:
+            if dest_is_path and dest_file is not None:
                 dest_file.close()
         
         return dest_name
@@ -642,12 +661,12 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
         Raises:
             IOError if there is an error decompressing the file.
         """
-        source_is_path = isinstance(source, str)
+        source_is_path = isinstance(source, Path)
         if source_is_path:
-            source_path = str(source)
-            check_readable_file(source_path)
+            source_path = source
+            check_readable_file(source)
         else:
-            source_path = cast(FileLike, source).name
+            source_path = Path(cast(FileLike, source).name)
         source_parts = split_path(source_path)
         
         if dest is None:
@@ -661,7 +680,7 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
         else:
             dest_is_path = isinstance(dest, str)
         if dest_is_path:
-            dest_name = str(check_writable_file(str(dest)))
+            dest_name = str(check_writable_file(dest))
             dest_file = open(dest_name, 'wb')
         else:
             dest_file = cast(FileLike, dest)
@@ -697,14 +716,14 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
             if not keep:
                 if not source_is_path:
                     cast(FileLike, source).close()
-                os.remove(source_path)
+                source_path.unlink()
         finally:
             if dest_is_path:
                 dest_file.close()
         
         return dest_name
 
-    def get_list_command(self, path: str) -> List[str]:
+    def get_list_command(self, path: str) -> Optional[List[str]]:
         """Get the command to list contents of a compressed file.
 
         Args:
@@ -726,7 +745,7 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
             A tuple (<compressed size in bytes>, <uncompressed size in bytes>,
             <compression ratio>).
         """
-        raise NotImplementedError()
+        raise UnsupportedMethodError()
 
     def uncompressed_size(self, path: str) -> Union[int, None]:
         """Get the uncompressed size of a compressed file.
@@ -742,11 +761,12 @@ class CompressionFormat(FileFormat, metaclass=ABCMeta):
         list_command = self.get_list_command(path)
         if list_command is None:
             return None
-        listing = check_output(list_command, universal_newlines=True)
+        listing: str = check_output(list_command, universal_newlines=True)
         _, uncompressed, _ = self.parse_file_listing(listing)
         return uncompressed
 
-class SingleExeCompressionFormat(CompressionFormat): # pylint: disable=abstract-method
+
+class SingleExeCompressionFormat(CompressionFormat, metaclass=ABCMeta):  # pylint: disable=abstract-method
     """Base class form ``CompressionFormat``s that use the same executable for
     compressing and decompressing.
     """
@@ -792,7 +812,8 @@ class SingleExeCompressionFormat(CompressionFormat): # pylint: disable=abstract-
                 self._executable_path, self._executable_name = exe
             self._resolved = True
 
-class GzipBase(SingleExeCompressionFormat):
+
+class GzipBase(SingleExeCompressionFormat, metaclass=ABCMeta):
     """Base class for gzip and bgzip files.
     """
     def open_file_python(
@@ -808,6 +829,7 @@ class GzipBase(SingleExeCompressionFormat):
             else:
                 compressed_file = io.BufferedWriter(compressed_file)
         return compressed_file
+
 
 class Gzip(GzipBase):
     """Implementation of CompressionFormat for gzip files.
@@ -863,7 +885,7 @@ class Gzip(GzipBase):
             cmd.append('-c')
         threads = THREADS.threads
         if self.executable_name == 'pigz':
-            #cmd.append('-t')
+            # cmd.append('-t')
             if threads > 1:
                 cmd.extend(('-p', str(threads)))
         if src != STDIN:
@@ -887,6 +909,7 @@ class Gzip(GzipBase):
         parsed = re.split(' +', listing.splitlines(keepends=False)[1].strip())
         ratio = float(parsed[2][:-1]) / 100
         return (int(parsed[0]), int(parsed[1]), ratio)
+
 
 class BGzip(GzipBase):
     """bgzip is block gzip. bgzip files are compatible with gzip. Typically,
@@ -990,7 +1013,8 @@ class BZip2(SingleExeCompressionFormat):
         if src != STDIN:
             cmd.append(src)
         return cmd
-    
+
+    # noinspection PyTypeChecker
     def open_file_python(
             self, path_or_file: PathOrFile, mode: ModeArg,
             **kwargs) -> FileLike:
@@ -1029,9 +1053,9 @@ class Lzma(SingleExeCompressionFormat):
     @property
     def magic_bytes(self) -> Tuple[Tuple[int, ...], ...]:
         return (
-            (0x4C, 0x5A, 0x49, 0x50), # lz
-            (0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00), # xz
-            (0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C) # 7z
+            (0x4C, 0x5A, 0x49, 0x50),  # lz
+            (0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00),  # xz
+            (0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C)  # 7z
         )
     
     @property
@@ -1069,8 +1093,8 @@ class Lzma(SingleExeCompressionFormat):
     def parse_file_listing(self, listing: str) -> Tuple[int, int, float]:
         parsed = listing.splitlines(keepends=False)
         compressed, uncompressed = (
-            int(re.sub(r'[\.,]', '', re.match(
-                r'.+?([\d\.,]+) B\)?', size).group(1)))
+            int(re.sub(r'[.,]', '', re.match(
+                r'.+?([\d.,]+) B\)?', size).group(1)))
             for size in parsed[3:5])
         ratio = float(parsed[5][22:])
         return (compressed, uncompressed, ratio)
@@ -1078,9 +1102,10 @@ class Lzma(SingleExeCompressionFormat):
     def compress(self, raw_bytes, **kwargs) -> bytes:
         kwargs = dict(
             (k, kwargs[k])
-            for k, v in kwargs.items() if k in (
-                'format','check','preset','filter'))
+            for k, v in kwargs.items() if k in {
+                'format', 'check', 'preset', 'filter'})
         return self.lib.compress(raw_bytes, **kwargs)
+
 
 # class DualExeCompressionFormat(CompressionFormat):
 #     """CompressionFormat that uses the same executable for compressing and
@@ -1138,8 +1163,11 @@ class Lzma(SingleExeCompressionFormat):
 #
 # register_compression_format(Lzw)
 
+
 # Supported compression formats
-class Formats(object):
+
+
+class Formats:
     """Manages a set of compression formats.
     """
     def __init__(self):
@@ -1185,7 +1213,7 @@ class Formats(object):
         Args:
             with_sep: Add separator prefix to each extension.
         """
-        exts = set() # type: Set[str]
+        exts = set()  # type: Set[str]
         for fmt in self.compression_formats.values():
             exts.update(fmt.exts)
         if with_sep:
@@ -1256,7 +1284,8 @@ class Formats(object):
         magic = buffer.peek(self.max_magic_bytes)
         return self.guess_format_from_header_bytes(magic)
     
-    def guess_format_from_header_bytes(self, header_bytes: bytes) -> str:
+    def guess_format_from_header_bytes(
+            self, header_bytes: bytes) -> Optional[str]:
         """Guess file format from a sequence of bytes from a file header.
         
         Args:
@@ -1286,6 +1315,8 @@ class Formats(object):
         """
         return self.mime_types.get(mime_type, None)
 
+
+# TODO: do registration using a metaclass
 FORMATS = Formats()
 FORMATS.register_compression_format(Gzip)
 FORMATS.register_compression_format(BGzip)

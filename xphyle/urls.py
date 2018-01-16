@@ -4,6 +4,7 @@
 import copy
 import io
 import re
+from typing import Optional
 from http.client import HTTPResponse
 from urllib.error import URLError
 from urllib.parse import urlparse
@@ -14,7 +15,7 @@ from xphyle.types import Url, Range, Any, cast
 # URLs
 
 
-def parse_url(url_string: str) -> [Url, None]:
+def parse_url(url_string: str) -> Optional[Url]:
     """Attempts to parse a URL.
     
     Args:
@@ -33,8 +34,8 @@ def parse_url(url_string: str) -> [Url, None]:
 
 
 def open_url(
-        url_string: str, byte_range: Range = None, headers: dict = None,
-        **kwargs) -> Any:
+        url_string: str, byte_range: Optional[Range] = None,
+        headers: Optional[dict] = None, **kwargs) -> Any:
     """Open a URL for reading.
     
     Args:
@@ -70,7 +71,7 @@ def open_url(
         return None
 
 
-def get_url_mime_type(response: Any) -> [str, None]:
+def get_url_mime_type(response: Any) -> Optional[str]:
     """If a response object has HTTP-like headers, extract the MIME type
     from the Content-Type header.
     
@@ -88,7 +89,8 @@ def get_url_mime_type(response: Any) -> [str, None]:
 CONTENT_DISPOSITION_RE = re.compile('filename=([^;]+)')
 
 
-def get_url_file_name(response: Any, parsed_url: Url = None) -> [str, None]:
+def get_url_file_name(
+        response: Any, parsed_url: Optional[Url] = None) -> Optional[str]:
     """If a response object has HTTP-like headers, extract the filename
     from the Content-Disposition header.
     

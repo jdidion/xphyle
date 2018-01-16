@@ -8,17 +8,20 @@ still accepted as inputs, but all outputs will subclasses of os.PathLike.
 from abc import ABCMeta, abstractmethod
 import errno
 import os
+from os import PathLike
 import pathlib
 import re
 import shutil
 import stat
 import sys
 import tempfile
+from typing import (
+    Sequence, List, Tuple, Union, Iterable, Dict, Pattern, Match, Any,
+    cast)
 from xphyle.urls import parse_url
 from xphyle.types import (
     ModeAccess, Permission, PermissionSet, PermissionArg, PermissionSetArg, 
-    PathType, PathTypeArg, PathLike, Sequence, List, Tuple, Union, Iterable,
-    Dict, Regexp, Pattern, Match, Any, cast)
+    PathType, PathTypeArg, Regexp)
 
 
 STDIN = STDOUT = '-'
@@ -390,17 +393,17 @@ def find(
     fullmatch = os.sep in pat.pattern
     
     def get_matching(
-            names: Iterable[str], parent
+            names: Iterable[str], _parent
             ) -> List[Tuple[pathlib.Path, Match[str]]]:
         """Get all names that match the pattern."""
-        parent = as_path(parent)
+        _parent = as_path(_parent)
         if fullmatch:
-            names = (parent / name for name in names)
+            names = (_parent / name for name in names)
         matching = []
         for name in names:
             match = pat.fullmatch(str(name))
             if match:
-                path = pathlib.Path(name) if fullmatch else (parent / name)
+                path = pathlib.Path(name) if fullmatch else (_parent / name)
                 matching.append((path, match))
         return matching
     
@@ -475,7 +478,7 @@ class ExecutableCache(object):
         if default_path:
             self.add_search_path(default_path)
     
-    def get_path(self, executable: PathLike) -> pathlib.Path:
+    def get_path(self, executable: Union[str, PathLike]) -> pathlib.Path:
         """Get the full path of `executable`.
         
         Args:
@@ -659,8 +662,8 @@ class TempPathDescriptor(TempPath):
         self.prefix = prefix
         self.suffix = suffix
         self.contents = contents
-        self._abspath = None  # type: pathlib.Path
-        self._relpath = None  # type: pathlib.Path
+        self._abspath: pathlib.Path = None
+        self._relpath: pathlib.Path = None
     
     @property
     def absolute_path(self) -> pathlib.Path:
@@ -1051,18 +1054,18 @@ class SpecBase(metaclass=ABCMeta):
                 strng = strng.replace(char, "\{}".format(char))
             return strng
         
-        def template_to_pattern(template):
+        def template_to_pattern(_template):
             """Convert a template string to a regular expression.
             """
-            pattern = escape(
-                template,
+            _pattern = escape(
+                _template,
                 ('\\', '.', '*', '+', '?', '[', ']', '(', ')', '<', '>'))
-            pattern += '$'
+            _pattern += '$'
             pattern_args = dict(
                 (name, var.as_pattern())
                 for name, var in self.path_vars.items())
-            pattern = pattern.format(**pattern_args)
-            return escape(pattern, ('{', '}'))
+            _pattern = _pattern.format(**pattern_args)
+            return escape(_pattern, ('{', '}'))
         
         if pattern is None:
             pattern = template_to_pattern(template)
