@@ -1,5 +1,6 @@
 v3.1.6 (dev)
 ------------
+* Fix bug when specifying file_type=FileType.FILELIKE.
 
 v3.1.5 (2017.12.11)
 -------------------
