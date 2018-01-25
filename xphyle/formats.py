@@ -16,10 +16,9 @@ from typing import (
     Callable, Iterable, Iterator, List, Tuple, Set, IO, Optional, Union, cast)
 # noinspection PyUnresolvedReferences
 from types import ModuleType
-from xphyle.compat import deprecated_str_to_path
 from xphyle.paths import (
     STDIN, EXECUTABLE_CACHE, check_readable_file, check_writable_file,
-    split_path)
+    split_path, deprecated_str_to_path)
 from xphyle.progress import PROCESS_PROGRESS, iter_file_chunked
 from xphyle.types import (
     FileMode, FileLike, FileLikeInterface, FileLikeBase, ModeCoding, ModeArg,
@@ -843,7 +842,8 @@ class Formats:
             return alias
         return self.compression_format_aliases.get(alias, None)
 
-    def guess_compression_format(self, name: Union[str, PathLike]) -> Optional[str]:
+    def guess_compression_format(
+            self, name: Union[str, PathLike]) -> Optional[str]:
         """Guess the compression format by name or file extension.
 
         Returns:

@@ -18,9 +18,8 @@ from typing import (
     Generator, Callable, Dict, List, Tuple, Any, Sequence, Generic, Iterable,
     Iterator, Union, Optional, cast)
 from xphyle import open_, xopen, FileWrapper, Process, popen, EventListener
-from xphyle.compat import deprecated_str_to_path
 from xphyle.formats import FORMATS
-from xphyle.paths import STDIN, STDOUT
+from xphyle.paths import STDIN, STDOUT, deprecated_str_to_path
 from xphyle.progress import iter_file_chunked
 from xphyle.types import (
     PathOrFile, FileLike, FilesArg, FileMode, ModeAccessArg, CharMode, TextMode,
@@ -86,8 +85,9 @@ def read_bytes(
 
 @deprecated_str_to_path(1, 'path_or_file')
 def write_lines(
-        iterable: Iterable[str], path_or_file: PathOrFile, linesep: str = '\n',
-        convert: Callable[[Any], str] = str, **kwargs) -> int:
+        iterable: Iterable[str], path_or_file: PathOrFile,
+        linesep: Optional[str] = '\n', convert: Callable[[Any], str] = str,
+        **kwargs) -> int:
     """Write delimiter-separated strings to a file.
     
     Args:
@@ -134,8 +134,9 @@ def to_bytes(value: Any, encoding: str = 'utf-8'):
 
 @deprecated_str_to_path(1, 'path_or_file')
 def write_bytes(
-        iterable: Iterable[bytes], path_or_file: PathOrFile, sep: bytes = b'',
-        convert: Callable[[Any], bytes] = to_bytes, **kwargs) -> int:
+        iterable: Iterable, path_or_file: PathOrFile,
+        sep: Optional[bytes] = b'', convert: Callable[[Any], bytes] = to_bytes,
+        **kwargs) -> int:
     """Write an iterable of bytes to a file.
     
     Args:
@@ -204,7 +205,7 @@ def read_dict(
 @deprecated_str_to_path(1, 'path_or_file')
 def write_dict(
         dictobj: Dict[str, Any], path_or_file: PathOrFile, sep: str = '=',
-        linesep: str = '\n', convert: ToStrFunc = str,
+        linesep: Optional[str] = '\n', convert: ToStrFunc = str,
         **kwargs) -> int:
     """Write a dict to a file as name=value lines.
     
@@ -300,7 +301,7 @@ def read_delimited(
 def read_delimited_as_dict(
         path_or_file: PathOrFile, sep: str = '\t',
         header: Union[bool, Sequence[str]] = False,
-        key: Union[int, RowFunc] = 0, **kwargs) -> Dict[Any, Any]:
+        key: Union[int, str, RowFunc] = 0, **kwargs) -> Dict[Any, Any]:
     """Parse rows in a delimited file and add rows to a dict based on a a
     specified key index or function.
     
@@ -364,7 +365,7 @@ def compress_file(
         source_file: PathOrFile, compressed_file: PathOrFile = None,
         compression: CompressionArg = None, keep: bool = True,
         compresslevel: int = None, use_system: bool = True,
-        **kwargs) -> PathLike:
+        **kwargs) -> Path:
     """Compress an existing file, either in-place or to a separate file.
     
     Args:
@@ -403,7 +404,7 @@ def compress_file(
 def decompress_file(
         compressed_file: PathOrFile, dest_file: PathOrFile = None,
         compression: CompressionArg = None, keep: bool = True,
-        use_system: bool = True, **kwargs) -> PathLike:
+        use_system: bool = True, **kwargs) -> Path:
     """Decompress an existing file, either in-place or to a separate file.
     
     Args:
@@ -626,7 +627,7 @@ class FileManager(Sized):
             kwargs: Arguments to pass to xopen. These override any keyword
                 arguments passed to the FileManager's constructor.
         """
-        if isinstance(path_or_file, str):
+        if isinstance(path_or_file, Path):
             path = str(path_or_file)
             fileobj = copy.copy(self.default_open_args)
             fileobj.update(kwargs)
@@ -866,7 +867,7 @@ def fileinput(
     """
     if not files:
         files = sys.argv[1:] or (STDIN,)
-    elif isinstance(files, str):
+    elif isinstance(files, PathLike):
         files = (files,)
     return FileInput(files, char_mode)
 
@@ -1186,7 +1187,7 @@ def fileoutput(
     """
     if not files:
         files = sys.argv[1:] or (STDOUT,)
-    elif isinstance(files, str):
+    elif isinstance(files, PathLike):
         files = (files,)
     if not linesep:
         if char_mode == TextMode:

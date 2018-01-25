@@ -24,7 +24,7 @@ class XphyleTests(TestCase):
         EXECUTABLE_CACHE.cache = {}
 
     def test_configure(self):
-        def wrapper(a,b,c):
+        def wrapper(a, b, c):
             pass
         configure(progress=True, progress_wrapper=wrapper,
                   system_progress=True, system_progress_wrapper='foo',
@@ -32,7 +32,7 @@ class XphyleTests(TestCase):
         assert wrapper == ITERABLE_PROGRESS.wrapper
         assert ('foo',) == PROCESS_PROGRESS.wrapper
         assert 2 == THREADS.threads
-        self.assertTrue('foo' in EXECUTABLE_CACHE.search_path)
+        assert Path('foo') in EXECUTABLE_CACHE.search_path
     
         configure(threads=False)
         assert 1 == THREADS.threads

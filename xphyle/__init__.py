@@ -16,11 +16,11 @@ from typing import (
     Callable, Container, Iterable, Iterator, Union, Sequence, List, Tuple, Dict,
     Any, Generic, TypeVar, Generator, IO, Optional, Type, cast)
 
-from xphyle.compat import deprecated_str_to_path
 from xphyle.formats import FORMATS, THREADS
 from xphyle.paths import (
     STDIN, STDOUT, STDERR, EXECUTABLE_CACHE,
-    check_readable_file, check_writable_file, safe_check_readable_file)
+    check_readable_file, check_writable_file, safe_check_readable_file,
+    deprecated_str_to_path)
 from xphyle.progress import ITERABLE_PROGRESS, PROCESS_PROGRESS
 from xphyle.types import (
     FileType, FileLikeInterface, FileLike, FileMode, ModeArg,
