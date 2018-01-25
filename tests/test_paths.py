@@ -242,8 +242,7 @@ class PathTests(TestCase):
         assert 0 == len(y)
 
         # absolute match
-        x = find(level1, os.path.join(
-            level1, 'foo.*', 'bar.*'), 'f', recursive=True)
+        x = find(level1, level1 / 'foo.*' / 'bar.*', 'f', recursive=True)
         assert 3 == len(x)
         assert sorted(paths) == sorted(x)
 
@@ -443,7 +442,7 @@ class PathTests(TestCase):
 
         all_paths = spec.find(base, recursive=True)
         assert 1 == len(all_paths)
-        assert path_inst(path).values == path_var_values
+        assert path_inst(path, path_var_values) == all_paths[0]
 
         # make sure it works with plain paths
         spec = PathSpec(
