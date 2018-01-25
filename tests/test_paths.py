@@ -17,7 +17,7 @@ class TempDirTests(TestCase):
             f = temp.make_file(name='foo', permissions=None)
             assert Path('foo') in temp
             assert temp[f].exists
-            assert 'foo' == temp[f].relative_path
+            assert Path('foo') == temp[f].relative_path
             assert temp.absolute_path / 'foo' == temp[f].absolute_path
             assert PermissionSet('rwx') == temp[f].permissions
             assert PermissionSet('r') == temp[f].set_permissions('r')
@@ -26,7 +26,7 @@ class TempDirTests(TestCase):
         with TempDir(permissions='rwx') as temp:
             desc = TempPathDescriptor(
                 name='foo', path_type='f', parent=temp)
-            assert 'foo' == desc.relative_path
+            assert Path('foo') == desc.relative_path
             assert temp.absolute_path / 'foo' == desc.absolute_path
 
     def test_context_manager(self):
@@ -131,11 +131,11 @@ class PathTests(TestCase):
 
     def test_abspath_home(self):
         home = os.path.expanduser("~")
-        assert abspath('~/foo') == home / 'foo'
+        assert abspath('~/foo') == Path(home) / 'foo'
 
     def test_abspath_rel(self):
         cwd = os.getcwd()
-        assert abspath('foo') == cwd / 'foo'
+        assert abspath('foo') == Path(cwd) / 'foo'
 
     def test_get_root(self):
         # Need to do a different test for posix vs windows
@@ -242,7 +242,9 @@ class PathTests(TestCase):
         assert 0 == len(y)
 
         # absolute match
-        x = find(level1, level1 / 'foo.*' / 'bar.*', 'f', recursive=True)
+        x = find(
+            level1, os.path.join(str(level1), 'foo.*', 'bar.*'), 'f',
+            recursive=True)
         assert 3 == len(x)
         assert sorted(paths) == sorted(x)
 
@@ -487,7 +489,7 @@ class PathTests(TestCase):
         spec = DirSpec(
             StrPathVar('subdir', pattern='[A-Z0-9_]+', invalid=('XYZ999',)),
             StrPathVar('leaf', pattern='[^_]+', valid=('AAA', 'BBB')),
-            template=base / '{subdir}' / '{leaf}')
+            template=os.path.join(base, '{subdir}', '{leaf}'))
 
         all_paths = spec.find(recursive=True)
         assert 1 == len(all_paths)

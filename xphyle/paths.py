@@ -278,7 +278,7 @@ def check_path(
                 raise IOError(errno.EISDIR, "{} not a file".format(path), path)
             elif path_type == PathType.DIR and not path.is_dir():
                 raise IOError(errno.ENOTDIR, f"{path} not a directory", path)
-        elif not PathType.FILE:
+        elif not path_type is PathType.FILE:
             raise IOError(errno.EISDIR, "{} not a file".format(path), path)
     if permissions is not None:
         check_access(path, permissions)
@@ -1331,7 +1331,7 @@ class PathSpec:
             if dir_spec_str.endswith('$'):
                 dir_spec_str = dir_spec_str[:-1]
         self.pattern = os.path.join(
-            dir_spec_str /
+            dir_spec_str,
             file_spec if self.fixed_file else file_spec.pattern.pattern)
         
         self.path_vars: Dict[str, PathVar] = {}
@@ -1375,8 +1375,8 @@ class PathSpec:
             """
             if fixed:
                 inst = spec
-                if str(inst) != part:
-                    raise ValueError("{} doesn't match {}".format(part, spec))
+                if str(inst) != str(part):
+                    raise ValueError(f"{part} doesn't match {spec}")
             else:
                 inst = spec.parse(part)
             return inst
@@ -1410,7 +1410,7 @@ class PathSpec:
         """
         if root is None:
             if self.fixed_dir:
-                root = str(self.dir_spec)
+                root = self.dir_spec
             else:
                 root = self.dir_spec.default_search_root()
         
