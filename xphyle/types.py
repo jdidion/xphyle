@@ -5,19 +5,13 @@
 from abc import ABCMeta, abstractmethod
 import collections
 from enum import Enum
+from io import UnsupportedOperation
 import os
 from os import PathLike
 import stat
 from typing import (
     Dict, Sequence, List, Tuple, Set, Iterator, Iterable, Text, Union, Any, IO,
     Pattern, TypeVar, cast)
-
-
-class UnsupportedMethodError(Exception):
-    """Error raised when calling methods on interfaces that are not supported
-    for a particular subclass.
-    """
-    pass
 
 
 class ModeAccess(Enum):
@@ -377,27 +371,27 @@ class FileLikeBase(FileLikeInterface):
         return False
     
     def read(self, n: int = -1) -> AnyChar:
-        raise UnsupportedMethodError()
+        raise UnsupportedOperation()
     
     def readline(self, hint: int = -1) -> AnyChar:
-        raise UnsupportedMethodError()
+        raise UnsupportedOperation()
     
     def readlines(self, sizehint: int = -1) -> List[AnyChar]:
-        raise UnsupportedMethodError()
+        raise UnsupportedOperation()
     
     def writable(self) -> bool:
         return False
     
     def write(self, string: AnyChar) -> int:
-        raise UnsupportedMethodError()
+        raise UnsupportedOperation()
     
     def writelines(self, lines: Iterable[AnyChar]) -> None:
-        raise UnsupportedMethodError()
+        raise UnsupportedOperation()
 
     # noinspection PyTypeChecker
     def seek(self, offset, whence: int = 0) -> int:
         if self.seekable():
-            raise UnsupportedMethodError()
+            raise UnsupportedOperation()
         else:
             raise ValueError("Cannot call seek on a non-seekable object")
     
@@ -406,7 +400,7 @@ class FileLikeBase(FileLikeInterface):
     
     def tell(self) -> int:
         if self.seekable():
-            raise UnsupportedMethodError()
+            raise UnsupportedOperation()
         else:
             raise ValueError("Cannot call tell on a non-seekable object")
     
@@ -418,7 +412,7 @@ class FileLikeBase(FileLikeInterface):
     
     def truncate(self, size: int = None) -> int:
         if self.seekable():
-            raise UnsupportedMethodError()
+            raise UnsupportedOperation()
         else:
             raise ValueError("Cannot call truncate on a non-seekable object")
     
@@ -430,10 +424,10 @@ class FileLikeBase(FileLikeInterface):
         return False
     
     def __iter__(self) -> Iterator[AnyChar]:
-        raise UnsupportedMethodError()
+        raise UnsupportedOperation()
     
     def __next__(self) -> AnyChar:
-        raise UnsupportedMethodError()
+        raise UnsupportedOperation()
     
     def next(self) -> AnyChar:
         return self.__next__()
@@ -461,10 +455,6 @@ PathOrFile = Union[PathLike, FileLike]
 
 PathOrStd = Union[str, os.PathLike]
 """Either a PathLike or one of '-', '_'."""
-
-
-Url = Tuple[str, str, str, str, str, str]
-"""URL tuple (result of urllib.parse.urlparse)."""
 
 
 Range = Tuple[int, int]

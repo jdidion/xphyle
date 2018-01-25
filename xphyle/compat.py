@@ -35,51 +35,45 @@ def deprecated_str_to_path(
             new_args = list(args)
             for idx in args_to_convert:
                 if isinstance(idx, int):
-                    if len(args) >= idx and isinstance(args[idx], str):
+                    if len(args) > idx and isinstance(args[idx], str):
                         warn = True
                         new_args[idx] = Path(args[idx])
-                elif (
-                        isinstance(idx, str) and
-                        idx in kwargs and
-                        isinstance(kwargs[idx], str)):
-                    warn = True
-                    kwargs[idx] = Path(kwargs[idx])
+                elif isinstance(idx, str):
+                    if idx in kwargs and isinstance(kwargs[idx], str):
+                        warn = True
+                        kwargs[idx] = Path(kwargs[idx])
                 else:
                     raise ValueError("'args_to_convert' must be ints or strings")
             if list_args is not None:
                 for idx in list_args:
                     if isinstance(idx, int):
-                        if len(args) >= idx and isinstance(args[idx], list):
+                        if len(args) > idx and isinstance(args[idx], list):
                             warn = True
                             new_args[idx] = list(Path(s) for s in args[idx])
-                        elif (
-                                isinstance(idx, str) and
-                                idx in kwargs and
-                                isinstance(kwargs[idx], list)):
+                    elif isinstance(idx, str):
+                        if idx in kwargs and isinstance(kwargs[idx], list):
                             warn = True
                             kwargs[idx] = list(Path(s) for s in kwargs[idx])
                     else:
                         raise ValueError(
-                            "'args_to_convert' must be ints or strings")
+                            "'list_args' must be ints or strings")
             if dict_args is not None:
                 for idx in dict_args:
                     if isinstance(idx, int):
-                        if len(args) >= idx and isinstance(args[idx], dict):
+                        if len(args) > idx and isinstance(args[idx], dict):
                             warn = True
                             new_args[idx] = dict(
                                 (key, Path(val))
                                 for key, val in args[idx].items())
-                        elif (
-                                isinstance(idx, str) and
-                                idx in kwargs and
-                                isinstance(kwargs[idx], dict)):
+                    elif isinstance(idx, str):
+                        if idx in kwargs and isinstance(kwargs[idx], dict):
                             warn = True
                             kwargs[idx] = dict(
                                 (key, Path(val))
                                 for key, val in kwargs[idx].items())
                     else:
                         raise ValueError(
-                            "'args_to_convert' must be ints or strings")
+                            "'dict_args' must be ints or strings")
             if warn:
                 deprecated(
                     f"Use of {func.__name__} with string path arguments is "

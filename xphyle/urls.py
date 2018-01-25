@@ -7,15 +7,15 @@ import re
 from typing import Optional
 from http.client import HTTPResponse
 from urllib.error import URLError
-from urllib.parse import urlparse
+from urllib.parse import ParseResult, urlparse
 from urllib.request import urlopen, Request
-from xphyle.types import Url, Range, Any, cast
+from xphyle.types import Range, Any, cast
 
 
 # URLs
 
 
-def parse_url(url_string: str) -> Optional[Url]:
+def parse_url(url_string: str) -> Optional[ParseResult]:
     """Attempts to parse a URL.
     
     Args:
@@ -90,7 +90,8 @@ CONTENT_DISPOSITION_RE = re.compile('filename=([^;]+)')
 
 
 def get_url_file_name(
-        response: Any, parsed_url: Optional[Url] = None) -> Optional[str]:
+        response: Any, parsed_url: Optional[ParseResult] = None
+        ) -> Optional[str]:
     """If a response object has HTTP-like headers, extract the filename
     from the Content-Disposition header.
     
@@ -110,8 +111,5 @@ def get_url_file_name(
     if not parsed_url:
         parsed_url = parse_url(response.geturl())
     if parsed_url and hasattr(parsed_url, 'path'):
-        # ISSUE: ParseResult has named attributes that mypy does not
-        # yet recognize
-        # return parsed_url.path
-        return parsed_url[2]
+        return parsed_url.path
     return None

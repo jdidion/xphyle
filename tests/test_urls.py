@@ -23,7 +23,7 @@ class TestURLs(TestCase):
         with TempDir() as temp:
             path = abspath(temp.make_file(name='foo.txt'))
             url = open_url(path.as_uri())
-            self.assertEqual(get_url_file_name(url), path)
+            assert get_url_file_name(url) == str(path)
         # TODO: need to find a reliable compressed file URL with a
         # Content-Disposition, or figure out how to mock one up
     

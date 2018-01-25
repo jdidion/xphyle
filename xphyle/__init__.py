@@ -691,13 +691,13 @@ DEFAULTS: Dict[str, Any] = dict(xopen_context_wrapper=False)
 
 # noinspection PyShadowingNames
 def configure(
-        default_xopen_context_wrapper: bool = None,
-        progress: bool = None,
-        progress_wrapper: Callable[..., Iterable] = None,
-        system_progress: bool = None,
-        system_progress_wrapper: Union[str, Sequence[str]] = None,
-        threads: Union[int, bool] = None,
-        executable_path: Union[str, Sequence[str]] = None) -> None:
+        default_xopen_context_wrapper: Optional[bool] = None,
+        progress: Optional[bool] = None,
+        progress_wrapper: Optional[Callable[..., Iterable]] = None,
+        system_progress: Optional[bool] = None,
+        system_progress_wrapper: Optional[Union[str, Sequence[str]]] = None,
+        threads: Optional[Union[int, bool]] = None,
+        executable_path: Optional[Union[str, Sequence[str]]] = None) -> None:
     """Conifgure xphyle.
 
     Args:
@@ -776,6 +776,7 @@ def open_(
     else:
         is_fileobj = not (
             isinstance(target, str) or
+            isinstance(target, Path) or
             target in (str, bytes))
         if not wrap_fileobj:
             if is_fileobj:

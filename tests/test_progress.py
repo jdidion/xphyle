@@ -9,6 +9,7 @@ class MockProgress(object):
     def __call__(self, itr, desc, size):
         self.desc = desc
         self.size = size
+        i = 0
         for i, item in enumerate(itr, 1):
             yield item
         self.count = i
@@ -16,7 +17,7 @@ class MockProgress(object):
 class ProgressTests(TestCase):
     def setUp(self):
         self.root = TempDir()
-        xphyle.configure(progress=False, progress_wrapper=False)
+        xphyle.configure(progress=False)
     
     def tearDown(self):
         self.root.close()
@@ -34,7 +35,7 @@ class ProgressTests(TestCase):
                 o.write(random_text())
         compress_file(
             path, compression='gz', use_system=False)
-        self.assertEqual(100, progress.count)
+        assert 100 == progress.count
     
     def test_progress_delmited(self):
         progress = MockProgress()
@@ -44,8 +45,8 @@ class ProgressTests(TestCase):
             for i in range(100):
                 o.write('row\t{}\n'.format(i))
         rows = list(read_delimited(path))
-        self.assertEqual(100, len(rows))
-        self.assertEqual(100, progress.count)
+        assert 100 == len(rows)
+        assert 100 == progress.count
     
     def test_iter_stream(self):
         progress = MockProgress()
@@ -54,4 +55,4 @@ class ProgressTests(TestCase):
             with xopen(STDIN, 'rt', context_wrapper=True, compression=False) as o:
                 lines = list(o)
                 self.assertListEqual(['foo\n','bar\n','baz\n'], lines)
-        self.assertEquals(3, progress.count)
+        assert 3 == progress.count
