@@ -98,7 +98,9 @@ class PathTests(TestCase):
         assert PermissionSet('wx') == get_permissions(path)
 
     def test_check_access_std(self):
-        check_access(STDOUT, 'r')
+        check_access(STDIN_OR_STDOUT, 'r')
+        check_access(STDIN_OR_STDOUT, 'w')
+        check_access(STDIN, 'r')
         check_access(STDOUT, 'w')
         check_access(STDERR, 'w')
         with self.assertRaises(IOError):
@@ -131,21 +133,21 @@ class PathTests(TestCase):
 
     def test_abspath_home(self):
         home = os.path.expanduser("~")
-        assert abspath('~/foo') == Path(home) / 'foo'
+        assert abspath(Path('~/foo')) == Path(home) / 'foo'
 
     def test_abspath_rel(self):
         cwd = os.getcwd()
-        assert abspath('foo') == Path(cwd) / 'foo'
+        assert abspath(Path('foo')) == Path(cwd) / 'foo'
 
     def test_get_root(self):
         # Need to do a different test for posix vs windows
         if os.sep == '/':
             assert '/' == get_root()
-            assert '/' == get_root('/foo/bar/baz')
+            assert '/' == get_root(PosixPath('/foo/bar/baz'))
         else:
             script_drive = os.path.splitdrive(sys.executable)[0]
             assert script_drive == get_root()
-            assert 'C:\\' == get_root('C:\\foo\\bar\\baz')
+            assert 'C:\\' == get_root(WindowsPath('C:\\foo\\bar\\baz'))
 
     def test_split_path(self):
         parent = self.root.make_directory()
@@ -156,7 +158,7 @@ class PathTests(TestCase):
             (parent, 'foo', '.tar', '.gz')
 
     def test_filename(self):
-        assert filename('/path/to/foo.tar.gz') == 'foo'
+        assert filename(Path('/path/to/foo.tar.gz')) == 'foo'
 
     def test_resolve_std(self):
         assert STDOUT == resolve_path(STDOUT)
@@ -168,10 +170,10 @@ class PathTests(TestCase):
 
     def test_resolve_with_parent(self):
         self.root.make_directory(name='foo')
-        path = self.root.make_file(parent=self.root['foo'])
+        path = self.root.make_file(parent=self.root[Path('foo')])
         name = path.name
         parent = path.parent
-        assert path == resolve_path(name, parent)
+        assert path == resolve_path(Path(name), parent)
 
     def test_resolve_missing(self):
         with self.assertRaises(IOError):
@@ -185,7 +187,7 @@ class PathTests(TestCase):
         with self.assertRaises(IOError):
             check_readable_file(non_readable)
         with self.assertRaises(IOError):
-            check_readable_file('foo')
+            check_readable_file(Path('foo'))
         with self.assertRaises(IOError):
             check_readable_file(directory)
         assert safe_check_readable_file(readable)
@@ -209,9 +211,17 @@ class PathTests(TestCase):
         assert safe_check_writable_file(non_writable) is None
 
     def test_check_path_std(self):
-        check_path(STDOUT, 'f', 'r')
+        check_path(STDIN_OR_STDOUT, 'f', 'r')
+        check_path(STDIN_OR_STDOUT, 'f', 'w')
+        check_path(STDIN, 'f', 'r')
         check_path(STDOUT, 'f', 'w')
         check_path(STDERR, 'f', 'w')
+        with self.assertRaises(IOError):
+            check_path(STDIN, 'f', 'w')
+        with self.assertRaises(IOError):
+            check_path(STDOUT, 'f', 'r')
+        with self.assertRaises(IOError):
+            check_path(STDERR, 'f', 'r')
         with self.assertRaises(IOError):
             check_path(STDOUT, 'd', 'r')
 
@@ -258,7 +268,7 @@ class PathTests(TestCase):
         level1 = self.root.make_directory()
         level2 = self.root.make_directory(prefix='foo', parent=level1)
         path = self.root.make_path(name='bar123', parent=level2)
-        result = cast(Sequence[Tuple[PathLike, Match]], find(
+        result = cast(Sequence[Tuple[PurePath, Match]], find(
             level1, 'bar(.*)', 'f', recursive=True, return_matches=True))
         assert 1 == len(result)
         assert path == result[0][0]

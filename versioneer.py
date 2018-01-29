@@ -137,7 +137,7 @@ First, decide on values for the following configuration variables:
   a string, like 'PROJECTNAME-', which appears at the start of all VCS tags.
   If your tags look like 'myproject-1.2.0', then you should use
   tag_prefix='myproject-'. If you use unprefixed tags like '1.2.0', this
-  should be an empty string, using either `tag_prefix=` or `tag_prefix=''`.
+  should be an undefined string, using either `tag_prefix=` or `tag_prefix=''`.
 
 * `parentdir_prefix`:
 

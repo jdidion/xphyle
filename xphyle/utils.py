@@ -10,8 +10,7 @@ import copy
 import csv
 from itertools import cycle
 import os
-from os import PathLike
-from pathlib import Path
+from pathlib import PurePath, Path
 import shutil
 import sys
 from typing import (
@@ -22,7 +21,7 @@ from xphyle.formats import FORMATS
 from xphyle.paths import STDIN, STDOUT, deprecated_str_to_path
 from xphyle.progress import iter_file_chunked
 from xphyle.types import (
-    PathOrFile, FileLike, FilesArg, FileMode, ModeAccessArg, CharMode, TextMode,
+    PathOrFile, FileLike, FileMode, ModeAccessArg, CharMode, TextMode,
     BinMode, CompressionArg, AnyChar, is_iterable)
 
 
@@ -386,7 +385,7 @@ def compress_file(
     """
     if not isinstance(compression, str):
         if compressed_file:
-            if isinstance(compressed_file, PathLike):
+            if isinstance(compressed_file, PurePath):
                 name = str(compressed_file)
             else:
                 name = cast(FileLike, compressed_file).name
@@ -424,10 +423,10 @@ def decompress_file(
         The path of the decompressed file.
     """
     if not isinstance(compression, str):
-        if not isinstance(compressed_file, PathLike):
+        if not isinstance(compressed_file, PurePath):
             source_path = Path(getattr(compressed_file, 'name'))
         else:
-            source_path = cast(PathLike, compressed_file)
+            source_path = cast(PurePath, compressed_file)
         compression = FORMATS.guess_compression_format(source_path)
     fmt = FORMATS.get_compression_format(compression)
     return fmt.decompress_file(
@@ -478,7 +477,7 @@ def transcode_file(
 
 @deprecated_str_to_path(0, 'source_file', 1, 'dest_file')
 def uncompressed_size(
-        path: PathLike, compression: CompressionArg = None) -> Optional[int]:
+        path: PurePath, compression: CompressionArg = None) -> Optional[int]:
     """Get the uncompressed size of the compressed file.
 
     Args:
@@ -519,7 +518,7 @@ class MoveOnClose(EventListener[FileWrapper]):
     """Move a file after it is closed.
     """
     def execute(
-            self, wrapper: FileWrapper, dest: PathLike = None, **kwargs
+            self, wrapper: FileWrapper, dest: PurePath = None, **kwargs
             ) -> None:
         shutil.move(wrapper.path, str(dest))
 
@@ -557,7 +556,14 @@ def exec_process(
 # Replacement for fileinput, plus fileoutput
 
 
-FileManagerKey = Union[int, PathLike]
+FilesArg = Iterable[Union[PathOrFile, Tuple[Any, PathOrFile]]]
+"""Multiple files: an iterable over either paths or (key, PathOrFile).
+May include stdin/stdout/stderr shortcuts ('-', '_').
+"""
+
+
+FileOrFilesArg = Optional[Union[PathOrFile, FilesArg]]
+"""A path or multiple files."""
 
 
 class FileManager(Sized):
@@ -570,10 +576,11 @@ class FileManager(Sized):
         header: A header to write when opening writable files.
         kwargs: Default arguments to pass to xopen.
     """
+    @deprecated_str_to_path(1, 'files')
     def __init__(self, files: FilesArg = None, header=None, **kwargs) -> None:
-        self._files: OrderedDict[FileManagerKey, Union[FileLike, Dict]] = \
+        self._files: OrderedDict[Any, Union[FileLike, Dict]] = \
             OrderedDict()
-        self._paths: Dict[FileManagerKey, PathLike] = {}
+        self._paths: Dict[Any, PurePath] = {}
         self.header = header
         self.default_open_args = kwargs
         if files:
@@ -591,16 +598,14 @@ class FileManager(Sized):
     def __len__(self) -> int:
         return len(self._files)
 
-    @deprecated_str_to_path(1, 'key')
-    def __getitem__(self, key: FileManagerKey) -> FileLike:
+    def __getitem__(self, key: Any) -> FileLike:
         fileobj = self.get(key)
         if not fileobj:
             raise KeyError(key)
         return fileobj
 
-    @deprecated_str_to_path(1, 'key', 2, 'path_or_file')
-    def __setitem__(
-            self, key: FileManagerKey, path_or_file: PathOrFile) -> None:
+    @deprecated_str_to_path(2, 'path_or_file')
+    def __setitem__(self, key: Any, path_or_file: PathOrFile) -> None:
         """Add a file.
         
         Args:
@@ -610,13 +615,12 @@ class FileManager(Sized):
         """
         self.add(path_or_file, key)
 
-    @deprecated_str_to_path(1, 'key')
-    def __contains__(self, key: FileManagerKey):
+    def __contains__(self, key: Any):
         return key in self._files
 
-    @deprecated_str_to_path(1, 'path_or_file', 2, 'key')
+    @deprecated_str_to_path(1, 'path_or_file')
     def add(
-            self, path_or_file: PathOrFile, key: FileManagerKey = None, 
+            self, path_or_file: PathOrFile, key: Optional[Any] = None,
             **kwargs) -> None:
         """Add a file.
         
@@ -627,12 +631,12 @@ class FileManager(Sized):
             kwargs: Arguments to pass to xopen. These override any keyword
                 arguments passed to the FileManager's constructor.
         """
-        if isinstance(path_or_file, Path):
-            path = str(path_or_file)
+        if isinstance(path_or_file, PurePath):
+            path = path_or_file
             fileobj = copy.copy(self.default_open_args)
             fileobj.update(kwargs)
         else:
-            path = getattr(path_or_file, 'name')
+            path = Path(getattr(path_or_file, 'name'))
             fileobj = cast(FileLike, path_or_file)
         if key is None:
             key = path
@@ -641,10 +645,10 @@ class FileManager(Sized):
         self._files[key] = fileobj
         self._paths[key] = path
 
-    @deprecated_str_to_path(dict_args=(1, 'files'))
+    @deprecated_str_to_path(1, 'files', dict_args=(1, 'files'))
     def add_all(
-            self, files: Union[FilesArg, Dict[Any, PathOrFile]],
-            **kwargs) -> None:
+            self, files: Union[FilesArg, Dict[Any, PathOrFile]], **kwargs
+            ) -> None:
         """Add all files from an iterable or dict.
         
         Args:
@@ -657,14 +661,13 @@ class FileManager(Sized):
                 self.add(path_or_file, key=key)
         else:
             for fileobj in files:
-                if isinstance(fileobj, PathLike):
+                if isinstance(fileobj, PurePath):
                     self.add(fileobj, **kwargs)
                 else:
                     key, path_or_file = cast(Tuple[Any, PathOrFile], fileobj)
                     self.add(path_or_file, key=key, **kwargs)
 
-    @deprecated_str_to_path(1, 'key')
-    def get(self, key: FileManagerKey) -> Optional[FileLike]:
+    def get(self, key: Any) -> Optional[FileLike]:
         """Get the file object associated with a path. If the file is not
         already open, it is first opened with `xopen`.
         
@@ -690,8 +693,7 @@ class FileManager(Sized):
             self._files[key] = fileobj
         return fileobj
 
-    @deprecated_str_to_path(1, 'key')
-    def get_path(self, key: FileManagerKey) -> PathLike:
+    def get_path(self, key: Any) -> PurePath:
         """Returns the file path associated with a key.
         
         Args:
@@ -705,13 +707,13 @@ class FileManager(Sized):
         return self._paths[key]
     
     @property
-    def keys(self) -> Sequence[FileManagerKey]:
+    def keys(self) -> Sequence[Any]:
         """Returns a list of all keys in the order they were added.
         """
         return tuple(self._files.keys())
     
     @property
-    def paths(self) -> Sequence[PathLike]:
+    def paths(self) -> Sequence[PurePath]:
         """Returns a list of all paths in the order they were added.
         """
         return list(self._paths[key] for key in self.keys)
@@ -746,6 +748,7 @@ class FileInput(FileManager, Generic[CharMode], Iterator[CharMode]):
         required to specify the mode, or use one of the convenience methods
         (:method:`textinput` or :method:`byteinput`).
     """
+    @deprecated_str_to_path(1, 'files')
     def __init__(
             self, files: FilesArg = None, char_mode: CharMode = None
             ) -> None:
@@ -768,12 +771,12 @@ class FileInput(FileManager, Generic[CharMode], Iterator[CharMode]):
         return list(self.keys)[self.fileno]
     
     @property
-    def filename(self) -> Optional[str]:
+    def filename(self) -> Optional[PurePath]:
         """The name of the file currently being read.
         """
         if self.fileno < 0:
             return None
-        return str(self.get_path(self.fileno))
+        return self.get_path(self.fileno)
     
     @property
     def lineno(self) -> int:
@@ -789,8 +792,8 @@ class FileInput(FileManager, Generic[CharMode], Iterator[CharMode]):
 
     @deprecated_str_to_path(1, 'path_or_file')
     def add(
-            self, path_or_file: PathOrFile,
-            key: Optional[FileManagerKey] = None, **kwargs) -> None:
+            self, path_or_file: PathOrFile, key: Optional[Any] = None, **kwargs
+            ) -> None:
         """Overrides FileManager.add() to prevent file-specific open args.
         """
         # If we've already finished reading all the files,
@@ -840,7 +843,7 @@ class FileInput(FileManager, Generic[CharMode], Iterator[CharMode]):
         file if necessary and possible).
         
         Returns:
-            The next line, or the empty string if `self.finished==True`.
+            The next line, or the undefined string if `self.finished==True`.
         """
         try:
             return next(self)
@@ -848,9 +851,10 @@ class FileInput(FileManager, Generic[CharMode], Iterator[CharMode]):
             return cast(CharMode, b'' if self.char_mode == BinMode else '')
 
 
+@deprecated_str_to_path(0, 'files')
 def fileinput(
-        files: FilesArg = None, char_mode: CharMode = None
-        ) -> FileInput[CharMode]:
+        files: FileOrFilesArg = None,
+        char_mode: CharMode = None) -> FileInput[CharMode]:
     """Convenience method that creates a new ``FileInput``.
     
     Args:
@@ -867,12 +871,13 @@ def fileinput(
     """
     if not files:
         files = sys.argv[1:] or (STDIN,)
-    elif isinstance(files, PathLike):
+    elif isinstance(files, PurePath):
         files = (files,)
     return FileInput(files, char_mode)
 
 
-def textinput(files: FilesArg = None):
+@deprecated_str_to_path(0, 'files')
+def textinput(files: FileOrFilesArg = None):
     """Convenience method that creates a new ``FileInput`` in text mode.
     
     Args:
@@ -885,7 +890,8 @@ def textinput(files: FilesArg = None):
     return fileinput(files, TextMode)
 
 
-def byteinput(files: FilesArg = None):
+@deprecated_str_to_path(0, 'files')
+def byteinput(files: FileOrFilesArg = None):
     """Convenience method that creates a new ``FileInput`` in bytes mode.
     
     Args:
@@ -914,6 +920,7 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
         future version, `char_mode` and `linesep` will default to None and
         must be explicitly defined.
     """
+    @deprecated_str_to_path(1, 'files')
     def __init__(
             self, files: FilesArg = None, access: ModeAccessArg = 'w',
             char_mode: Optional[CharMode] = None,
@@ -1043,9 +1050,10 @@ class CycleFileOutput(FileOutput):
         files: A list of files.
         char_mode: The character mode.
     """
+    @deprecated_str_to_path(1, 'files')
     def __init__(
-            self, files: FilesArg = None, char_mode: CharMode = None,
-            **kwargs) -> None:
+            self, files: FilesArg = None,
+            char_mode: CharMode = None, **kwargs) -> None:
         super().__init__(files=files, char_mode=char_mode, **kwargs)
     
     def _writeline(self, line: CharMode = None) -> int:
@@ -1061,6 +1069,7 @@ class NCycleFileOutput(FileOutput):
         num_lines: How many lines to write to a file before moving on to the
             next file.
     """
+    @deprecated_str_to_path(1, 'files')
     def __init__(
             self, files: FilesArg = None, char_mode: CharMode = None,
             lines_per_file: int = 1, **kwargs) -> None:
@@ -1133,9 +1142,6 @@ class PatternFileOutput(TokenFileOutput):
         return self.token_func(line)
 
 
-FilePatternArg = Union[str, Iterable[str]]
-
-
 class RollingFileOutput(TokenFileOutput):
     """Write up to ``num_lines`` lines to a file before opening the next file.
     File names are created from a pattern.
@@ -1148,7 +1154,7 @@ class RollingFileOutput(TokenFileOutput):
         kwargs: Additional args.
     """
     def __init__(
-            self, filename_pattern: FilePatternArg = None,
+            self, filename_pattern: Union[str, Iterable[str]] = None,
             char_mode: CharMode = None,
             lines_per_file: int = 1, **kwargs) -> None:
         if isinstance(filename_pattern, str):
@@ -1162,8 +1168,12 @@ class RollingFileOutput(TokenFileOutput):
         return {'index': self.num_lines // self.lines_per_file}
 
 
+PatternOrFileOrFilesArg = Optional[Union[str, PathOrFile, FilesArg]]
+"""A pattern, path, file, or multiple files."""
+
+
 def fileoutput(
-        files: FilesArg = None, char_mode: CharMode = None,
+        files: PatternOrFileOrFilesArg = None, char_mode: CharMode = None,
         linesep: CharMode = None, encoding: str = 'utf-8',
         file_output_type:
         Callable[..., FileOutput[CharMode]] = TeeFileOutput[CharMode],
@@ -1171,7 +1181,7 @@ def fileoutput(
     """Convenience function to create a fileoutput.
     
     Args:
-        files: The files to write to.
+        files: The files to write to. Can include '-'/'_' for stdout/stderr.
         char_mode: The write mode ('t' or b'b').
         linesep: The separator to use when writing lines.
         encoding: The default file encoding to use.
@@ -1187,7 +1197,7 @@ def fileoutput(
     """
     if not files:
         files = sys.argv[1:] or (STDOUT,)
-    elif isinstance(files, PathLike):
+    elif isinstance(files, PurePath):
         files = (files,)
     if not linesep:
         if char_mode == TextMode:
@@ -1200,7 +1210,7 @@ def fileoutput(
 
 
 def textoutput(
-        files: FilesArg = None,
+        files: FileOrFilesArg = None,
         file_output_type: Callable[..., FileOutput[str]] = TeeFileOutput[str],
         **kwargs) -> FileOutput[str]:
     """Convenience function to create a fileoutput in text mode.
@@ -1219,7 +1229,7 @@ def textoutput(
 
 
 def byteoutput(
-        files: FilesArg = None,
+        files: FileOrFilesArg = None,
         file_output_type:
         Callable[..., FileOutput[bytes]] = TeeFileOutput[bytes],
         **kwargs) -> FileOutput[bytes]:
@@ -1270,7 +1280,7 @@ def linecount(
             return -1
         read_f = fileobj.read  # loop optimization
         buf = read_f(buffer_size)
-        if len(buf) == 0:  # empty file case
+        if len(buf) == 0:  # undefined file case
             return 0
         lines = 1
         while buf:

@@ -2,12 +2,12 @@ from unittest import TestCase, skipIf
 from . import *
 import gzip
 from io import BytesIO
-from subprocess import PIPE
 from xphyle import *
 from xphyle.paths import TempDir, STDIN, STDOUT, STDERR, EXECUTABLE_CACHE
 from xphyle.progress import ITERABLE_PROGRESS, PROCESS_PROGRESS
 from xphyle.formats import THREADS
 from xphyle.types import EventType
+
 
 class XphyleTests(TestCase):
     def setUp(self):
@@ -24,11 +24,11 @@ class XphyleTests(TestCase):
         EXECUTABLE_CACHE.cache = {}
 
     def test_configure(self):
-        def wrapper(a, b, c):
-            pass
+        def wrapper(a, b, c) -> Iterable:
+            return []
         configure(progress=True, progress_wrapper=wrapper,
                   system_progress=True, system_progress_wrapper='foo',
-                  threads=2, executable_path=['foo'])
+                  threads=2, executable_path=[Path('foo')])
         assert wrapper == ITERABLE_PROGRESS.wrapper
         assert ('foo',) == PROCESS_PROGRESS.wrapper
         assert 2 == THREADS.threads
@@ -159,7 +159,7 @@ class XphyleTests(TestCase):
         with intercept_stdout(True) as i:
             with xopen(
                     STDOUT, 'wt', context_wrapper=True, compression='gz') as o:
-                assert o.compression == 'gzip'
+                assert cast(StdWrapper, o).compression == 'gzip'
                 o.write('foo')
             assert gzip.decompress(i.getvalue()) == b'foo'
     
@@ -168,7 +168,7 @@ class XphyleTests(TestCase):
         with intercept_stdin(gzip.compress(b'foo\n'), is_bytes=True):
             with xopen(
                     STDIN, 'rt', compression=True, context_wrapper=True) as i:
-                assert i.compression == 'gzip'
+                assert cast(StdWrapper, i).compression == 'gzip'
                 assert i.read() == 'foo\n'
     
     def test_xopen_file(self):
@@ -178,7 +178,7 @@ class XphyleTests(TestCase):
         with xopen(path, 'rU') as i:
             assert 'rt' == i.mode
         with xopen(path, 'w', compression=True, context_wrapper=True) as o:
-            assert o.compression == 'gzip'
+            assert cast(FileLikeWrapper, o).compression == 'gzip'
             o.write('foo')
         with gzip.open(path, 'rt') as i:
             assert i.read() == 'foo'
@@ -217,10 +217,10 @@ class XphyleTests(TestCase):
         
         # with compression
         with self.assertRaises(ValueError):
-            with open_(bytes, compression=True) as buf:
+            with open_(bytes, compression=True):
                 pass
         with self.assertRaises(ValueError):
-            with open_(str, compression='gzip') as buf:
+            with open_(str, compression='gzip'):
                 pass
         
         with open_(bytes, mode='wt', compression='gzip') as buf:
@@ -232,12 +232,14 @@ class XphyleTests(TestCase):
             xopen('foo', 'wt', file_type=FileType.BUFFER)
         with self.assertRaises(ValueError):
             xopen('foo', 'rb', file_type=FileType.BUFFER)
-        with open_('foo', file_type=FileType.BUFFER, context_wrapper=True) as buf:
+        with open_(
+                'foo', file_type=FileType.BUFFER, context_wrapper=True) as buf:
             assert 'foo' == buf.read()
         
         with self.assertRaises(ValueError):
             xopen(b'foo', 'rt', file_type=FileType.BUFFER)
-        with open_(b'foo', file_type=FileType.BUFFER, context_wrapper=True) as buf:
+        with open_(
+                b'foo', file_type=FileType.BUFFER, context_wrapper=True) as buf:
             assert b'foo' == buf.read()
     
     @skipIf(no_internet(), "No internet connection")
@@ -278,13 +280,19 @@ class XphyleTests(TestCase):
     
     def test_event_listeners(self):
         class MockEventListener(EventListener):
+            def __init__(self):
+                super().__init__()
+                self.executed = False
+
             def execute(self, file_wrapper: FileLikeWrapper, **kwargs):
                 self.executed = True
+
         std_listener = MockEventListener()
         with intercept_stdin('foo'):
             f = xopen(STDIN, context_wrapper=True)
             try:
-                f.register_listener(EventType.CLOSE, std_listener)
+                cast(EventManager, f).register_listener(
+                    EventType.CLOSE, std_listener)
             finally:
                 f.close()
             self.assertTrue(std_listener.executed)
@@ -293,7 +301,8 @@ class XphyleTests(TestCase):
         path = self.root.make_file()
         f = xopen(path, 'w', context_wrapper=True)
         try:
-            f.register_listener(EventType.CLOSE, file_listener)
+            cast(EventManager, f).register_listener(
+                EventType.CLOSE, file_listener)
         finally:
             f.close()
         self.assertTrue(file_listener.executed)
@@ -361,8 +370,13 @@ class XphyleTests(TestCase):
     
     def test_process_del(self):
         class MockProcessListener(EventListener):
+            def __init__(self):
+                super().__init__()
+                self.executed = False
+
             def execute(self, process: Process, **kwargs) -> None:
                 self.executed = True
+
         listener = MockProcessListener()
         p = Process('cat', stdin=PIPE, stdout=PIPE)
         p.register_listener(EventType.CLOSE, listener)
@@ -381,13 +395,13 @@ class XphyleTests(TestCase):
     def test_process_close_hung(self):
         p = Process(('sleep', '5'))
         with self.assertRaises(Exception):
-            p.close(timeout=1, terminate=False)
+            p.close1(timeout=1, terminate=False)
         p = Process(('sleep', '5'))
         p.close1(timeout=1, terminate=True)
         self.assertTrue(p.closed)
     
     def test_process_error(self):
-        p = popen(('exit','2'), shell=True)
+        p = popen(('exit', '2'), shell=True)
         with self.assertRaises(IOError):
             p.close1(raise_on_error=True)
-        self.assertFalse(p.returncode==0)
+        self.assertFalse(p.returncode == 0)

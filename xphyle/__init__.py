@@ -6,7 +6,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 import io
 import os
-from pathlib import Path
+from pathlib import Path, PurePath
 import shlex
 import signal
 from subprocess import Popen, PIPE, TimeoutExpired
@@ -23,8 +23,8 @@ from xphyle.paths import (
     deprecated_str_to_path)
 from xphyle.progress import ITERABLE_PROGRESS, PROCESS_PROGRESS
 from xphyle.types import (
-    FileType, FileLikeInterface, FileLike, FileMode, ModeArg,
-    ModeAccess, ModeCoding, CompressionArg, EventType, EventTypeArg, PathOrFile,
+    FileType, FileLikeInterface, FileLike, FileMode, ModeArg, ModeAccess,
+    ModeCoding, CompressionArg, EventType, EventTypeArg, PathOrFile,
     FileLikeBase, AnyChar)
 from xphyle.urls import parse_url, open_url, get_url_file_name
 
@@ -273,22 +273,22 @@ class FileWrapper(FileLikeWrapper):
         name: Use an alternative name for the file.
         kwargs: Additional arguments to pass to xopen.
     """
+    @deprecated_str_to_path(1, 'source')
     def __init__(
             self, source: PathOrFile, mode: ModeArg = 'w',
-            compression: CompressionArg = False, name: str = None,
-            **kwargs) -> None:
-        if isinstance(source, str):
-            self._path = str(source)
+            compression: CompressionArg = False,
+            name: Union[str, PurePath] = None, **kwargs) -> None:
+        if isinstance(source, Path):
+            self._path = source
             source_fileobj = xopen(
                 source, mode=mode, compression=compression, **kwargs)
         else:
             source_fileobj = cast(FileLike, source)
-            if name or not hasattr(source_fileobj, 'name'):
-                self._path = name
-            else:
-                self._path = getattr(source_fileobj, 'name')
+            if name is None and hasattr(source_fileobj, 'name'):
+                name = str(getattr(source_fileobj, 'name'))
+            self._path = Path(name) if name else None
         super().__init__(source_fileobj, compression=compression)
-        self._name = name
+        self._name = str(name)
         if mode or not hasattr(source, 'mode'):
             self._mode = str(mode)
         else:
@@ -301,7 +301,7 @@ class FileWrapper(FileLikeWrapper):
         return super().name
 
     @property
-    def path(self):
+    def path(self) -> PurePath:
         """The source path.
         """
         return getattr(self, '_path', None)
@@ -312,7 +312,7 @@ class OpenFileWrapper(FileWrapper):
     not close the underlying file.
     """
     def _close(self) -> None:
-        pass
+        self._fileobj.flush()
 
 
 class BufferWrapper(FileWrapper):
@@ -697,7 +697,8 @@ def configure(
         system_progress: Optional[bool] = None,
         system_progress_wrapper: Optional[Union[str, Sequence[str]]] = None,
         threads: Optional[Union[int, bool]] = None,
-        executable_path: Optional[Union[str, Sequence[str]]] = None) -> None:
+        executable_path: Optional[Union[PurePath, Sequence[PurePath]]] = None
+        ) -> None:
     """Conifgure xphyle.
 
     Args:
@@ -776,7 +777,7 @@ def open_(
     else:
         is_fileobj = not (
             isinstance(target, str) or
-            isinstance(target, Path) or
+            isinstance(target, PurePath) or
             target in (str, bytes))
         if not wrap_fileobj:
             if is_fileobj:
@@ -885,7 +886,7 @@ def xopen(
     # Whether target is a string
     is_str = isinstance(target, str)
     # Whether target is a Path
-    is_path = isinstance(target, os.PathLike)
+    is_path = not is_std and isinstance(target, PurePath)
     # Whether target is a class indicating a buffer type
     is_buffer = target in (str, bytes)
 
@@ -1163,7 +1164,7 @@ def xopen(
 
 
 @deprecated_str_to_path(0, 'path')
-def guess_file_format(path: os.PathLike) -> str:
+def guess_file_format(path: PurePath) -> str:
     """Try to guess the file format, first from the extension, and then
     from the header bytes.
 

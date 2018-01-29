@@ -5,6 +5,7 @@ from xphyle.paths import TempDir
 from xphyle.progress import ITERABLE_PROGRESS, PROCESS_PROGRESS
 from xphyle.utils import *
 
+
 class MockProgress(object):
     def __call__(self, itr, desc, size):
         self.desc = desc
@@ -13,6 +14,7 @@ class MockProgress(object):
         for i, item in enumerate(itr, 1):
             yield item
         self.count = i
+
 
 class ProgressTests(TestCase):
     def setUp(self):
@@ -52,7 +54,8 @@ class ProgressTests(TestCase):
         progress = MockProgress()
         xphyle.configure(progress=True, progress_wrapper=progress)
         with intercept_stdin('foo\nbar\nbaz'):
-            with xopen(STDIN, 'rt', context_wrapper=True, compression=False) as o:
+            with xopen(
+                    STDIN, 'rt', context_wrapper=True, compression=False) as o:
                 lines = list(o)
-                self.assertListEqual(['foo\n','bar\n','baz\n'], lines)
+                self.assertListEqual(['foo\n', 'bar\n', 'baz\n'], lines)
         assert 3 == progress.count

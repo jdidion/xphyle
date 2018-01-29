@@ -191,7 +191,7 @@ class UtilsTests(TestCase):
             o.write('foo')
         gzfile = compress_file(path, compression='gz', keep=False)
         assert gzfile == Path(str(path) + '.gz')
-        assert path.exists()
+        assert not path.exists()
         assert gzfile.exists()
         with gzip.open(gzfile, 'rt') as i:
             assert i.read() == 'foo'
@@ -219,7 +219,7 @@ class UtilsTests(TestCase):
         finally:
             gzfile.close()
         assert path.exists()
-        assert gzfile.exists()
+        assert gzpath.exists()
         with gzip.open(gzpath, 'rt') as i:
             assert i.read() == 'foo'
     
@@ -330,18 +330,18 @@ class UtilsTests(TestCase):
             f.add(path5_fh)
             path6 = self.root.make_file()
             f['path6'] = path6
-            assert path6 == f.get_path(Path('path6'))
+            assert path6 == f.get_path('path6')
             all_paths = list(paths12.values()) + paths34 + [path5, path6]
             self.assertListEqual(all_paths, f.paths)
             assert len(f) == 6
             for key, fh in f.iter_files():
                 self.assertFalse(fh.closed)
-            assert f[Path('path2')] is not None
-            assert f.get(Path('path2')) is not None
-            assert f[Path('path6')] == f.get(5)
+            assert f['path2'] is not None
+            assert f.get('path2') is not None
+            assert f['path6'] == f.get(5)
             with self.assertRaises(KeyError):
                 _ = f['foo']
-            assert f.get(Path('foo')) is None
+            assert f.get('foo') is None
         assert len(f) == 6
         for key, fh in f.iter_files():
             self.assertTrue(fh.closed)
@@ -468,7 +468,7 @@ class UtilsTests(TestCase):
     def test_single_fileoutput(self):
         file1 = self.root.make_file(suffix='.gz')
         with textoutput(file1) as o:
-            o.writelines(('foo','bar','baz'))
+            o.writelines(('foo', 'bar', 'baz'))
         with gzip.open(file1, 'rt') as i:
             assert 'foo\nbar\nbaz\n' == i.read()
     
@@ -607,12 +607,12 @@ class UtilsTests(TestCase):
             return dict(zip(('a', 'b'), line.split(' ')))
 
         with textoutput(
-                Path(str(path) + '{a}.{b}.txt'),
+                str(path) + '{a}.{b}.txt',
                 file_output_type=PatternFileOutput,
                 token_func=get_tokens) as out:
             for a in range(2):
                 for b in range(2):
-                    out.writeline('{} {}'.format(a, b))
+                    out.writeline(f'{a} {b}')
 
         for a in range(2):
             for b in range(2):

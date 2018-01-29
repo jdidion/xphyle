@@ -453,10 +453,6 @@ PathOrFile = Union[PathLike, FileLike]
 """Either a PathLike or FileLike."""
 
 
-PathOrStd = Union[str, os.PathLike]
-"""Either a PathLike or one of '-', '_'."""
-
-
 Range = Tuple[int, int]
 """Two-integer tuple representing a range."""
 
@@ -498,10 +494,6 @@ PathTypeArg = Union[str, PathType]
 
 EventTypeArg = Union[str, EventType]
 """An event type name or :class:`EventType`."""
-
-
-FilesArg = Iterable[Union[PathLike, Tuple[Any, PathOrFile]]]
-"""Multiple files: an iterable over either strings or (key, PathOrFile)."""
 
 
 CompressionArg = Union[bool, str]
