@@ -197,6 +197,7 @@ class XphyleTests(TestCase):
         with open(path, 'wb') as out1:
             with open_(out1, 'wt') as out2:
                 out2.write('foo')
+            assert not out1.closed
         with gzip.open(path, 'rt') as i:
             assert 'foo' == i.read()
     

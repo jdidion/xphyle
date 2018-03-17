@@ -296,7 +296,7 @@ def check_access(
             raise IOError(
                 errno.EACCES, "STDIN permissions must be r", path)
         elif path in {STDOUT, STDERR} and \
-                    Permission.WRITE not in permission_set:
+                Permission.WRITE not in permission_set:
             raise IOError(
                 errno.EACCES, "STDOUT/STDERR permissions must be w", path)
     elif not os.access(path, permission_set.os_flags):
@@ -908,7 +908,7 @@ class TempPathManager:
     """Base for classes that manage mapping between paths and
     TempPathDescriptors.
     """
-    def __init__(self):
+    def __init__(self) -> None:
         self.paths: Dict[Path, TempPathDescriptor] = {}
 
     @deprecated_str_to_path(1, 'path')

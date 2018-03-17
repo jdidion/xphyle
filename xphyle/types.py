@@ -5,7 +5,7 @@
 from abc import ABCMeta, abstractmethod
 import collections
 from enum import Enum
-from io import UnsupportedOperation
+from io import IOBase, UnsupportedOperation
 import os
 from os import PathLike
 import stat
@@ -444,7 +444,7 @@ class PathType(Enum):
     """Path represents a FIFO."""
 
 
-FileLike = Union[IO, FileLikeInterface]
+FileLike = Union[IO, IOBase, FileLikeInterface]
 """File-like object; either a subclass of :class:`io.IOBase` or a
 :class:`FileLikeInterface`.
 """

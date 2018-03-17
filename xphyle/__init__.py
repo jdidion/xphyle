@@ -82,7 +82,7 @@ class EventListener(Generic[E], metaclass=ABCMeta):
 class EventManager:
     """Mixin type for classes that allow registering event listners.
     """
-    def __init__(self):
+    def __init__(self) -> None:
         self._listeners: Dict[EventType, List[EventListener]] = \
             defaultdict(lambda: [])
 
@@ -289,10 +289,12 @@ class FileWrapper(FileLikeWrapper):
             self._path = Path(name) if name else None
         super().__init__(source_fileobj, compression=compression)
         self._name = str(name)
-        if mode or not hasattr(source, 'mode'):
+        if mode is None and hasattr(source, 'mode'):
+            self._mode = getattr(source_fileobj, 'mode')
+        if mode:
             self._mode = str(mode)
         else:
-            self._mode = getattr(source_fileobj, 'mode')
+            self._mode = None
 
     @property
     def name(self) -> str:
