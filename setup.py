@@ -1,14 +1,16 @@
-from setuptools import setup
 import sys
 
-version_info = sys.version_info
 
+version_info = sys.version_info
 if version_info < (3, 6):
     sys.stdout.write(
         "xphyle 4+ requires python3.6. Use xphyle 3 with python 3.4 or 3.5.\n")
     sys.exit(1)
 
+
+from setuptools import setup
 import versioneer
+
 
 setup(
     name='xphyle',
@@ -20,7 +22,7 @@ setup(
     author_email='john.didion@nih.gov',
     license='MIT',
     packages = ['xphyle'],
-    install_requires = [],
+    install_requires = ['pokrok'],
     extras_require = {
         'performance' : ['lorem']
     },

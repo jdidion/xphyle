@@ -1,29 +1,18 @@
 # -*- coding: utf-8 -*-
 """Common interface to enable operations to be wrapped in a progress bar.
-By default, tqdm is used for python-level operations and pv for system-level
+By default, pokrok is used for python-level operations and pv for system-level
 operations.
 """
 from os import PathLike
 import shlex
 from subprocess import Popen, PIPE
 from typing import Iterable, Union, Callable, Tuple, Sequence, Optional
+from pokrok import progress_iter
 from xphyle.paths import EXECUTABLE_CACHE, check_path
 from xphyle.types import PathType, Permission, FileLike
 
 
 # Python-level progress wrapper
-# TODO: drop Tqdm in favor of pokrok
-
-
-class Tqdm:
-    """Default python progress bar wrapper.
-    """
-    def __init__(self):
-        import tqdm
-        self.wrapper_fn = tqdm.tqdm
-    
-    def __call__(self, itr: Iterable, desc: str, size: int) -> Iterable:
-        return self.wrapper_fn(itr, desc=desc, total=size)
 
 
 class IterableProgress:
@@ -33,7 +22,7 @@ class IterableProgress:
         default_wrapper: Callable (typically a class) that returns a Callable
             with the signature of ``wrap``.
     """
-    def __init__(self, default_wrapper: Callable = Tqdm) -> None:
+    def __init__(self, default_wrapper: Callable = progress_iter) -> None:
         self.enabled = False
         self.wrapper: Callable[..., Iterable] = None
         self.default_wrapper = default_wrapper
@@ -87,7 +76,8 @@ ITERABLE_PROGRESS = IterableProgress()
 
 
 def system_progress_command(
-        exe: Union[str, PathLike], *args, require: bool = False) -> Tuple:  # pragma: no-cover
+        exe: Union[str, PathLike], *args, require: bool = False
+        ) -> Tuple:  # pragma: no-cover
     """Resolve a system-level progress bar command.
     
     Args:

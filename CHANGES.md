@@ -2,6 +2,7 @@ v4.0.0 (dev)
 ------------
 * Starting with v4, xphyle requires python 3.6+
 * All path-oriented functions now use pathlib paths by default. Support for string paths is deprecated.
+* Moved to pokrok for progress bar management.
 
 v3.1.2 (2017.11.18)
 ------------------- 

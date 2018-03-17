@@ -35,9 +35,9 @@ If you have programs installed at a location that is not on your path, you can a
 
 If you would like progress bars displayed for file operations, you need to configure one or both of the python-level and system-level progress bars.
 
-For python-level operations, `tqdm <https://pypi.python.org/pypi/tqdm>`_ is used by default. To enable this::
+For python-level operations, the `pokrok <https://pypi.python.org/pypi/pokrok>`_ API is used by default. Pokrok provides access to many popular progress bar libraries with a single, standard interface. Please see the documentation for more information about which libraries are currently supported and how to configure them. To enable this::
 
-    > pip install tqdm
+    > pip install pokrok
     
     xphyle.configure(progress=True)
 
