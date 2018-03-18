@@ -4,6 +4,14 @@ v4.0.0 (dev)
 * All path-oriented functions now use pathlib paths by default. Support for string paths is deprecated.
 * Moved to pokrok for progress bar management.
 
+v3.1.6 (dev)
+------------
+* Fix bug when specifying file_type=FileType.FILELIKE.
+
+v3.1.5 (2017.12.11)
+-------------------
+* Added `close_fileobj` parameters to `xopen()` to allow user to specify whether the file/buffer should be closed when the wrapper is closed.
+
 v3.1.2 (2017.11.18)
 ------------------- 
 * Added `xphyle.utils.uncompressed_size()`.
