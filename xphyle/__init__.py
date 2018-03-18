@@ -49,7 +49,7 @@ class EventListener(Generic[E], metaclass=ABCMeta):
     Args:
         kwargs: keyword arguments to pass through to ``execute``
     """
-    def __init__(self, **kwargs: Dict[Any, Any]) -> None:
+    def __init__(self, **kwargs) -> None:
         self.create_args = kwargs
 
     def __call__(self, wrapper: E, **call_args) -> None:

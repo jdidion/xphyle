@@ -449,6 +449,7 @@ FileLike = Union[IO, IOBase, FileLikeInterface]
 :class:`FileLikeInterface`.
 """
 
+
 PathOrFile = Union[PathLike, FileLike]
 """Either a PathLike or FileLike."""
 
