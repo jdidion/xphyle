@@ -8,3 +8,4 @@ docs/_build/
 .vscode*
 .mypy_cache/
 .idea/
+.pytest_cache/
