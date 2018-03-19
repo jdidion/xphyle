@@ -804,7 +804,7 @@ def xopen(
         compression: CompressionArg = None, use_system: bool = True,
         allow_subprocesses: bool = True, context_wrapper: bool = None,
         file_type: FileType = None, validate: bool = True,
-        overwrite: bool = True, close_fileobj: bool = False,
+        overwrite: bool = True, close_fileobj: bool = True,
         **kwargs) -> FileLike:
     """
     Replacement for the builtin `open` function that can also open URLs and
