@@ -34,8 +34,8 @@ def create_truncated_file(path, fmt):
 
 gz_path = get_format('gz').executable_path
 no_pigz = gz_path is None or get_format('gz').executable_name != 'pigz'
-bgz_path = get_format('bgz').executable_path
-no_bgzip = gz_path is None or get_format('bgz').executable_name != 'bgzip'
+bgz_compress_path = get_format('bgz').compress_path
+bgz_decompress_path = get_format('bgz').decompress_path
 bz_path = get_format('bz2').executable_path
 no_pbzip2 = bz_path is None or get_format('bz2').executable_name != 'pbzip2'
 xz_path = get_format('xz').executable_path
@@ -61,7 +61,7 @@ class CompressionTests(TestCase):
     def tearDown(self):
         EXECUTABLE_CACHE.cache = {}
         THREADS.update(1)
-    
+
     def test_list_formats(self):
         self.assertSetEqual(
             {'gzip', 'bgzip', 'bz2', 'lzma'},
@@ -69,24 +69,24 @@ class CompressionTests(TestCase):
         self.assertSetEqual(
             {'gzip', 'gz', 'pigz'},
             set(get_format('gzip').aliases))
-    
+
     def test_list_extensions(self):
         self.assertSetEqual(
             {
-                '.gz', '.bgz', '.bz2', '.bzip', '.bzip2', '.xz', '.lzma', 
+                '.gz', '.bgz', '.bz2', '.bzip', '.bzip2', '.xz', '.lzma',
                 '.7z', '.7zip'},
             set(FORMATS.list_extensions(True)))
-    
+
     def test_guess_format(self):
         assert 'gzip' == FORMATS.guess_compression_format('gz')
         assert 'gzip' == FORMATS.guess_compression_format('.gz')
         assert 'gzip' == FORMATS.guess_compression_format('foo.gz')
-    
+
     def test_invalid_format(self):
         self.assertIsNone(FORMATS.guess_compression_format('foo'))
         with self.assertRaises(ValueError):
             FORMATS.get_compression_format('foo')
-    
+
     def test_get_format_from_mime_type(self):
         self.assertEqual(
             'gzip', FORMATS.get_format_for_mime_type('application/gz'))
@@ -94,15 +94,15 @@ class CompressionTests(TestCase):
             'bz2', FORMATS.get_format_for_mime_type('application/bz2'))
         self.assertEqual(
             'lzma', FORMATS.get_format_for_mime_type('application/lzma'))
-    
+
     # TODO: need a way to force selection of a specific executable to properly
     # test all possible scenarios
-    
+
     def _test_format(self, fmt):
         assert fmt.default_compresslevel == fmt._get_compresslevel(None)
         assert fmt.compresslevel_range[0] == fmt._get_compresslevel(-1)
         assert fmt.compresslevel_range[1] == fmt._get_compresslevel(100)
-    
+
     @skipIf(gz_path is None, "'gzip' not available")
     def test_gzip(self):
         gz = get_format('gz')
@@ -138,25 +138,47 @@ class CompressionTests(TestCase):
         self.assertEqual(
             gz.get_command('d', 'foo.gz'),
             [str(gz_path), '-d', '-c', '-p', '2', 'foo.gz'])
-    
-    @skipIf(no_bgzip, "'bgzip' not available")
-    def test_bgzip(self):
+
+    @skipIf(bgz_compress_path is None, "'bgzip' not available")
+    def test_bgzip_compress(self):
         THREADS.update(2)
         bgz = get_format('bgz')
         assert bgz.default_ext == 'bgz'
         self.assertEqual(
             bgz.get_command('c'),
-            [str(bgz_path), '-c', '-@', '2'])
+            [str(bgz_compress_path), '-c', '-@', '2'])
         self.assertEqual(
             bgz.get_command('c', 'foo.bar', compresslevel=5),
-            [str(bgz_path), '-c', '-@', '2', 'foo.bar'])
-        self.assertEqual(
-            bgz.get_command('d'),
-            [str(bgz_path), '-d', '-c', '-@', '2'])
-        self.assertEqual(
-            bgz.get_command('d', 'foo.gz'),
-            [str(bgz_path), '-d', '-c', '-@', '2', 'foo.gz'])
-    
+            [str(bgz_compress_path), '-l', '5', '-c', '-@', '2', 'foo.bar'])
+
+    @skipIf(bgz_decompress_path is None, "'gzip/pigz' not available")
+    def test_bgzip_decompress(self):
+        THREADS.update(2)
+        bgz = get_format('bgz')
+        if bgz.decompress_name == 'pigz':
+            self.assertEqual(
+                bgz.get_command('d'),
+                [str(bgz_decompress_path), '-d', '-c', '-p', '2'])
+            self.assertEqual(
+                bgz.get_command('d', PurePath('foo.gz')),
+                [str(bgz_decompress_path), '-d', '-c', '-p', '2', 'foo.gz'])
+            self.assertEqual(
+                bgz.get_command('d', PurePath('foo.bar')),
+                [
+                    str(bgz_decompress_path), '-d', '-c', '-p', '2', '-S', '.bar',
+                    'foo.bar'
+                ])
+        else:
+            self.assertEqual(
+                bgz.get_command('d'),
+                [str(bgz_decompress_path), '-d', '-c'])
+            self.assertEqual(
+                bgz.get_command('d', 'foo.gz'),
+                [str(bgz_decompress_path), '-d', '-c', 'foo.gz'])
+            self.assertEqual(
+                bgz.get_command('d', 'foo.bar'),
+                [str(bgz_decompress_path), '-d', '-c', '-S', '.bar', 'foo.bar'])
+
     @skipIf(bz_path is None, "'bzip2' not available")
     def test_bzip2(self):
         bz = get_format('bz2')
@@ -174,7 +196,7 @@ class CompressionTests(TestCase):
         self.assertEqual(
             bz.get_command('d', 'foo.bz2'),
             [str(bz_path), '-d', '-c', 'foo.bz2'])
-    
+
     @skipIf(no_pbzip2, "'pbzip2' not available")
     def test_pbzip2(self):
         THREADS.update(2)
@@ -192,7 +214,7 @@ class CompressionTests(TestCase):
         self.assertEqual(
             bz.get_command('d', 'foo.bz2'),
             [str(bz_path), '-d', '-c', '-p2', 'foo.bz2'])
-    
+
     @skipIf(xz_path is None, "'xz' not available")
     def test_lzma(self):
         xz = get_format('xz')
@@ -226,14 +248,14 @@ class CompressionTests(TestCase):
 class FileTests(TestCase):
     def setUp(self):
         self.root = TempDir()
-    
+
     def tearDown(self):
         self.root.close()
-    
+
     def test_invalid(self):
         with self.assertRaises(ValueError):
             get_format('gz').open_file(Path('foo'), 'n')
-        
+
     def write_read_file(self, ext, use_system, mode='t', content=None):
         if content is None:
             content = random_text()  # generate 1 kb of random text
@@ -244,24 +266,24 @@ class FileTests(TestCase):
         write_file(fmt, path, use_system, content, 'w' + mode)
         in_text = read_file(fmt, path, use_system, 'r' + mode)
         assert content == in_text
-    
+
     def test_write_read_bytes_python(self):
         for fmt in ('.gz', '.bz2', '.xz'):
             with self.subTest(fmt=fmt):
                 self.write_read_file(fmt, False, 'b')
-    
+
     def test_write_read_text_python(self):
         for fmt in ('.gz', '.bz2', '.xz'):
             with self.subTest(fmt=fmt):
                 self.write_read_file(fmt, False, 't')
-    
+
     # These tests will be skipped if the required system-level executables
     # are not available
-    
+
     @skipIf(gz_path is None, "'gzip' not available")
     def test_system_gzip(self):
         self.write_read_file('.gz', True)
-    
+
     @skipIf(gz_path is None, "'gzip' not available")
     def test_iter_system(self):
         path = self.root.make_file(suffix='.gz')
@@ -274,15 +296,15 @@ class FileTests(TestCase):
         with fmt.open_file(path, mode='rb', ext='.gz', use_system=True) as f:
             lines = list(line.rstrip().decode() for line in iter(f))
         self.assertListEqual(lines, ['line1', 'line2', 'line3'])
-    
+
     @skipIf(bz_path is None, "'bzip2' not available")
     def test_system_bzip(self):
         self.write_read_file('.bz2', True)
-    
+
     @skipIf(xz_path is None, "'xz' not available")
     def test_system_lzma(self):
         self.write_read_file('.xz', True)
-    
+
     def test_compress_path(self):
         b = (True, False) if gz_path else (False,)
         for use_system in b:
@@ -298,7 +320,7 @@ class FileTests(TestCase):
                 self.assertTrue(os.path.exists(gzfile))
                 with gzip.open(gzfile, 'rt') as i:
                     assert i.read() == 'foo'
-                
+
                 path = self.root.make_file()
                 with open(path, 'wt') as o:
                     o.write('foo')
@@ -311,7 +333,7 @@ class FileTests(TestCase):
                 self.assertTrue(os.path.exists(gzfile))
                 with gzip.open(gzfile, 'rt') as i:
                     assert i.read() == 'foo'
-    
+
     def test_compress_file(self):
         b = (True, False) if gz_path else (False,)
         for use_system in b:
@@ -327,7 +349,7 @@ class FileTests(TestCase):
                 self.assertTrue(os.path.exists(gzfile))
                 with gzip.open(gzfile, 'rt') as i:
                     assert i.read() == 'foo'
-                
+
                 path = self.root.make_file()
                 with open(path, 'wt') as o:
                     o.write('foo')
@@ -341,7 +363,7 @@ class FileTests(TestCase):
                 self.assertTrue(os.path.exists(gzfile))
                 with gzip.open(gzfile, 'rt') as i:
                     assert i.read() == 'foo'
-    
+
     def test_decompress_path_error(self):
         path = self.root.make_file()
         with gzip.open(path, 'wt') as o:
@@ -349,7 +371,7 @@ class FileTests(TestCase):
         with self.assertRaises(Exception):
             fmt = get_format('.gz')
             fmt.decompress_file(path)
-    
+
     def test_decompress_path(self):
         b = (True, False) if gz_path else (False,)
         for use_system in b:
@@ -365,7 +387,7 @@ class FileTests(TestCase):
                 self.assertTrue(os.path.exists(gzfile))
                 with open(path, 'rt') as i:
                     assert i.read() == 'foo'
-                
+
                 path = self.root.make_file()
                 gzfile = Path(str(path) + '.gz')
                 with gzip.open(gzfile, 'wt') as o:
@@ -378,7 +400,7 @@ class FileTests(TestCase):
                 self.assertFalse(os.path.exists(gzfile))
                 with open(path, 'rt') as i:
                     assert i.read() == 'foo'
-    
+
     def test_decompress_file(self):
         b = (True, False) if gz_path else (False,)
         for use_system in b:
@@ -395,7 +417,7 @@ class FileTests(TestCase):
                 self.assertTrue(os.path.exists(gzfile))
                 with open(path, 'rt') as i:
                     assert i.read() == 'foo'
-                
+
                 with gzip.open(gzfile, 'wt') as o:
                     o.write('foo')
                 dest = self.root.make_file()
@@ -406,7 +428,7 @@ class FileTests(TestCase):
                 self.assertTrue(os.path.exists(gzfile))
                 with open(dest, 'rt') as i:
                     assert i.read() == 'foo'
-                
+
                 path = self.root.make_file()
                 gzfile = Path(str(path) + '.bar')
                 with gzip.open(gzfile, 'wt') as o:
@@ -420,7 +442,7 @@ class FileTests(TestCase):
                 self.assertTrue(os.path.exists(path))
                 with open(path, 'rt') as i:
                     assert i.read() == 'foo'
-    
+
     # Disable this test in python 3.3
     @skipIf(sys.version_info[:2] <= (3, 3), "Incompatible test")
     def test_truncated_gz(self):
@@ -443,7 +465,7 @@ class StringTests(TestCase):
                 compressed = fmt.compress(_bytes)
                 decompressed = fmt.decompress(compressed)
                 assert _bytes == decompressed
-    
+
     def test_compress_string(self):
         for ext in ('.gz', '.bz2', '.xz'):
             with self.subTest(ext=ext):
@@ -452,7 +474,7 @@ class StringTests(TestCase):
                 compressed = fmt.compress_string(text)
                 decompressed = fmt.decompress_string(compressed)
                 assert text == decompressed
-    
+
     def test_compress_iterable(self):
         for ext in ('.gz', '.bz2', '.xz'):
             with self.subTest(ext=ext):
