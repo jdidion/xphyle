@@ -1,11 +1,15 @@
-v4.0.0 (dev)
-------------
+v4.0.0-rc1 (2018.08.02)
+-----------------------
+* Support non-.gz extensions when decompressing bgzip files.
+
+v4.0.0-rc0 (2018.03.18)
+-----------------------
 * Starting with v4, xphyle requires python 3.6+
 * All path-oriented functions now use pathlib paths by default. Support for string paths is deprecated.
 * Moved to pokrok for progress bar management.
 
-v3.1.6 (dev)
-------------
+v3.1.6 (2018.01.16)
+-------------------
 * Fix bug when specifying file_type=FileType.FILELIKE.
 
 v3.1.5 (2017.12.11)

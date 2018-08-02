@@ -173,10 +173,10 @@ class CompressionTests(TestCase):
                 bgz.get_command('d'),
                 [str(bgz_decompress_path), '-d', '-c'])
             self.assertEqual(
-                bgz.get_command('d', 'foo.gz'),
+                bgz.get_command('d', PurePath('foo.gz')),
                 [str(bgz_decompress_path), '-d', '-c', 'foo.gz'])
             self.assertEqual(
-                bgz.get_command('d', 'foo.bar'),
+                bgz.get_command('d', PurePath('foo.bar')),
                 [str(bgz_decompress_path), '-d', '-c', '-S', '.bar', 'foo.bar'])
 
     @skipIf(bz_path is None, "'bzip2' not available")
