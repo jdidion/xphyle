@@ -17,7 +17,7 @@ setup(
     description='Utilities for working with files.',
     url='https://github.com/jdidion/xphyle',
     author='John Didion',
-    author_email='john.didion@nih.gov',
+    author_email='github@didion.net',
     license='MIT',
     packages=['xphyle'],
     install_requires=['pokrok'],
