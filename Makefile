@@ -50,7 +50,7 @@ release:
 		  "target_commitish": "master", \
 		  "name": "$(version)", \
 		  "body": "$(desc)", \
-		  "draft": false,
+		  "draft": false, \
 		  "prerelease": false \
 		}'
 
