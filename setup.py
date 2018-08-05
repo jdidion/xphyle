@@ -1,4 +1,6 @@
+from setuptools import setup
 import sys
+import versioneer
 
 
 version_info = sys.version_info
@@ -6,10 +8,6 @@ if version_info < (3, 6):
     sys.stdout.write(
         "xphyle 4+ requires python3.6. Use xphyle 3 with python 3.4 or 3.5.\n")
     sys.exit(1)
-
-
-from setuptools import setup
-import versioneer
 
 
 setup(
@@ -21,12 +19,12 @@ setup(
     author='John Didion',
     author_email='john.didion@nih.gov',
     license='MIT',
-    packages = ['xphyle'],
-    install_requires = ['pokrok'],
-    extras_require = {
-        'performance' : ['lorem']
+    packages=['xphyle'],
+    install_requires=['pokrok'],
+    extras_require={
+        'performance': ['lorem']
     },
-    tests_require = ['pytest', 'pytest-cov'],
+    tests_require=['pytest', 'pytest-cov'],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
@@ -34,6 +32,6 @@ setup(
         'License :: OSI Approved :: MIT License',
         'License :: Public Domain',
         'Programming Language :: Python :: 3 :: Only',
-        'Programming Language :: Python :: 3.6',
-    ],
+        'Programming Language :: Python :: 3.6'
+    ]
 )
