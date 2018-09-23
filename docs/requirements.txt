@@ -1,2 +1,2 @@
-sphinxcontrib-napoleon==0.6.1
+sphinxcontrib-napoleon==0.7
 backports.typing
