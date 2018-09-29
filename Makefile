@@ -27,8 +27,11 @@ clean:
 	rm -Rf dist
 	rm -Rf build
 	rm -Rf *.egg-info
+	rm -Rf .pytest_cache
+	rm -Rf .coverage
 
 release:
+	echo "Releasing version $(version)"
 	$(clean)
 	# tag
 	git tag $(version)
