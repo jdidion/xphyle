@@ -1,12 +1,15 @@
+module = xphyle
+#pytestops = "--full-trace"
+#pytestops = "-v -s"
+repo = jdidion/$(module)
+desc = Release $(version)
 tests = tests
 desc = ''
-module = xphyle
-repo = jdidion/$(module)
 # Use this option to show full stack trace for errors
 #pytestopts = "--full-trace"
 
 BUILD = python setup.py install
-TEST  = py.test -m "not perf" --cov --cov-report term-missing $(pytestopts) $(tests)
+TEST  = py.test -m "not perf" -vv --cov --cov-report term-missing $(pytestopts) $(tests)
 
 all:
 	$(BUILD)
@@ -65,4 +68,4 @@ readme:
 	pandoc --from=markdown --to=rst --output=README.rst README.md
 
 lint:
-	pylint xphyle
+	pylint $(module)
