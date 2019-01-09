@@ -1,20 +1,18 @@
 from unittest import TestCase
 from . import *
-from collections import OrderedDict
 import gzip
 import bz2
-import os
-from xphyle import FileWrapper
 from xphyle.formats import THREADS
 from xphyle.paths import TempDir, EXECUTABLE_CACHE
 from xphyle.progress import ITERABLE_PROGRESS, PROCESS_PROGRESS
 from xphyle.utils import *
 
+
 class UtilsTests(TestCase):
     def setUp(self):
         self.root = TempDir()
         self.system_args = sys.argv
-    
+
     def tearDown(self):
         self.root.close()
         ITERABLE_PROGRESS.enabled = False
@@ -24,62 +22,61 @@ class UtilsTests(TestCase):
         THREADS.update(1)
         EXECUTABLE_CACHE.reset_search_path()
         EXECUTABLE_CACHE.cache = {}
-    
+
     def test_read_lines(self):
-        self.assertListEqual(list(read_lines('foobar', errors=False)), [])
-    
+        self.assertListEqual(list(read_lines(Path('foobar'), errors=False)), [])
+
         path = self.root.make_file()
         with open(path, 'wt') as o:
             o.write("1\n2\n3")
         self.assertListEqual(
             list(read_lines(path)),
-            ['1','2','3'])
+            ['1', '2', '3'])
         self.assertListEqual(
             list(read_lines(path, convert=int)),
-            [1,2,3])
-    
+            [1, 2, 3])
+
     def test_read_chunked(self):
-        self.assertListEqual([], list(read_bytes('foobar', errors=False)))
+        self.assertListEqual([], list(read_bytes(Path('foobar'), errors=False)))
         path = self.root.make_file()
         with open(path, 'wt') as o:
             o.write("1234567890")
         chunks = list(read_bytes(path, 3))
         self.assertListEqual([b'123', b'456', b'789', b'0'], chunks)
-    
+
     def test_write_lines(self):
         linesep_len = len(os.linesep)
         path = self.root.make_file()
-        self.assertEquals(3, write_lines(['foo'], path, linesep=None))
-        self.assertEqual(list(read_lines(path)), ['foo'])
+        assert 3 == write_lines(['foo'], path, linesep=None)
+        assert list(read_lines(path)) == ['foo']
         path = self.root.make_file()
         self.assertEquals(
             9 + (2*linesep_len),
             write_lines(('foo', 'bar', 'baz'), path, linesep=None))
         self.assertEqual(
             list(read_lines(path)),
-            ['foo','bar','baz'])
+            ['foo', 'bar', 'baz'])
         path = self.root.make_file()
         self.assertEquals(
             11, write_lines(('foo', 'bar', 'baz'), path, linesep='|'))
-        self.assertEqual(list(read_lines(path)), ['foo|bar|baz'])
+        assert list(read_lines(path)) == ['foo|bar|baz']
         path = self.root.make_file(permissions='r')
-        self.assertEqual(-1, write_lines(['foo'], path, errors=False))
-    
+        assert -1 == write_lines(['foo'], path, errors=False)
+
     def test_write_bytes(self):
         path = self.root.make_file()
         linesep_len = len(os.linesep)
-        self.assertEquals(3, write_bytes([b'foo'], path))
-        self.assertEqual(list(read_bytes(path)), [b'foo'])
+        assert 3 == write_bytes([b'foo'], path)
+        assert list(read_bytes(path)) == [b'foo']
         path = self.root.make_file()
-        self.assertEquals(
-            9 + (2*linesep_len),
-            write_bytes(('foo', 'bar', 'baz'), path, sep=None))
+        assert 9 + (2*linesep_len) == \
+            write_bytes(('foo', 'bar', 'baz'), path, sep=None)
         self.assertEqual(
-            os.linesep.encode().join((b'foo',b'bar',b'baz')),
+            os.linesep.encode().join((b'foo', b'bar', b'baz')),
             b''.join(read_bytes(path)))
         path = self.root.make_file(permissions='r')
-        self.assertEqual(-1, write_bytes([b'foo'], path, errors=False))
-    
+        assert -1 == write_bytes([b'foo'], path, errors=False)
+
     def test_read_dict(self):
         path = self.root.make_file()
         with open(path, 'wt') as o:
@@ -87,218 +84,201 @@ class UtilsTests(TestCase):
             o.write("foo=1\n")
             o.write("bar=2\n")
         d = read_dict(path, convert=int, ordered=True)
-        self.assertEqual(len(d), 2)
-        self.assertEqual(d['foo'], 1)
-        self.assertEqual(d['bar'], 2)
-        self.assertEqual(list(d.items()), [('foo',1),('bar',2)])
-    
+        assert len(d) == 2
+        assert d['foo'] == 1
+        assert d['bar'] == 2
+        assert list(d.items()) == [('foo', 1), ('bar', 2)]
+
     def test_write_dict(self):
         path = self.root.make_file()
-        write_dict(OrderedDict([('foo',1), ('bar',2)]), path, linesep=None)
-        self.assertEqual(
-            list(read_lines(path)),
-            ['foo=1','bar=2'])
-    
+        write_dict(OrderedDict([('foo', 1), ('bar', 2)]), path, linesep=None)
+        assert list(read_lines(path)) == ['foo=1', 'bar=2']
+
     def test_tsv(self):
-        self.assertListEqual([], list(read_delimited('foobar', errors=False)))
-    
+        assert [] == list(read_delimited(Path('foobar'), errors=False))
+
         path = self.root.make_file()
         with open(path, 'wt') as o:
             o.write('a\tb\tc\n')
             o.write('1\t2\t3\n')
             o.write('4\t5\t6\n')
-    
+
         with self.assertRaises(ValueError):
             list(read_delimited(path, header=False, converters='int'))
         with self.assertRaises(ValueError):
             list(read_delimited(
                 path, header=False, converters=int, row_type='dict',
                 yield_header=False))
-    
-        self.assertListEqual(
-            [
-                ['a','b','c'],
-                [1, 2, 3],
-                [4, 5, 6]
-            ],
-            list(read_delimited(
-                path, header=True, converters=int)))
-        self.assertListEqual(
-            [
-                ['a','b','c'],
-                (1, 2, 3),
-                (4, 5, 6)
-            ],
-            list(read_delimited(
-                path, header=True, converters=int, row_type='tuple')))
-        self.assertListEqual(
-            [
-                ['a','b','c'],
-                (1, 2, 3),
-                (4, 5, 6)
-            ],
-            list(read_delimited(
-                path, header=True, converters=int, row_type=tuple)))
-        self.assertListEqual(
-            [
-                dict(a=1, b=2, c=3),
-                dict(a=4, b=5, c=6)
-            ],
-            list(read_delimited(
-                path, header=True, converters=int, row_type='dict',
-                yield_header=False)))
-    
+
+        assert [
+            ['a', 'b', 'c'],
+            [1, 2, 3],
+            [4, 5, 6]
+        ] == list(read_delimited(
+            path, header=True, converters=int))
+        assert [
+            ['a', 'b', 'c'],
+            (1, 2, 3),
+            (4, 5, 6)
+        ] == list(read_delimited(
+            path, header=True, converters=int, row_type='tuple'))
+        assert [
+            ['a', 'b', 'c'],
+            (1, 2, 3),
+            (4, 5, 6)
+        ] == list(read_delimited(
+            path, header=True, converters=int, row_type=tuple))
+        assert [
+            dict(a=1, b=2, c=3),
+            dict(a=4, b=5, c=6)
+        ] == list(read_delimited(
+            path, header=True, converters=int, row_type='dict',
+            yield_header=False))
+
     def test_tsv_dict(self):
         path = self.root.make_file()
         with open(path, 'wt') as o:
             o.write('id\ta\tb\tc\n')
             o.write('row1\t1\t2\t3\n')
             o.write('row2\t4\t5\t6\n')
-    
+
         with self.assertRaises(ValueError):
             read_delimited_as_dict(path, key='id', header=False)
         with self.assertRaises(ValueError):
             read_delimited_as_dict(path, key=None, header=False)
-    
-        self.assertDictEqual(
-            dict(
-                row1=['row1',1,2,3],
-                row2=['row2',4,5,6]
-            ),
-            read_delimited_as_dict(
-                path, key=0, header=True, converters=(str,int,int,int)))
-        self.assertDictEqual(
-            dict(
-                row1=['row1',1,2,3],
-                row2=['row2',4,5,6]
-            ),
-            read_delimited_as_dict(
-                path, key='id', header=True, converters=(str,int,int,int)))
-    
+
+        assert dict(
+                row1=['row1', 1, 2, 3],
+                row2=['row2', 4, 5, 6]
+        ) == read_delimited_as_dict(
+            path, key=0, header=True, converters=(str, int, int, int))
+        assert dict(
+                row1=['row1', 1, 2, 3],
+                row2=['row2', 4, 5, 6]
+        ) == read_delimited_as_dict(
+            path, key='id', header=True, converters=(str, int, int, int))
+
         with open(path, 'wt') as o:
             o.write('a\tb\tc\n')
             o.write('1\t2\t3\n')
             o.write('4\t5\t6\n')
-    
-        self.assertDictEqual(
-            dict(
-                row1=[1,2,3],
-                row4=[4,5,6]
-            ),
-            read_delimited_as_dict(
-                path, key=lambda row: 'row{}'.format(row[0]),
-                header=True, converters=int))
-    
+
+        assert dict(
+            row1=[1, 2, 3],
+            row4=[4, 5, 6]
+        ) == read_delimited_as_dict(
+            path, key=lambda row: 'row{}'.format(row[0]),
+            header=True, converters=int)
+
     def test_tsv_dict_dups(self):
         path = self.root.make_file()
         with open(path, 'wt') as o:
             o.write('id\ta\tb\tc\n')
             o.write('row1\t1\t2\t3\n')
             o.write('row1\t4\t5\t6\n')
-    
+
         with self.assertRaises(Exception):
             read_delimited_as_dict(
-                path, key='id', header=True, converters=(str,int,int,int))
-    
+                path, key='id', header=True, converters=(str, int, int, int))
+
     def test_compress_file_no_dest(self):
         path = self.root.make_file()
-    
+
         with self.assertRaises(ValueError):
             compress_file(path, compression=True, keep=True)
-    
+
         with open(path, 'wt') as o:
             o.write('foo')
         gzfile = compress_file(path, compression='gz', keep=False)
-        self.assertEqual(gzfile, path + '.gz')
-        self.assertFalse(os.path.exists(path))
-        self.assertTrue(os.path.exists(gzfile))
+        assert gzfile == Path(str(path) + '.gz')
+        assert not path.exists()
+        assert gzfile.exists()
         with gzip.open(gzfile, 'rt') as i:
-            self.assertEqual(i.read(), 'foo')
-    
+            assert i.read() == 'foo'
+
     def test_compress_fileobj(self):
         path = self.root.make_file()
         with open(path, 'wt') as o:
             o.write('foo')
-    
+
         f = open(path, 'rb')
         try:
             gzfile = compress_file(f, compression='gz')
-            self.assertEqual(gzfile, path + '.gz')
-            self.assertTrue(os.path.exists(path))
-            self.assertTrue(os.path.exists(gzfile))
+            assert gzfile == Path(str(path) + '.gz')
+            assert path.exists()
+            assert gzfile.exists()
             with gzip.open(gzfile, 'rt') as i:
-                self.assertEqual(i.read(), 'foo')
+                assert i.read() == 'foo'
         finally:
             f.close()
-    
-        gzpath = path + '.gz'
+
+        gzpath = Path(str(path) + '.gz')
         gzfile = gzip.open(gzpath, 'w')
         try:
-            self.assertEquals(
-                gzpath, compress_file(path, gzfile, compression=True))
+            assert gzpath == compress_file(path, gzfile, compression=True)
         finally:
             gzfile.close()
-        self.assertTrue(os.path.exists(path))
-        self.assertTrue(os.path.exists(gzpath))
+        assert path.exists()
+        assert gzpath.exists()
         with gzip.open(gzpath, 'rt') as i:
-            self.assertEqual(i.read(), 'foo')
-    
+            assert i.read() == 'foo'
+
     def test_compress_file_no_compression(self):
         path = self.root.make_file()
         with open(path, 'wt') as o:
             o.write('foo')
-        gzfile = path + '.gz'
+        gzfile = Path(str(path) + '.gz')
         gzfile2 = compress_file(path, gzfile, keep=True)
-        self.assertEqual(gzfile, gzfile2)
-        self.assertTrue(os.path.exists(path))
-        self.assertTrue(os.path.exists(gzfile))
+        assert gzfile == gzfile2
+        assert path.exists()
+        assert gzfile.exists()
         with gzip.open(gzfile, 'rt') as i:
-            self.assertEqual(i.read(), 'foo')
-    
+            assert i.read() == 'foo'
+
     def test_decompress_file(self):
         path = self.root.make_file()
-        gzfile = path + '.gz'
+        gzfile = Path(str(path) + '.gz')
         with gzip.open(gzfile, 'wt') as o:
             o.write('foo')
-    
+
         path2 = decompress_file(gzfile, keep=True)
-        self.assertEqual(path, path2)
-        self.assertTrue(os.path.exists(gzfile))
-        self.assertTrue(os.path.exists(path))
+        assert path == path2
+        assert path.exists()
+        assert gzfile.exists()
         with open(path, 'rt') as i:
-            self.assertEqual(i.read(), 'foo')
-    
+            assert i.read() == 'foo'
+
         with open(gzfile, 'rb') as i:
             path2 = decompress_file(i, keep=True)
-            self.assertEqual(path, path2)
-            self.assertTrue(os.path.exists(gzfile))
-            self.assertTrue(os.path.exists(path))
-            with open(path, 'rt') as i:
-                self.assertEqual(i.read(), 'foo')
-    
+            assert path == path2
+            assert path.exists()
+            assert gzfile.exists()
+            with open(path, 'rt') as j:
+                assert j.read() == 'foo'
+
     def test_decompress_file_compression(self):
         path = self.root.make_file()
-        gzfile = path + '.foo'
+        gzfile = Path(str(path) + '.foo')
         with gzip.open(gzfile, 'wt') as o:
             o.write('foo')
         with self.assertRaises(ValueError):
             decompress_file(gzfile)
         path2 = decompress_file(gzfile, compression='gz', keep=False)
-        self.assertEqual(path, path2)
-        self.assertFalse(os.path.exists(gzfile))
-        self.assertTrue(os.path.exists(path))
+        assert path == path2
+        assert path.exists()
+        assert not gzfile.exists()
         with open(path, 'rt') as i:
-            self.assertEqual(i.read(), 'foo')
-    
+            assert i.read() == 'foo'
+
     def test_transcode(self):
         path = self.root.make_file()
-        gzfile = path + '.gz'
+        gzfile = Path(str(path) + '.gz')
         with gzip.open(gzfile, 'wt') as o:
             o.write('foo')
-        bzfile = path + '.bz2'
+        bzfile = Path(str(path) + '.bz2')
         transcode_file(gzfile, bzfile)
         with bz2.open(bzfile, 'rt') as i:
-            self.assertEqual('foo', i.read())
+            assert 'foo' == i.read()
 
     def test_uncompressed_size(self):
         for ext in ('.gz', '.xz'):
@@ -306,7 +286,7 @@ class UtilsTests(TestCase):
                 raw = self.root.make_file(contents=random_text(1000))
                 compressed = self.root.make_file(suffix=ext)
                 compress_file(raw, compressed)
-                self.assertEquals(1000, uncompressed_size(compressed))
+                assert 1000 == uncompressed_size(compressed)
 
     def test_exec_process(self):
         inp = self.root.make_file(suffix='.gz')
@@ -315,10 +295,10 @@ class UtilsTests(TestCase):
         out = self.root.make_file(suffix='.gz')
         exec_process('cat', stdin=inp, stdout=out)
         with gzip.open(out, 'rt') as o:
-            self.assertEquals('foo', o.read())
-    
+            assert 'foo' == o.read()
+
     def test_linecount(self):
-        self.assertEqual(-1, linecount('foobar', errors=False))
+        assert -1 == linecount(Path('foobar'), errors=False)
         path = self.root.make_file()
         with open(path, 'wt') as o:
             for i in range(100):
@@ -329,12 +309,12 @@ class UtilsTests(TestCase):
             linecount(path, buffer_size=-1)
         with self.assertRaises(ValueError):
             linecount(path, mode='wb')
-        self.assertEqual(100, linecount(path))
-    
+        assert 100 == linecount(path)
+
     def test_linecount_empty(self):
         path = self.root.make_file()
-        self.assertEqual(0, linecount(path))
-    
+        assert 0 == linecount(path)
+
     def test_file_manager(self):
         paths12 = dict(
             path1=self.root.make_empty_files(1)[0],
@@ -350,41 +330,41 @@ class UtilsTests(TestCase):
             f.add(path5_fh)
             path6 = self.root.make_file()
             f['path6'] = path6
-            self.assertEqual(path6, f.get_path('path6'))
-            all_paths = list(paths12.values()) + paths34 + [path5, path6]
+            assert path6 == f.get_path('path6')
+            all_paths = list(paths12.values()) + list(paths34) + [path5, path6]
             self.assertListEqual(all_paths, f.paths)
-            self.assertEqual(len(f), 6)
+            assert len(f) == 6
             for key, fh in f.iter_files():
                 self.assertFalse(fh.closed)
-            self.assertIsNotNone(f['path2'])
-            self.assertIsNotNone(f.get('path2'))
-            self.assertEqual(f['path6'], f.get(5))
+            assert f['path2'] is not None
+            assert f.get('path2') is not None
+            assert f['path6'] == f.get(5)
             with self.assertRaises(KeyError):
-                f['foo']
-            self.assertIsNone(f.get('foo'))
-        self.assertEqual(len(f), 6)
+                _ = f['foo']
+            assert f.get('foo') is None
+        assert len(f) == 6
         for key, fh in f.iter_files():
             self.assertTrue(fh.closed)
-    
+
     def test_file_manager_dup_files(self):
         f = FileManager()
         path = self.root.make_file()
         f.add(path)
         with self.assertRaises(ValueError):
             f.add(path)
-    
+
     def test_compress_on_close(self):
         path = self.root.make_file()
         compressor = CompressOnClose(compression='gz')
         with FileWrapper(path, 'wt') as wrapper:
             wrapper.register_listener('close', compressor)
             wrapper.write('foo')
-        gzfile = path + '.gz'
-        self.assertEqual(gzfile, compressor.compressed_path)
+        gzfile = Path(str(path) + '.gz')
+        assert gzfile == compressor.compressed_path
         self.assertTrue(os.path.exists(gzfile))
         with gzip.open(gzfile, 'rt') as i:
-            self.assertEqual(i.read(), 'foo')
-    
+            assert i.read() == 'foo'
+
     def test_move_on_close(self):
         path = self.root.make_file()
         dest = self.root.make_file()
@@ -394,58 +374,58 @@ class UtilsTests(TestCase):
         self.assertFalse(os.path.exists(path))
         self.assertTrue(os.path.exists(dest))
         with open(dest, 'rt') as i:
-            self.assertEqual(i.read(), 'foo')
-    
+            assert i.read() == 'foo'
+
     def test_remove_on_close(self):
         path = self.root.make_file()
         with FileWrapper(path, 'wt') as wrapper:
             wrapper.register_listener('close', RemoveOnClose())
             wrapper.write('foo')
         self.assertFalse(os.path.exists(path))
-        
+
         path = self.root.make_file()
         with FileWrapper(open(path, 'wt')) as wrapper:
             wrapper.register_listener('close', RemoveOnClose())
             wrapper.write('foo')
         self.assertFalse(os.path.exists(path))
-    
+
     def test_fileinput(self):
         file1 = self.root.make_file(suffix='.gz')
         with gzip.open(file1, 'wt') as o:
             o.write('foo\nbar\n')
         with textinput(file1) as i:
             lines = list(i)
-            self.assertListEqual(['foo\n','bar\n'], lines)
+            self.assertListEqual(['foo\n', 'bar\n'], lines)
         file2 = self.root.make_file(suffix='.gz')
         with gzip.open(file2, 'wt') as o:
             o.write('baz\n')
         with textinput((file1, file2)) as i:
             lines = list(i)
-            self.assertListEqual(['foo\n','bar\n', 'baz\n'], lines)
-        with textinput([('key1',file1), ('key2', file2)]) as i:
-            self.assertEqual(i.filekey, None)
-            self.assertEqual(i.filename, None)
-            self.assertEqual(i.lineno, 0)
-            self.assertEqual(i.filelineno, 0)
-            
-            self.assertEqual(next(i), 'foo\n')
-            self.assertEqual(i.filekey, 'key1')
-            self.assertEqual(i.filename, file1)
-            self.assertEqual(i.lineno, 1)
-            self.assertEqual(i.filelineno, 1)
-            
-            self.assertEqual(next(i), 'bar\n')
-            self.assertEqual(i.filekey, 'key1')
-            self.assertEqual(i.filename, file1)
-            self.assertEqual(i.lineno, 2)
-            self.assertEqual(i.filelineno, 2)
-            
-            self.assertEqual(next(i), 'baz\n')
-            self.assertEqual(i.filekey, 'key2')
-            self.assertEqual(i.filename, file2)
-            self.assertEqual(i.lineno, 3)
-            self.assertEqual(i.filelineno, 1)
-    
+            self.assertListEqual(['foo\n', 'bar\n', 'baz\n'], lines)
+        with textinput([('key1', file1), ('key2', file2)]) as i:
+            assert i.filekey is None
+            assert i.filename is None
+            assert i.lineno == 0
+            assert i.filelineno == 0
+
+            assert next(i) == 'foo\n'
+            assert i.filekey == 'key1'
+            assert i.filename == file1
+            assert i.lineno == 1
+            assert i.filelineno == 1
+
+            assert next(i) == 'bar\n'
+            assert i.filekey == 'key1'
+            assert i.filename == file1
+            assert i.lineno == 2
+            assert i.filelineno == 2
+
+            assert next(i) == 'baz\n'
+            assert i.filekey == 'key2'
+            assert i.filename == file2
+            assert i.lineno == 3
+            assert i.filelineno == 1
+
     def test_pending(self):
         file1 = self.root.make_file(suffix='.gz')
         with gzip.open(file1, 'wt') as o:
@@ -462,147 +442,147 @@ class UtilsTests(TestCase):
         f.add(file2)
         self.assertTrue(f._pending)
         self.assertFalse(f.finished)
-        self.assertEqual('baz\n', f.readline())
-        self.assertEqual('', f.readline())
+        assert 'baz\n' == f.readline()
+        assert '' == f.readline()
         with self.assertRaises(StopIteration):
             next(f)
         self.assertTrue(f.finished)
         self.assertFalse(f._pending)
-    
+
     def test_fileinput_defaults(self):
         path = self.root.make_file()
         with open(path, 'wt') as o:
             o.write('foo\nbar\n')
         sys.argv = [self.system_args[0], path]
         self.assertEqual(
-            ['foo\n','bar\n'],
+            ['foo\n', 'bar\n'],
             list(textinput()))
         sys.argv = []
         with intercept_stdin('foo\n'):
             lines = list(textinput([STDIN]))
-            self.assertEqual(1, len(lines))
-            self.assertEqual('foo\n', lines[0])
+            assert 1 == len(lines)
+            assert 'foo\n' == lines[0]
         with intercept_stdin(b'foo\nbar\n', is_bytes=True):
-            self.assertEqual([b'foo\n',b'bar\n'], list(byteinput()))
-    
+            assert [b'foo\n', b'bar\n'] == list(byteinput())
+
     def test_single_fileoutput(self):
         file1 = self.root.make_file(suffix='.gz')
         with textoutput(file1) as o:
-            o.writelines(('foo','bar','baz'))
+            o.writelines(('foo', 'bar', 'baz'))
         with gzip.open(file1, 'rt') as i:
-            self.assertEqual('foo\nbar\nbaz\n', i.read())
-    
+            assert 'foo\nbar\nbaz\n' == i.read()
+
     def test_tee_fileoutput(self):
         file1 = self.root.make_file(suffix='.gz')
         file2 = self.root.make_file()
         with self.assertRaises(ValueError):
-            textoutput((file1,file2), access='z')
-        with textoutput((file1,file2)) as o:
-            o.writelines(('foo','bar','baz'))
+            textoutput((file1, file2), access='z')
+        with textoutput((file1, file2)) as o:
+            o.writelines(('foo', 'bar', 'baz'))
         with gzip.open(file1, 'rt') as i:
-            self.assertEqual('foo\nbar\nbaz\n', i.read())
+            assert 'foo\nbar\nbaz\n' == i.read()
         with open(file2, 'rt') as i:
-            self.assertEqual('foo\nbar\nbaz\n', i.read())
-    
+            assert 'foo\nbar\nbaz\n' == i.read()
+
     def test_tee_fileoutput_binary(self):
         file1 = self.root.make_file(suffix='.gz')
         file2 = self.root.make_file()
         with byteoutput(
-                (file1,file2),
+                (file1, file2),
                 file_output_type=TeeFileOutput) as o:
-            o.writelines((b'foo',b'bar',b'baz'))
+            o.writelines((b'foo', b'bar', b'baz'))
         with gzip.open(file1, 'rb') as i:
-            self.assertEqual(b'foo\nbar\nbaz\n', i.read())
+            assert b'foo\nbar\nbaz\n' == i.read()
         with open(file2, 'rb') as i:
-            self.assertEqual(b'foo\nbar\nbaz\n', i.read())
-    
-        with textoutput((file1,file2), file_output_type=TeeFileOutput) as o:
-            o.writelines((b'foo',b'bar',b'baz'))
+            assert b'foo\nbar\nbaz\n' == i.read()
+
+        with textoutput((file1, file2), file_output_type=TeeFileOutput) as o:
+            o.writelines((b'foo', b'bar', b'baz'))
         with gzip.open(file1, 'rt') as i:
-            self.assertEqual('foo\nbar\nbaz\n', i.read())
+            assert 'foo\nbar\nbaz\n' == i.read()
         with open(file2, 'rt') as i:
-            self.assertEqual('foo\nbar\nbaz\n', i.read())
-    
-        with byteoutput((file1,file2), file_output_type=TeeFileOutput) as o:
-            o.writelines(('foo',b'bar',b'baz'))
+            assert 'foo\nbar\nbaz\n' == i.read()
+
+        with byteoutput((file1, file2), file_output_type=TeeFileOutput) as o:
+            o.writelines(('foo', b'bar', b'baz'))
         with gzip.open(file1, 'rb') as i:
-            self.assertEqual(b'foo\nbar\nbaz\n', i.read())
+            assert b'foo\nbar\nbaz\n' == i.read()
         with open(file2, 'rb') as i:
-            self.assertEqual(b'foo\nbar\nbaz\n', i.read())
-    
+            assert b'foo\nbar\nbaz\n' == i.read()
+
     def test_tee_fileoutput_no_newline(self):
         file1 = self.root.make_file(suffix='.gz')
         file2 = self.root.make_file()
-        with textoutput((file1,file2)) as o:
+        with textoutput((file1, file2)) as o:
             o.writeline('foo')
             o.writeline('bar')
-            self.assertEqual(2, o.num_lines)
+            assert 2 == o.num_lines
         with gzip.open(file1, 'rb') as i:
-            self.assertEqual(b'foo\nbar\n', i.read())
+            assert b'foo\nbar\n' == i.read()
         with open(file2, 'rb') as i:
-            self.assertEqual(b'foo\nbar\n', i.read())
-    
+            assert b'foo\nbar\n' == i.read()
+
     def test_fileoutput_stdout(self):
         path = self.root.make_file()
         sys.argv = [self.system_args, path]
         with textoutput() as o:
-            o.writelines(('foo','bar','baz'))
+            o.writelines(('foo', 'bar', 'baz'))
         with open(path, 'rt') as i:
-            self.assertEqual('foo\nbar\nbaz\n', i.read())
+            assert 'foo\nbar\nbaz\n' == i.read()
         sys.argv = []
         with intercept_stdout(True) as outbuf:
             with byteoutput() as o:
                 o.writelines((b'foo', b'bar', b'baz'))
-            self.assertEqual(b'foo\nbar\nbaz\n', outbuf.getvalue())
-    
+            assert b'foo\nbar\nbaz\n' == outbuf.getvalue()
+
     def test_cycle_fileoutput(self):
         file1 = self.root.make_file(suffix='.gz')
         file2 = self.root.make_file()
-        with textoutput((file1,file2), file_output_type=CycleFileOutput) as o:
-            o.writelines(('foo','bar','baz'))
+        with textoutput((file1, file2), file_output_type=CycleFileOutput) as o:
+            o.writelines(('foo', 'bar', 'baz'))
         with gzip.open(file1, 'rt') as i:
-            self.assertEqual('foo\nbaz\n', i.read())
+            assert 'foo\nbaz\n' == i.read()
         with open(file2, 'rt') as i:
-            self.assertEqual('bar\n', i.read())
-    
+            assert 'bar\n' == i.read()
+
     def test_ncycle_fileoutput(self):
         file1 = self.root.make_file(suffix='.gz')
         file2 = self.root.make_file()
         with textoutput(
-                (file1,file2), lines_per_file=2,
+                (file1, file2), lines_per_file=2,
                 file_output_type=NCycleFileOutput) as o:
-            o.writelines(('foo','bar','baz','blorf','bing'))
+            o.writelines(('foo', 'bar', 'baz', 'blorf', 'bing'))
         with gzip.open(file1, 'rt') as i:
-            self.assertEqual('foo\nbar\nbing\n', i.read())
+            assert 'foo\nbar\nbing\n' == i.read()
         with open(file2, 'rt') as i:
-            self.assertEqual('baz\nblorf\n', i.read())
-    
+            assert 'baz\nblorf\n' == i.read()
+
     def test_rolling_fileoutput(self):
-        path = self.root.make_file()
+        path = str(self.root.make_file())
         with RollingFileOutput(
                 path + '{index}.txt', char_mode=TextMode, linesep=os.linesep,
                 lines_per_file=3) as out:
             for i in range(6):
                 out.write(str(i))
         with open(path + '0.txt', 'rt') as infile:
-            self.assertEqual('0\n1\n2\n', infile.read())
+            assert '0\n1\n2\n' == infile.read()
         with open(path + '1.txt', 'rt') as infile:
-            self.assertEqual('3\n4\n5\n', infile.read())
-    
+            assert '3\n4\n5\n' == infile.read()
+
     def test_fileoutput_with_header(self):
-        path = self.root.make_file()
+        path = str(self.root.make_file())
         with textoutput(
                 path + '{index}.txt', file_output_type=RollingFileOutput,
                 header="number\n", lines_per_file=3) as out:
             for i in range(6):
                 out.write(str(i))
         with open(path + '0.txt', 'rt') as infile:
-            self.assertEqual('number\n0\n1\n2\n', infile.read())
+            assert 'number\n0\n1\n2\n' == infile.read()
         with open(path + '1.txt', 'rt') as infile:
-            self.assertEqual('number\n3\n4\n5\n', infile.read())
-    
+            assert 'number\n3\n4\n5\n' == infile.read()
+
     def test_rolling_fileoutput_write(self):
-        path = self.root.make_file()
+        path = str(self.root.make_file())
         with textoutput(
                 path + '{index}.txt', file_output_type=RollingFileOutput,
                 lines_per_file=3) as out:
@@ -612,25 +592,29 @@ class UtilsTests(TestCase):
                 out.write(ch, False)
             out.write("d\ne\nf")
         with open(path + '0.txt', 'rt') as infile:
-            self.assertEqual('0\n1\n2\n', infile.read())
+            assert '0\n1\n2\n' == infile.read()
         with open(path + '1.txt', 'rt') as infile:
-            self.assertEqual('3\n4\n5\n', infile.read())
+            assert '3\n4\n5\n' == infile.read()
         with open(path + '2.txt', 'rt') as infile:
-            self.assertEqual('a\nb\nc\n', infile.read())
+            assert 'a\nb\nc\n' == infile.read()
         with open(path + '3.txt', 'rt') as infile:
-            self.assertEqual('d\ne\nf\n', infile.read())
-    
+            assert 'd\ne\nf\n' == infile.read()
+
     def test_pattern_file_output(self):
         path = self.root.make_file()
+
         def get_tokens(line):
-            return dict(zip(('a','b'), line.split(' ')))
+            return dict(zip(('a', 'b'), line.split(' ')))
+
         with textoutput(
-                path + '{a}.{b}.txt', file_output_type=PatternFileOutput,
+                str(path) + '{a}.{b}.txt',
+                file_output_type=PatternFileOutput,
                 token_func=get_tokens) as out:
             for a in range(2):
                 for b in range(2):
-                    out.writeline('{} {}'.format(a, b))
+                    out.writeline(f'{a} {b}')
+
         for a in range(2):
             for b in range(2):
-                with open(path + '{}.{}.txt'.format(a, b), 'rt') as infile:
-                    self.assertEqual('{} {}\n'.format(a, b), infile.read())
+                with open(str(path) + f'{a}.{b}.txt', 'rt') as infile:
+                    assert f'{a} {b}\n' == infile.read()

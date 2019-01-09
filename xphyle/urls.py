@@ -4,19 +4,22 @@
 import copy
 import io
 import re
+from typing import Optional
 from http.client import HTTPResponse
 from urllib.error import URLError
-from urllib.parse import urlparse
+from urllib.parse import ParseResult, urlparse
 from urllib.request import urlopen, Request
-from xphyle.types import Url, Range, Any, cast
+from xphyle.types import Range, Any, cast
+
 
 # URLs
 
-def parse_url(url_string: str) -> Url:
+
+def parse_url(url_string: str) -> Optional[ParseResult]:
     """Attempts to parse a URL.
     
     Args:
-        s: String to test.
+        url_string: String to test.
     
     Returns:
         A 6-tuple, as described in ``urlparse``, or  None if the URL cannot be
@@ -29,13 +32,14 @@ def parse_url(url_string: str) -> Url:
         return None
     return url
 
+
 def open_url(
-        url_string: str, byte_range: Range = None, headers: dict = None,
-        **kwargs) -> Any:
+        url_string: str, byte_range: Optional[Range] = None,
+        headers: Optional[dict] = None, **kwargs) -> Any:
     """Open a URL for reading.
     
     Args:
-        url: A valid url string.
+        url_string: A valid url string.
         byte_range: Range of bytes to read (start, stop).
         headers: dict of request headers.
         kwargs: Additional arguments to pass to `urlopen`.
@@ -63,11 +67,11 @@ def open_url(
             return io.BufferedReader(cast(HTTPResponse, response))
         else:
             return response
-        return response
     except (URLError, ValueError):
         return None
 
-def get_url_mime_type(response: Any) -> str:
+
+def get_url_mime_type(response: Any) -> Optional[str]:
     """If a response object has HTTP-like headers, extract the MIME type
     from the Content-Type header.
     
@@ -81,9 +85,13 @@ def get_url_mime_type(response: Any) -> str:
         return response.headers['Content-Type']
     return None
 
+
 CONTENT_DISPOSITION_RE = re.compile('filename=([^;]+)')
 
-def get_url_file_name(response: Any, parsed_url: Url = None) -> str:
+
+def get_url_file_name(
+        response: Any, parsed_url: Optional[ParseResult] = None
+        ) -> Optional[str]:
     """If a response object has HTTP-like headers, extract the filename
     from the Content-Disposition header.
     
@@ -103,8 +111,5 @@ def get_url_file_name(response: Any, parsed_url: Url = None) -> str:
     if not parsed_url:
         parsed_url = parse_url(response.geturl())
     if parsed_url and hasattr(parsed_url, 'path'):
-        # ISSUE: ParseResult has named attributes that mypy does not
-        # yet recognize
-        #return parsed_url.path
-        return parsed_url[2]
+        return parsed_url.path
     return None

@@ -1,25 +1,14 @@
 from setuptools import setup
 import sys
+import versioneer
+
 
 version_info = sys.version_info
-
-if version_info < (3, 4):
-    sys.stdout.write("At least Python 3.4 is required.\n")
+if version_info < (3, 6):
+    sys.stdout.write(
+        "xphyle 4+ requires python3.6. Use xphyle 3 with python 3.4 or 3.5.\n")
     sys.exit(1)
 
-install_requirements = []
-test_requirements = ['pytest']
-
-if version_info >= (3, 5):
-    test_requirements.append('pytest-cov')
-
-if version_info < (3, 6):
-    # typing was added in 3.5, and we rely on critical features that were
-    # introduced in 3.5.2+, so for versions older than 3.6 we rely on
-    # a backport
-    install_requirements.append('typing')
-
-import versioneer
 
 setup(
     name='xphyle',
@@ -28,14 +17,14 @@ setup(
     description='Utilities for working with files.',
     url='https://github.com/jdidion/xphyle',
     author='John Didion',
-    author_email='john.didion@nih.gov',
+    author_email='github@didion.net',
     license='MIT',
-    packages = ['xphyle'],
-    install_requires = install_requirements,
-    extras_require = {
-        'performance' : ['lorem']
+    packages=['xphyle'],
+    install_requires=['pokrok'],
+    extras_require={
+        'performance': ['lorem']
     },
-    tests_require = test_requirements,
+    tests_require=['pytest', 'pytest-cov'],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
@@ -43,8 +32,6 @@ setup(
         'License :: OSI Approved :: MIT License',
         'License :: Public Domain',
         'Programming Language :: Python :: 3 :: Only',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
-    ],
+        'Programming Language :: Python :: 3.6'
+    ]
 )
