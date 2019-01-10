@@ -1,3 +1,5 @@
+# xphyle: extraordinarily simple file handling
+
 [![PyPI](https://img.shields.io/pypi/v/xphyle.svg?branch=master)](https://pypi.python.org/pypi/xphyle)
 [![Travis CI](https://img.shields.io/travis/jdidion/xphyle/master.svg)](https://travis-ci.org/jdidion/xphyle)
 [![Coverage Status](https://img.shields.io/coveralls/jdidion/xphyle/master.svg)](https://coveralls.io/github/jdidion/xphyle?branch=master)
@@ -5,8 +7,6 @@
 [![Documentation Status](https://readthedocs.org/projects/xphyle/badge/?version=latest)](http://xphyle.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/71260678.svg)](https://zenodo.org/badge/latestdoi/71260678)
 [![JOSS](http://joss.theoj.org/papers/10.21105/joss.00255/status.svg)](http://joss.theoj.org/papers/10.21105/joss.00255)
-
-# xphyle: extraordinarily simple file handling
 
 <img src="https://github.com/jdidion/xphyle/blob/master/docs/logo.png?raw=true"
      alt="logo" width="200" height="200">
