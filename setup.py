@@ -24,6 +24,7 @@ setup(
     cmdclass=versioneer.get_cmdclass(),
     description='Utilities for working with files.',
     long_description=long_description,
+    long_description_content_type="text/markdown",
     url='https://github.com/jdidion/xphyle',
     author='John Didion',
     author_email='github@didion.net',
