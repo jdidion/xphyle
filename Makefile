@@ -43,7 +43,8 @@ release:
 	$(TEST)
 	python setup.py sdist bdist_wheel
 	# release
-	python setup.py sdist upload -r pypi
+	#python setup.py upload -r pypi
+	twine upload dist/*
 	# push new tag after successful build
 	git push origin --tags
 	# create release in GitHub

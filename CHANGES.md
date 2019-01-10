@@ -1,3 +1,10 @@
+# Changes
+
+v4.0.0 (2019.01.10)
+-------------------
+* Official 4.0.0 release
+* Fix setup.py and Makefile to perform pypi upload correctly
+
 v4.0.0-rc1 (2018.08.02)
 -----------------------
 * Support non-.gz extensions when decompressing bgzip files.
@@ -17,7 +24,7 @@ v3.1.5 (2017.12.11)
 * Added `close_fileobj` parameters to `xopen()` to allow user to specify whether the file/buffer should be closed when the wrapper is closed.
 
 v3.1.2 (2017.11.18)
-------------------- 
+-------------------
 * Added `xphyle.utils.uncompressed_size()`.
 
 v3.1.1 (2017.10.13)
