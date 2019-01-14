@@ -1,9 +1,13 @@
 # Changes
 
+v4.0.5 (2019.01.10)
+-------------------
+* Fix setup.py and Makefile to perform pypi upload correctly
+* Add readthedocs.yml and update docs config to get docs building correctly
+
 v4.0.0 (2019.01.10)
 -------------------
 * Official 4.0.0 release
-* Fix setup.py and Makefile to perform pypi upload correctly
 
 v4.0.0-rc1 (2018.08.02)
 -----------------------
