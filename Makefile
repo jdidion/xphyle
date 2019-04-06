@@ -33,9 +33,8 @@ clean:
 	rm -Rf .pytest_cache
 	rm -Rf .coverage
 
-release:
+release: clean
 	echo "Releasing version $(version)"
-	$(clean)
 	# tag
 	git tag $(version)
 	# build

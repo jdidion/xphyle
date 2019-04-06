@@ -1,6 +1,6 @@
 # Changes
 
-v4.0.6 (2019.04.06)
+v4.0.7 (2019.04.06)
 -------------------
 * Don't complain when writing a bgzip file and the extension is gz
 * Reformat codebase using black, and other code cleanup
