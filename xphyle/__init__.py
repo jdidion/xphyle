@@ -13,33 +13,67 @@ from subprocess import Popen, PIPE, TimeoutExpired
 import sys
 import warnings
 from typing import (
-    Callable, Container, Iterable, Iterator, Union, Sequence, List, Tuple, Dict,
-    Any, Generic, TypeVar, Generator, IO, Optional, Type, cast)
+    Callable,
+    Container,
+    Iterable,
+    Iterator,
+    Union,
+    Sequence,
+    List,
+    Tuple,
+    Dict,
+    Any,
+    Generic,
+    TypeVar,
+    Generator,
+    IO,
+    Optional,
+    Type,
+    cast,
+)
 
 from xphyle.formats import FORMATS, THREADS
 from xphyle.paths import (
-    STDIN, STDOUT, STDERR, EXECUTABLE_CACHE,
-    check_readable_file, check_writable_file, safe_check_readable_file,
-    deprecated_str_to_path)
+    STDIN,
+    STDOUT,
+    STDERR,
+    EXECUTABLE_CACHE,
+    check_readable_file,
+    check_writable_file,
+    safe_check_readable_file,
+    deprecated_str_to_path,
+)
 from xphyle.progress import ITERABLE_PROGRESS, PROCESS_PROGRESS
 from xphyle.types import (
-    FileType, FileLikeInterface, FileLike, FileMode, ModeArg, ModeAccess,
-    ModeCoding, CompressionArg, EventType, EventTypeArg, PathOrFile,
-    FileLikeBase, AnyChar)
+    FileType,
+    FileLikeInterface,
+    FileLike,
+    FileMode,
+    ModeArg,
+    ModeAccess,
+    ModeCoding,
+    CompressionArg,
+    EventType,
+    EventTypeArg,
+    PathOrFile,
+    FileLikeBase,
+    AnyChar,
+)
 from xphyle.urls import parse_url, open_url, get_url_file_name
 
 
 # pylint: disable=protected-access
 # noinspection PyProtectedMember
 from xphyle._version import get_versions
-__version__ = get_versions()['version']
+
+__version__ = get_versions()["version"]
 del get_versions
 
 
 # Classes
 
 
-E = TypeVar('E', bound='EventManager')
+E = TypeVar("E", bound="EventManager")
 
 
 class EventListener(Generic[E], metaclass=ABCMeta):
@@ -49,6 +83,7 @@ class EventListener(Generic[E], metaclass=ABCMeta):
     Args:
         kwargs: keyword arguments to pass through to ``execute``
     """
+
     def __init__(self, **kwargs) -> None:
         self.create_args = kwargs
 
@@ -82,12 +117,11 @@ class EventListener(Generic[E], metaclass=ABCMeta):
 class EventManager:
     """Mixin type for classes that allow registering event listners.
     """
-    def __init__(self) -> None:
-        self._listeners: Dict[EventType, List[EventListener]] = \
-            defaultdict(lambda: [])
 
-    def register_listener(
-            self, event: EventTypeArg, listener: EventListener) -> None:
+    def __init__(self) -> None:
+        self._listeners: Dict[EventType, List[EventListener]] = defaultdict(lambda: [])
+
+    def register_listener(self, event: EventTypeArg, listener: EventListener) -> None:
         """Register an event listener.
 
         Args:
@@ -128,12 +162,16 @@ class FileLikeWrapper(EventManager, FileLikeBase):
             this wrapper.
 
     """
+
     def __init__(
-            self, fileobj: FileLike, compression: CompressionArg = False,
-            close_fileobj: bool = True) -> None:
+        self,
+        fileobj: FileLike,
+        compression: CompressionArg = False,
+        close_fileobj: bool = True,
+    ) -> None:
         EventManager.__init__(self)
         self._fileobj = fileobj
-        self._iterator: Iterator = None
+        self._iterator: Optional[Iterator] = None
         self.compression = compression
         self.close_fileobj = close_fileobj
 
@@ -142,11 +180,10 @@ class FileLikeWrapper(EventManager, FileLikeBase):
 
     def __iter__(self) -> Iterator:
         if self._iterator is None:
-            self._iterator = iter(
-                ITERABLE_PROGRESS.wrap(self._fileobj, desc=self.name))
+            self._iterator = iter(ITERABLE_PROGRESS.wrap(self._fileobj, desc=self.name))
         return self._iterator
 
-    def __enter__(self) -> 'FileLikeWrapper':
+    def __enter__(self) -> "FileLikeWrapper":
         if self.closed:
             raise IOError("I/O operation on closed file.")
         return self
@@ -174,9 +211,9 @@ class FileLikeWrapper(EventManager, FileLikeBase):
         if not FileMode(self._fileobj.mode).readable:
             raise IOError("Can only call peek() on a readable file")
 
-        if hasattr(self._fileobj, 'peek'):
+        if hasattr(self._fileobj, "peek"):
             # The underlying file has a peek() method
-            peek = getattr(self._fileobj, 'peek')(size)
+            peek = getattr(self._fileobj, "peek")(size)
             # I don't think the following is a valid state
             # if 't' in self._fileobj.mode:
             #     if isinstance(peek, 'bytes'):
@@ -186,7 +223,7 @@ class FileLikeWrapper(EventManager, FileLikeBase):
             #             peek = peek_bytes.decode()
             if len(peek) > size:
                 peek = peek[:size]
-        elif hasattr(self._fileobj, 'seek'):
+        elif hasattr(self._fileobj, "seek"):
             # The underlying file has a seek() method
             curpos = self._fileobj.tell()
             try:
@@ -203,8 +240,8 @@ class FileLikeWrapper(EventManager, FileLikeBase):
         any listeners.
         """
         self._close()
-        if hasattr(self, '_iterator'):
-            delattr(self, '_iterator')
+        if hasattr(self, "_iterator"):
+            delattr(self, "_iterator")
         self._fire_listeners(EventType.CLOSE)
 
     def _close(self) -> None:
@@ -278,26 +315,31 @@ class FileWrapper(FileLikeWrapper):
         name: Use an alternative name for the file.
         kwargs: Additional arguments to pass to xopen.
     """
-    @deprecated_str_to_path(1, 'source')
+
+    @deprecated_str_to_path(1, "source")
     def __init__(
-            self, source: PathOrFile, mode: ModeArg = 'w',
-            compression: CompressionArg = False,
-            name: Union[str, PurePath] = None, close_fileobj: bool = True,
-            **kwargs) -> None:
+        self,
+        source: PathOrFile,
+        mode: ModeArg = "w",
+        compression: CompressionArg = False,
+        name: Union[str, PurePath] = None,
+        close_fileobj: bool = True,
+        **kwargs,
+    ) -> None:
         if isinstance(source, Path):
             self._path = source
-            source_fileobj = xopen(
-                source, mode=mode, compression=compression, **kwargs)
+            source_fileobj = xopen(source, mode=mode, compression=compression, **kwargs)
         else:
             source_fileobj = cast(FileLike, source)
-            if name is None and hasattr(source_fileobj, 'name'):
-                name = str(getattr(source_fileobj, 'name'))
+            if name is None and hasattr(source_fileobj, "name"):
+                name = str(getattr(source_fileobj, "name"))
             self._path = Path(name) if name else None
         super().__init__(
-            source_fileobj, compression=compression, close_fileobj=close_fileobj)
+            source_fileobj, compression=compression, close_fileobj=close_fileobj
+        )
         self._name = str(name)
-        if mode is None and hasattr(source, 'mode'):
-            self._mode = getattr(source_fileobj, 'mode')
+        if mode is None and hasattr(source, "mode"):
+            self._mode = getattr(source_fileobj, "mode")
         if mode:
             self._mode = str(mode)
         else:
@@ -305,15 +347,15 @@ class FileWrapper(FileLikeWrapper):
 
     @property
     def name(self) -> str:
-        if hasattr(self, '_name'):
-            return getattr(self, '_name')
+        if hasattr(self, "_name"):
+            return getattr(self, "_name")
         return super().name
 
     @property
     def path(self) -> PurePath:
         """The source path.
         """
-        return getattr(self, '_path', None)
+        return getattr(self, "_path", None)
 
 
 class BufferWrapper(FileWrapper):
@@ -325,27 +367,32 @@ class BufferWrapper(FileWrapper):
         compression: Compression type.
         close_fileobj: Whether to close the buffer when closing this wrapper.
     """
+
     def __init__(
-            self, fileobj: PathOrFile, buffer: Union[io.StringIO, io.BytesIO],
-            compression: CompressionArg = False, name: str = None, **kwargs
-            ) -> None:
+        self,
+        fileobj: PathOrFile,
+        buffer: Union[io.StringIO, io.BytesIO],
+        compression: CompressionArg = False,
+        name: str = None,
+        **kwargs,
+    ) -> None:
         super().__init__(fileobj, compression=compression, name=name, **kwargs)
         self.buffer = buffer
 
     def getvalue(self) -> AnyChar:
         """Returns the contents of the buffer.
         """
-        if hasattr(self, '_value'):
-            return getattr(self, '_value')
+        if hasattr(self, "_value"):
+            return getattr(self, "_value")
         else:
             return self.buffer.getvalue()
 
     def _close(self):
         if self.compression:
             self._fileobj.close()
-            setattr(self, '_value', self.buffer.getvalue())
+            setattr(self, "_value", self.buffer.getvalue())
         elif self.close_fileobj:
-            setattr(self, '_value', self.buffer.getvalue())
+            setattr(self, "_value", self.buffer.getvalue())
             self._fileobj.close()
 
 
@@ -356,9 +403,8 @@ class StdWrapper(FileLikeWrapper):
         stream: The stream to wrap.
         compression: Compression type.
     """
-    def __init__(
-            self, stream: FileLike, compression: CompressionArg = False
-            ) -> None:
+
+    def __init__(self, stream: FileLike, compression: CompressionArg = False) -> None:
         super().__init__(stream, compression=compression)
         self._closed = False
 
@@ -393,22 +439,30 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
         kwargs: Keyword arguments, passed to :class:`subprocess.Popen`
             constructor.
     """
+
     def __init__(
-            self, args, stdin: PopenStdArg = None, stdout: PopenStdArg = None,
-            stderr: PopenStdArg = None, **kwargs) -> None:
+        self,
+        args,
+        stdin: PopenStdArg = None,
+        stdout: PopenStdArg = None,
+        stderr: PopenStdArg = None,
+        **kwargs,
+    ) -> None:
         Popen.__init__(
-            cast(Popen, self), args, stdin=stdin, stdout=stdout, stderr=stderr,
-            **kwargs)
+            cast(Popen, self), args, stdin=stdin, stdout=stdout, stderr=stderr, **kwargs
+        )
         EventManager.__init__(self)
         # Construct a dict of name=(stream, wrapper, is_pipe) for std streams
-        self._name = ' '.join(args)
+        self._name = " ".join(args)
         self._std = dict(
             (name, [stream, None, desc == PIPE])
             for name, desc, stream in zip(
-                ('stdin', 'stdout', 'stderr'),
+                ("stdin", "stdout", "stderr"),
                 (stdin, stdout, stderr),
-                (self.stdin, self.stdout, self.stderr)))
-        self._iterator: Iterator[str] = None
+                (self.stdin, self.stdout, self.stderr),
+            )
+        )
+        self._iterator: Optional[Iterator[str]] = None
 
     @property
     def name(self) -> str:
@@ -418,10 +472,8 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
     def mode(self) -> str:
         if self.writable():
             mode = self.get_writer().mode
-            if (
-                    self.readable() and
-                    ('b' in mode) == ('b' in self.get_reader().mode)):
-                mode += 'r'
+            if self.readable() and ("b" in mode) == ("b" in self.get_reader().mode):
+                mode += "r"
             return mode
         elif self.readable():
             return self.get_reader().mode
@@ -441,7 +493,7 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
             std = self._std[name]
             if not std[2]:
                 raise IOError("Only PIPE streams can be wrapped")
-            args['validate'] = False
+            args["validate"] = False
             std[1] = xopen(std[0], **args)
 
     def is_wrapped(self, name: str) -> bool:
@@ -474,7 +526,7 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
     def get_writer(self) -> FileLike:
         """Returns the stream for writing to stdin.
         """
-        stdin = self._std['stdin']
+        stdin = self._std["stdin"]
         return stdin[1] or stdin[0]
 
     def readable(self) -> bool:
@@ -505,22 +557,20 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
         Returns:
             The specified stream, or None if the stream doesn't exist.
         """
-        if which in ('stdout', None):
-            std = self._std['stdout']
+        if which in ("stdout", None):
+            std = self._std["stdout"]
         else:
-            std = self._std['stderr']
+            std = self._std["stderr"]
         return std[1] or std[0]
 
     def get_readers(self):
         """Returns (stdout, stderr) tuple.
         """
-        return tuple(self.get_reader(std) for std in ('stdout', 'stderr'))
+        return tuple(self.get_reader(std) for std in ("stdout", "stderr"))
 
     # ISSUE: No idea why mypy says the type of `inp` is incompatible with
     # super class.
-    def communicate(
-            self, inp: AnyChar = None, timeout: float = None
-            ) -> Tuple[IO, IO]:
+    def communicate(self, inp: AnyChar = None, timeout: float = None) -> Tuple[IO, IO]:
         """Send input to stdin, wait for process to terminate, return
         results.
 
@@ -534,7 +584,7 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
         if inp:
             self.write(inp)
         self.close1(timeout, True, True)
-        return (self.stdout, self.stderr)
+        return self.stdout, self.stderr
 
     def flush(self) -> None:
         """Flushes stdin if there is one.
@@ -552,11 +602,14 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
         :method:`_reader(which=None)` is used to create one.
         """
         if not self._iterator:
-            self._iterator = iter(ITERABLE_PROGRESS.wrap(
-                cast(Iterable[AnyChar], self.get_reader()), desc=str(self)))
+            self._iterator = iter(
+                ITERABLE_PROGRESS.wrap(
+                    cast(Iterable[AnyChar], self.get_reader()), desc=str(self)
+                )
+            )
         return self._iterator
 
-    def __enter__(self) -> 'Process':
+    def __enter__(self) -> "Process":
         return self
 
     def __exit__(self, exception_type, exception_value, traceback) -> bool:
@@ -585,9 +638,12 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
         self.close1()
 
     def close1(
-            self, timeout: float = None, raise_on_error: bool = False,
-            record_output: bool = False, terminate: bool = False
-            ) -> Optional[int]:
+        self,
+        timeout: float = None,
+        raise_on_error: bool = False,
+        record_output: bool = False,
+        terminate: bool = False,
+    ) -> Optional[int]:
         """Close stdin/stdout/stderr streams, wait for process to finish, and
         return the process return code.
 
@@ -604,7 +660,7 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
         Notes:
             If :attribute:`record_output` is True, and if stdout/stderr is a
             PIPE, any contents are read and stored as the value of
-            :attribute:`stdout`\:attribute:`stderr`. Otherwise the data is lost.
+            :attribute:`stdout`/:attribute:`stderr`. Otherwise the data is lost.
 
         Returns:
             The process returncode.
@@ -619,7 +675,7 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
             else:
                 return None
 
-        stdin = self._std['stdin']
+        stdin = self._std["stdin"]
         if stdin and stdin[0]:
             if stdin[1]:
                 stdin[1].close()
@@ -627,7 +683,7 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
                 stdin[0].close()
             except IOError:  # pragma: no-cover
                 pass
-            self._std['stdin'] = None
+            self._std["stdin"] = None
 
         try:
             self.wait(timeout)
@@ -650,8 +706,8 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
             self._std[name] = None
             return data
 
-        self.stdout = _close_reader('stdout')
-        self.stderr = _close_reader('stderr')
+        self.stdout = _close_reader("stdout")
+        self.stderr = _close_reader("stderr")
         self._iterator = None
         self._std = None
 
@@ -662,8 +718,9 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
 
         return self.returncode
 
-    def check_valid_returncode(self, valid: Container[int] = (
-            0, None, signal.SIGPIPE, signal.SIGPIPE + 128)):
+    def check_valid_returncode(
+        self, valid: Container[int] = (0, None, signal.SIGPIPE, signal.SIGPIPE + 128)
+    ):
         """Check that the returncodes does not have a value associated with
         an error state.
 
@@ -672,8 +729,7 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
             state.
         """
         if self.returncode not in valid:
-            raise IOError("Process existed with return code {}".format(
-                self.returncode))
+            raise IOError("Process existed with return code {}".format(self.returncode))
 
     def readline(self, hint: int = -1, which: str = None) -> AnyChar:
         return self.get_reader(which).readline(hint)
@@ -693,14 +749,14 @@ DEFAULTS: Dict[str, Any] = dict(xopen_context_wrapper=False)
 
 # noinspection PyShadowingNames
 def configure(
-        default_xopen_context_wrapper: Optional[bool] = None,
-        progress: Optional[bool] = None,
-        progress_wrapper: Optional[Callable[..., Iterable]] = None,
-        system_progress: Optional[bool] = None,
-        system_progress_wrapper: Optional[Union[str, Sequence[str]]] = None,
-        threads: Optional[Union[int, bool]] = None,
-        executable_path: Optional[Union[PurePath, Sequence[PurePath]]] = None
-        ) -> None:
+    default_xopen_context_wrapper: Optional[bool] = None,
+    progress: Optional[bool] = None,
+    progress_wrapper: Optional[Callable[..., Iterable]] = None,
+    system_progress: Optional[bool] = None,
+    system_progress_wrapper: Optional[Union[str, Sequence[str]]] = None,
+    threads: Optional[Union[int, bool]] = None,
+    executable_path: Optional[Union[PurePath, Sequence[PurePath]]] = None,
+) -> None:
     """Conifgure xphyle.
 
     Args:
@@ -742,8 +798,12 @@ OpenArg = Union[PathOrFile, bytes, str, Type[Union[bytes, str]]]
 
 @contextmanager
 def open_(
-        target: OpenArg, mode: ModeArg = None, errors: bool = True,
-        wrap_fileobj: bool = True, **kwargs) -> Generator[FileLike, None, None]:
+    target: OpenArg,
+    mode: ModeArg = None,
+    errors: bool = True,
+    wrap_fileobj: bool = True,
+    **kwargs,
+) -> Generator[FileLike, None, None]:
     """Context manager that frees you from checking if an argument is a path
     or a file object. Calls ``xopen`` to open files.
 
@@ -778,17 +838,19 @@ def open_(
             yield None
     else:
         is_fileobj = not (
-            isinstance(target, str) or
-            isinstance(target, PurePath) or
-            target in (str, bytes))
+            isinstance(target, str)
+            or isinstance(target, PurePath)
+            or target in (str, bytes)
+        )
         if not wrap_fileobj:
             if is_fileobj:
                 yield target
             else:
                 raise ValueError(
-                    "'wrap_fileobj must be True if 'path' is not file-like")
+                    "'wrap_fileobj must be True if 'path' is not file-like"
+                )
         else:
-            kwargs['context_wrapper'] = True
+            kwargs["context_wrapper"] = True
             try:
                 with xopen(target, mode, **kwargs) as fileobj:
                     yield fileobj
@@ -800,12 +862,18 @@ def open_(
 
 
 def xopen(
-        target: OpenArg, mode: ModeArg = None,
-        compression: CompressionArg = None, use_system: bool = True,
-        allow_subprocesses: bool = True, context_wrapper: bool = None,
-        file_type: FileType = None, validate: bool = True,
-        overwrite: bool = True, close_fileobj: bool = True,
-        **kwargs) -> FileLike:
+    target: OpenArg,
+    mode: ModeArg = None,
+    compression: CompressionArg = None,
+    use_system: bool = True,
+    allow_subprocesses: bool = True,
+    context_wrapper: bool = None,
+    file_type: FileType = None,
+    validate: bool = True,
+    overwrite: bool = True,
+    close_fileobj: bool = True,
+    **kwargs,
+) -> FileLike:
     """
     Replacement for the builtin `open` function that can also open URLs and
     subprocessess, and automatically handles compressed files.
@@ -875,8 +943,7 @@ def xopen(
     if compression and isinstance(compression, str):
         cannonical_fmt_name = FORMATS.get_compression_format_name(compression)
         if cannonical_fmt_name is None:
-            raise ValueError(
-                "Invalid compression format: {}".format(compression))
+            raise ValueError("Invalid compression format: {}".format(compression))
         else:
             compression = cannonical_fmt_name
 
@@ -900,18 +967,20 @@ def xopen(
             file_type = FileType.BUFFER
         elif not is_str:
             file_type = FileType.FILELIKE
-        elif target.startswith('|'):
+        elif target.startswith("|"):
             file_type = FileType.PROCESS
     elif file_type == FileType.BUFFER and (
-            is_str or is_path or isinstance(target, bytes)):
+        is_str or is_path or isinstance(target, bytes)
+    ):
         if not mode:
-            mode = FileMode(access='r', coding='t' if is_str else 'b')
+            mode = FileMode(access="r", coding="t" if is_str else "b")
         is_buffer = True
-    elif ((is_str or is_path or is_buffer) == (file_type is FileType.FILELIKE) or
-          is_std != (file_type is FileType.STDIO) or
-          is_buffer != (file_type is FileType.BUFFER)):
-        raise ValueError(
-            f"file_type = {file_type} does not match target {target}")
+    elif (
+        (is_str or is_path or is_buffer) == (file_type is FileType.FILELIKE)
+        or is_std != (file_type is FileType.STDIO)
+        or is_buffer != (file_type is FileType.BUFFER)
+    ):
+        raise ValueError(f"file_type = {file_type} does not match target {target}")
 
     url_parts = None
     if file_type in (FileType.URL, None):
@@ -926,43 +995,46 @@ def xopen(
         if not is_buffer:
             mode = FileMode()
         elif target == str:
-            mode = FileMode('wt')
+            mode = FileMode("wt")
         else:
-            mode = FileMode('wb')
+            mode = FileMode("wb")
     elif isinstance(mode, str):
-        if ('U' in mode
-                and 'newline' in kwargs and
-                kwargs['newline'] is not None):
+        if "U" in mode and "newline" in kwargs and kwargs["newline"] is not None:
             raise ValueError(
                 "newline={} not compatible with universal newlines ('U') "
-                "mode".format(kwargs['newline']))
+                "mode".format(kwargs["newline"])
+            )
         mode = FileMode(mode)
 
     if context_wrapper is None:
-        context_wrapper = DEFAULTS['xopen_context_wrapper']
+        context_wrapper = DEFAULTS["xopen_context_wrapper"]
 
     # Return early if opening a process
     if file_type is FileType.PROCESS:
         if not allow_subprocesses:
             raise ValueError("Subprocesses are disallowed")
-        if target.startswith('|'):
+        if target.startswith("|"):
             target = target[1:]
         popen_args = dict(kwargs)
-        for std in ('stdin', 'stdout', 'stderr'):
+        for std in ("stdin", "stdout", "stderr"):
             popen_args[std] = PIPE
         if mode.writable:
             if compression is True:
                 raise ValueError(
                     "Can determine compression automatically when writing to "
-                    "process stdin")
+                    "process stdin"
+                )
             elif compression is None:
                 compression = False
-            outstream = 'stdin'
+            outstream = "stdin"
         else:
-            outstream = 'stdout'
+            outstream = "stdout"
         popen_args[outstream] = dict(
-            mode=mode, compression=compression, validate=validate,
-            context_wrapper=context_wrapper)
+            mode=mode,
+            compression=compression,
+            validate=validate,
+            context_wrapper=context_wrapper,
+        )
         return popen(target, **popen_args)
 
     buffer = None
@@ -977,7 +1049,8 @@ def xopen(
             if not mode.readable:
                 raise ValueError(
                     "'mode' must be readable when 'file_type' == BUFFER "
-                    "and 'target' is string or bytes.")
+                    "and 'target' is string or bytes."
+                )
             if is_str:
                 if mode.coding != ModeCoding.TEXT:
                     raise ValueError("Must use text mode with a string buffer")
@@ -991,8 +1064,7 @@ def xopen(
             buffer = target
         if not mode.readable:
             if compression is True:
-                raise ValueError(
-                    "Cannot guess compression for a write-only buffer")
+                raise ValueError("Cannot guess compression for a write-only buffer")
             elif compression is None:
                 compression = False
             validate = False
@@ -1006,7 +1078,7 @@ def xopen(
     guess = None
     # Whether to try and guess file format
     guess_format = compression in (None, True)
-    # Whether to validate that the actually compression format matches expected
+    # Whether to validate that the actual compression format matches expected
     validate = validate and bool(compression) and not guess_format
 
     if file_type is FileType.STDIO:
@@ -1029,7 +1101,7 @@ def xopen(
             fileobj = stdobj
 
         if check_readable:
-            if not hasattr(fileobj, 'peek'):
+            if not hasattr(fileobj, "peek"):
                 fileobj = io.BufferedReader(fileobj)
             guess = FORMATS.guess_format_from_buffer(fileobj)
         else:
@@ -1039,9 +1111,9 @@ def xopen(
         use_system = False
 
         # determine mode of fileobj
-        if hasattr(fileobj, 'mode'):
+        if hasattr(fileobj, "mode"):
             fileobj_mode = FileMode(target.mode)
-        elif hasattr(fileobj, 'readable'):
+        elif hasattr(fileobj, "readable"):
             access = ModeAccess.READWRITE
             # if fileobj.readable and fileobj.writable:
             #     access = ModeAccess.READWRITE
@@ -1050,39 +1122,42 @@ def xopen(
             # else:
             #     access = ModeAccess.READ
             fileobj_mode = FileMode(
-                access=access,
-                coding='t' if hasattr(fileobj, 'encoding') else 'b')
+                access=access, coding="t" if hasattr(fileobj, "encoding") else "b"
+            )
         else:  # pragma: no-cover
             # TODO I don't think we can actually get here, but leaving for now.
             raise ValueError("Cannot determine file mode")
 
         # make sure modes are compatible
-        if not ((mode.readable and fileobj_mode.readable) or
-                (mode.writable and fileobj_mode.writable)):
+        if not (
+            (mode.readable and fileobj_mode.readable)
+            or (mode.writable and fileobj_mode.writable)
+        ):
             raise ValueError(
-                "mode {} and file mode {} are not compatible".format(
-                    mode, fileobj_mode))
+                "mode {} and file mode {} are not compatible".format(mode, fileobj_mode)
+            )
 
         # compression/decompression only possible for binary files
         is_bin = fileobj_mode.binary
         if not is_bin:
             if compression:
                 raise ValueError(
-                    "Cannot compress to/decompress from a text-mode "
-                    "file/buffer")
+                    "Cannot compress to/decompress from a text-mode " "file/buffer"
+                )
             else:
                 # noinspection PyUnusedLocal
                 guess_format = False
         elif validate or guess_format:
             if mode.readable:
-                if not hasattr(fileobj, 'peek'):
+                if not hasattr(fileobj, "peek"):
                     fileobj = io.BufferedReader(fileobj)
                 guess = FORMATS.guess_format_from_buffer(fileobj)
-            elif hasattr(fileobj, 'name') and isinstance(fileobj.name, str):
+            elif hasattr(fileobj, "name") and isinstance(fileobj.name, str):
                 guess = FORMATS.guess_compression_format(fileobj.name)
             else:
                 raise ValueError(
-                    "Could not guess compression format from {}".format(target))
+                    "Could not guess compression format from {}".format(target)
+                )
     elif file_type is FileType.URL:
         if not mode.readable:
             raise ValueError("URLs can only be opened in read mode")
@@ -1129,9 +1204,18 @@ def xopen(
                 guess = FORMATS.guess_compression_format(target)
 
     if validate and guess != compression:
-        raise ValueError(
-            "Acutal compression format {} does not match expected "
-            "format {}".format(guess, compression))
+        # TODO: this is to handle the case where the same extension can be used for
+        # multiple compression formats, and we're writing a file so the format cannot
+        # be detected from the header. Formats currently does not support an extension
+        # being used with multiple formats. Currently bgzip is the only format that has
+        # this issue.
+        if not mode.readable and FORMATS.has_compatible_extension(compression, guess):
+            pass
+        else:
+            raise ValueError(
+                "Acutal compression format {} is not compatible with expected "
+                "format {}".format(guess, compression)
+            )
     elif guess:
         compression = guess
     elif compression is True:
@@ -1141,7 +1225,8 @@ def xopen(
         fmt = FORMATS.get_compression_format(str(compression))
         compression = fmt.name
         fileobj = fmt.open_file(
-            fileobj or target, mode, use_system=use_system, **kwargs)
+            fileobj or target, mode, use_system=use_system, **kwargs
+        )
         is_std = False
     elif not fileobj:
         fileobj = open(target, mode.value, **kwargs)
@@ -1154,17 +1239,21 @@ def xopen(
             fileobj = StdWrapper(fileobj, compression=compression)
         elif file_type == FileType.BUFFER:
             fileobj = BufferWrapper(
-                fileobj, buffer, compression=compression,
-                close_fileobj=close_fileobj)
+                fileobj, buffer, compression=compression, close_fileobj=close_fileobj
+            )
         else:
             fileobj = FileWrapper(
-                fileobj, name=name, mode=mode, compression=compression,
-                close_fileobj=close_fileobj)
+                fileobj,
+                name=name,
+                mode=mode,
+                compression=compression,
+                close_fileobj=close_fileobj,
+            )
 
     return fileobj
 
 
-@deprecated_str_to_path(0, 'path')
+@deprecated_str_to_path(0, "path")
 def guess_file_format(path: PurePath) -> str:
     """Try to guess the file format, first from the extension, and then
     from the header bytes.
@@ -1182,13 +1271,18 @@ def guess_file_format(path: PurePath) -> str:
 
 
 PopenStdParamsArg = Union[
-    PopenStdArg, dict, Tuple[PopenStdArg, Union[ModeArg, dict]]]  # pylint: disable=invalid-name
+    PopenStdArg, dict, Tuple[PopenStdArg, Union[ModeArg, dict]]
+]  # pylint: disable=invalid-name
 
 
 def popen(
-        args: Union[str, Iterable], stdin: PopenStdParamsArg = None,
-        stdout: PopenStdParamsArg = None, stderr: PopenStdParamsArg = None,
-        shell: bool = False, **kwargs) -> Process:
+    args: Union[str, Iterable],
+    stdin: PopenStdParamsArg = None,
+    stdout: PopenStdParamsArg = None,
+    stderr: PopenStdParamsArg = None,
+    shell: bool = False,
+    **kwargs,
+) -> Process:
     """Opens a subprocess, using xopen to open input/output streams.
 
     Args:
@@ -1209,16 +1303,15 @@ def popen(
     if not is_str:
         args = [str(a) for a in args]
     if shell and not is_str:
-        args = ' '.join(args)
+        args = " ".join(args)
     elif not shell and is_str:
         args = shlex.split(str(args))
     std_args = {}
 
     # Open non-PIPE streams
     for name, arg, default_mode in zip(
-            ('stdin', 'stdout', 'stderr'),
-            (stdin, stdout, stderr),
-            ('rb', 'wb', 'wb')):
+        ("stdin", "stdout", "stderr"), (stdin, stdout, stderr), ("rb", "wb", "wb")
+    ):
         if arg is None:
             kwargs[name] = None
             continue
@@ -1233,22 +1326,22 @@ def popen(
             path = arg
             path_args = {}
         if path == PIPE and path_args:
-            path_args['file_type'] = FileType.FILELIKE
+            path_args["file_type"] = FileType.FILELIKE
             std_args[name] = path_args
         elif path not in (PIPE, None):
-            path_args['use_system'] = False
-            path_args['context_wrapper'] = True
-            if 'mode' not in path_args:
-                path_args['mode'] = default_mode
+            path_args["use_system"] = False
+            path_args["context_wrapper"] = True
+            if "mode" not in path_args:
+                path_args["mode"] = default_mode
             path = xopen(path, **path_args)
         kwargs[name] = path
 
     # add defaults for some Popen args
-    kwargs['shell'] = shell
-    if 'executable' not in kwargs:
-        kwargs['executable'] = os.environ.get('SHELL') if shell else None
-    if 'preexec_fn' not in kwargs:
-        kwargs['preexec_fn'] = _prefunc
+    kwargs["shell"] = shell
+    if "executable" not in kwargs:
+        kwargs["executable"] = os.environ.get("SHELL") if shell else None
+    if "preexec_fn" not in kwargs:
+        kwargs["preexec_fn"] = _prefunc
 
     # create process
     process = Process(args, **kwargs)

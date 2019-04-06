@@ -17,28 +17,49 @@ import stat
 import sys
 import tempfile
 from typing import (
-    Sequence, List, Tuple, Union, Iterable, Dict, Pattern, Match, Any,
-    Callable, Generic, TypeVar, Optional, cast)
+    Sequence,
+    List,
+    Tuple,
+    Union,
+    Iterable,
+    Dict,
+    Pattern,
+    Match,
+    Any,
+    Callable,
+    Generic,
+    TypeVar,
+    Optional,
+    cast,
+)
 import warnings
 from xphyle.types import (
-    ModeAccess, ModeAccessArg, Permission, PermissionSet, PermissionArg,
-    PermissionSetArg, PathType, PathTypeArg, Regexp)
+    ModeAccess,
+    ModeAccessArg,
+    Permission,
+    PermissionSet,
+    PermissionArg,
+    PermissionSetArg,
+    PathType,
+    PathTypeArg,
+    Regexp,
+)
 from xphyle.urls import parse_url
 
 
-STDIN_OR_STDOUT_STR = '-'
+STDIN_OR_STDOUT_STR = "-"
 """String placeholder for stdin/stdout."""
-STDERR_STR = '_'
+STDERR_STR = "_"
 """String placeholder for stderr."""
 STDIN_OR_STDOUT = PurePath(STDIN_OR_STDOUT_STR)
 """Placeholder for stdin or stdout, when the access mode is not known."""
-STDIN = PurePath('/dev/stdin')
+STDIN = PurePath("/dev/stdin")
 """Placeholder for `sys.stdin`."""
-STDOUT = PurePath('/dev/stdout')
+STDOUT = PurePath("/dev/stdout")
 """Placeholder for or `sys.stdout`."""
-STDERR = PurePath('/dev/stderr')
+STDERR = PurePath("/dev/stderr")
 """Placeholder for `sys.stderr`"""
-BACKCOMPAT = os.getenv('XPHYLE_BACKCOMPAT') != '0'
+BACKCOMPAT = os.getenv("XPHYLE_BACKCOMPAT") != "0"
 """Whether backward compatibility is enabled. By default, backward compatibility
 is enabled unless environment variable XPHYLE_BACKCOMPAT is set to '0'.
 """
@@ -48,9 +69,10 @@ IndexOrName = Union[int, str]
 
 
 def deprecated_str_to_path(
-        *args_to_convert: IndexOrName,
-        list_args: Optional[Sequence[IndexOrName]] = None,
-        dict_args: Optional[Sequence[IndexOrName]] = None) -> Callable:
+    *args_to_convert: IndexOrName,
+    list_args: Optional[Sequence[IndexOrName]] = None,
+    dict_args: Optional[Sequence[IndexOrName]] = None,
+) -> Callable:
     """Decorator for a function that used to take paths as strings and now only
     takes them as os.PurePath objects. A deprecation warning is issued, and
     the string arguments are converted to paths before calling the function.
@@ -58,6 +80,7 @@ def deprecated_str_to_path(
     Backward compatibility can be disabled by the XPHYLE_BACKCOMPAT environment
     variable. If set to false (0), the `func` is returned immediately.
     """
+
     def decorate(func: Callable):
         if not BACKCOMPAT:
             return func
@@ -77,10 +100,10 @@ def deprecated_str_to_path(
                         warn = True
                         kwargs[idx] = as_pure_path(kwargs[idx])
                 else:
-                    raise ValueError(
-                        "'args_to_convert' must be ints or strings")
+                    raise ValueError("'args_to_convert' must be ints or strings")
 
             if list_args is not None:
+
                 def convert_list_arg(l):
                     global warn
                     for i in range(len(l)):
@@ -96,10 +119,10 @@ def deprecated_str_to_path(
                         if idx in kwargs and isinstance(kwargs[idx], list):
                             convert_list_arg(kwargs[idx])
                     else:
-                        raise ValueError(
-                            "'list_args' must be ints or strings")
+                        raise ValueError("'list_args' must be ints or strings")
 
             if dict_args is not None:
+
                 def convert_dict_arg(d):
                     global warn
                     for key in d.keys():
@@ -115,14 +138,14 @@ def deprecated_str_to_path(
                         if idx in kwargs and isinstance(kwargs[idx], dict):
                             convert_dict_arg(kwargs[idx])
                     else:
-                        raise ValueError(
-                            "'dict_args' must be ints or strings")
+                        raise ValueError("'dict_args' must be ints or strings")
 
             if warn:
                 caller = inspect.stack()[3]
                 deprecated(
                     f"Use of {func.__name__} with string path arguments is "
-                    f"deprected (lineno {caller[1]}:{caller[2]})")
+                    f"deprected (lineno {caller[1]}:{caller[2]})"
+                )
 
             return func(*new_args, **kwargs)
 
@@ -137,14 +160,14 @@ def deprecated(msg: str):
     Args:
         msg: The warning message to display.
     """
-    warnings.simplefilter('always', DeprecationWarning)  # turn off filter
+    warnings.simplefilter("always", DeprecationWarning)  # turn off filter
     warnings.warn(msg, category=DeprecationWarning, stacklevel=2)
-    warnings.simplefilter('default', DeprecationWarning)  # reset filter
+    warnings.simplefilter("default", DeprecationWarning)  # reset filter
 
 
 def as_pure_path(
-        path: Union[str, PurePath], access: Optional[ModeAccessArg] = None
-        ) -> PurePath:
+    path: Union[str, PurePath], access: Optional[ModeAccessArg] = None
+) -> PurePath:
     """Convert a string to a PurePath.
 
     Args:
@@ -175,7 +198,7 @@ def as_pure_path(
 
     url = parse_url(path)
     if url:
-        if url.scheme == 'file':
+        if url.scheme == "file":
             return Path(url.path)
         else:
             raise IOError(f"Cannot convert URL {path} to path", path)
@@ -183,9 +206,7 @@ def as_pure_path(
     return Path(path)
 
 
-def as_path(
-        path: Union[str, PurePath], access: Optional[ModeAccessArg] = None
-        ) -> Path:
+def as_path(path: Union[str, PurePath], access: Optional[ModeAccessArg] = None) -> Path:
     """Convert a string to a Path. Note that trying to use STDIN/STDOUT/STDERR
     as actual paths on Windows will result in an error.
 
@@ -206,11 +227,12 @@ def as_path(
     if pure_path == STDIN_OR_STDOUT:
         raise ValueError(
             "Cannot convert stdin/stdout placeholder ('-') to a path without "
-            "the access mode.")
+            "the access mode."
+        )
     return Path(pure_path)
 
 
-@deprecated_str_to_path(0, 'path')
+@deprecated_str_to_path(0, "path")
 def check_std(path: PurePath, error: bool = False) -> bool:
     """Check whether the path is '-' (stdout) or '_' (stderr).
 
@@ -232,7 +254,7 @@ def check_std(path: PurePath, error: bool = False) -> bool:
     return False
 
 
-@deprecated_str_to_path(0, 'path')
+@deprecated_str_to_path(0, "path")
 def get_permissions(path: PurePath) -> PermissionSet:
     """Get the permissions of a file/directory.
 
@@ -248,9 +270,8 @@ def get_permissions(path: PurePath) -> PermissionSet:
     return PermissionSet(as_path(path).stat().st_mode)
 
 
-@deprecated_str_to_path(0, 'path')
-def set_permissions(
-        path: PurePath, permissions: PermissionSetArg) -> PermissionSet:
+@deprecated_str_to_path(0, "path")
+def set_permissions(path: PurePath, permissions: PermissionSetArg) -> PermissionSet:
     """Sets file stat flags (using chmod).
 
     Args:
@@ -267,10 +288,10 @@ def set_permissions(
     return permissions
 
 
-@deprecated_str_to_path(0, 'path')
+@deprecated_str_to_path(0, "path")
 def check_access(
-        path: PurePath, permissions: Union[PermissionArg, PermissionSetArg]
-        ) -> PermissionSet:
+    path: PurePath, permissions: Union[PermissionArg, PermissionSetArg]
+) -> PermissionSet:
     """Check that `path` is accessible with the given set of permissions.
 
     Args:
@@ -284,27 +305,25 @@ def check_access(
         permission_set = cast(PermissionSet, permissions)
     else:
         permission_set = PermissionSet(
-            cast(Union[PermissionArg, Sequence[PermissionArg]], permissions))
+            cast(Union[PermissionArg, Sequence[PermissionArg]], permissions)
+        )
     if check_std(path):
         if path == STDIN_OR_STDOUT and not any(
-                flag in permission_set for flag in {
-                    Permission.READ, Permission.WRITE}):
+            flag in permission_set for flag in {Permission.READ, Permission.WRITE}
+        ):
             raise IOError(
-                errno.EACCES, "STDIN_OR_STDOUT permissions must be r or w",
-                path)
+                errno.EACCES, "STDIN_OR_STDOUT permissions must be r or w", path
+            )
         elif path == STDIN and Permission.READ not in permission_set:
-            raise IOError(
-                errno.EACCES, "STDIN permissions must be r", path)
-        elif path in {STDOUT, STDERR} and \
-                Permission.WRITE not in permission_set:
-            raise IOError(
-                errno.EACCES, "STDOUT/STDERR permissions must be w", path)
+            raise IOError(errno.EACCES, "STDIN permissions must be r", path)
+        elif path in {STDOUT, STDERR} and Permission.WRITE not in permission_set:
+            raise IOError(errno.EACCES, "STDOUT/STDERR permissions must be w", path)
     elif not os.access(path, permission_set.os_flags):
         raise IOError(errno.EACCES, f"{path} not accessable", path)
     return permission_set
 
 
-@deprecated_str_to_path(0, 'path')
+@deprecated_str_to_path(0, "path")
 def abspath(path: PurePath) -> PurePath:
     """Returns the fully resolved path associated with `path`.
 
@@ -323,7 +342,7 @@ def abspath(path: PurePath) -> PurePath:
     return as_path(path).expanduser().resolve()
 
 
-@deprecated_str_to_path(0, 'path')
+@deprecated_str_to_path(0, "path")
 def get_root(path: Optional[PurePath] = None) -> str:
     """Get the root directory.
 
@@ -342,10 +361,10 @@ def get_root(path: Optional[PurePath] = None) -> str:
     return as_pure_path(path).anchor
 
 
-@deprecated_str_to_path(0, 'path')
+@deprecated_str_to_path(0, "path")
 def split_path(
-        path: PurePath, keep_seps: bool = True,
-        resolve: bool = True) -> Tuple[str, ...]:
+    path: PurePath, keep_seps: bool = True, resolve: bool = True
+) -> Tuple[str, ...]:
     """Splits a path into a (parent_dir, name, *ext) tuple.
 
     Args:
@@ -374,11 +393,11 @@ def split_path(
     else:
         seps = file_parts[1:]
         if keep_seps:
-            seps = tuple(f'{os.extsep}{ext}' for ext in file_parts[1:])
+            seps = tuple(f"{os.extsep}{ext}" for ext in file_parts[1:])
     return (path.parent, file_parts[0]) + seps
 
 
-@deprecated_str_to_path(0, 'path')
+@deprecated_str_to_path(0, "path")
 def filename(path: PurePath) -> str:
     """Equivalent to `split_path(path)[1]`.
 
@@ -391,7 +410,7 @@ def filename(path: PurePath) -> str:
     return split_path(path)[1]
 
 
-@deprecated_str_to_path(0, 'path')
+@deprecated_str_to_path(0, "path")
 def resolve_path(path: PurePath, parent: PurePath = None) -> PurePath:
     """Resolves the absolute path of the specified file and ensures that the
     file/directory exists.
@@ -418,11 +437,12 @@ def resolve_path(path: PurePath, parent: PurePath = None) -> PurePath:
     return path
 
 
-@deprecated_str_to_path(0, 'path')
+@deprecated_str_to_path(0, "path")
 def check_path(
-        path: PurePath, path_type: PathTypeArg = None,
-        permissions: Union[PermissionArg, PermissionSetArg] = None
-        ) -> PurePath:
+    path: PurePath,
+    path_type: PathTypeArg = None,
+    permissions: Union[PermissionArg, PermissionSetArg] = None,
+) -> PurePath:
     """Resolves the path (using `resolve_path`) and checks that the path is
     of the specified type and allows the specified access.
 
@@ -455,7 +475,7 @@ def check_path(
     return path
 
 
-@deprecated_str_to_path(0, 'path')
+@deprecated_str_to_path(0, "path")
 def check_readable_file(path: PurePath) -> PurePath:
     """Check that `path` exists and is readable.
 
@@ -468,7 +488,7 @@ def check_readable_file(path: PurePath) -> PurePath:
     return check_path(path, PathType.FILE, ModeAccess.READ)
 
 
-@deprecated_str_to_path(0, 'path')
+@deprecated_str_to_path(0, "path")
 def check_writable_file(path: PurePath, mkdirs: bool = True) -> PurePath:
     """If `path` exists, check that it is writable, otherwise check that
     its parent directory exists and is writable.
@@ -500,7 +520,7 @@ def check_writable_file(path: PurePath, mkdirs: bool = True) -> PurePath:
 # instead of throwing exceptions
 
 
-@deprecated_str_to_path(0, 'path')
+@deprecated_str_to_path(0, "path")
 def safe_check_path(path: PurePath, *args, **kwargs) -> Optional[PurePath]:
     """Safe vesion of `check_path`. Returns None rather than throw an
     exception.
@@ -511,7 +531,7 @@ def safe_check_path(path: PurePath, *args, **kwargs) -> Optional[PurePath]:
         return None
 
 
-@deprecated_str_to_path(0, 'path')
+@deprecated_str_to_path(0, "path")
 def safe_check_readable_file(path: PurePath) -> Optional[PurePath]:
     """Safe vesion of `check_readable_file`. Returns None rather than throw an
     exception.
@@ -522,7 +542,7 @@ def safe_check_readable_file(path: PurePath) -> Optional[PurePath]:
         return None
 
 
-@deprecated_str_to_path(0, 'path')
+@deprecated_str_to_path(0, "path")
 def safe_check_writable_file(path: PurePath) -> Optional[PurePath]:
     """Safe vesion of `check_writable_file`. Returns None rather than throw
     an exception.
@@ -533,12 +553,14 @@ def safe_check_writable_file(path: PurePath) -> Optional[PurePath]:
         return None
 
 
-@deprecated_str_to_path(0, 'root')
+@deprecated_str_to_path(0, "root")
 def find(
-        root: PurePath, pattern: Regexp,
-        path_types: Sequence[PathTypeArg] = 'f',
-        recursive: bool = True, return_matches: bool = False
-        ) -> Union[Sequence[PurePath], Sequence[Tuple[PurePath, Match]]]:
+    root: PurePath,
+    pattern: Regexp,
+    path_types: Sequence[PathTypeArg] = "f",
+    recursive: bool = True,
+    return_matches: bool = False,
+) -> Union[Sequence[PurePath], Sequence[Tuple[PurePath, Match]]]:
     """Find all paths under `root` that match `pattern`.
 
     Args:
@@ -559,16 +581,12 @@ def find(
     else:
         pat = cast(Pattern, pattern)
 
-    path_type_set = {
-        PathType(p) if isinstance(p, str) else p
-        for p in path_types}
+    path_type_set = {PathType(p) if isinstance(p, str) else p for p in path_types}
 
     # Whether we need to match the full path or just the filename
     fullmatch = os.sep in pat.pattern
 
-    def get_matching(
-            names: Iterable[str], _parent
-            ) -> List[Tuple[Path, Match[str]]]:
+    def get_matching(names: Iterable[str], _parent) -> List[Tuple[Path, Match[str]]]:
         """Get all names that match the pattern."""
         _parent = as_pure_path(_parent)
         if fullmatch:
@@ -589,8 +607,8 @@ def find(
             matching_files = get_matching(files, parent)
             if PathType.FILE not in path_type_set:
                 found.extend(
-                    f for f in matching_files
-                    if stat.S_ISFIFO(f[0].stat().st_mode))
+                    f for f in matching_files if stat.S_ISFIFO(f[0].stat().st_mode)
+                )
             else:
                 found.extend(matching_files)
         if not recursive:
@@ -611,20 +629,20 @@ class ExecutableCache(object):
     Args:
         default_path: The default executable path
     """
-    def __init__(
-            self, default_path: Optional[Iterable[PurePath]] = None) -> None:
+
+    def __init__(self, default_path: Optional[Iterable[PurePath]] = None) -> None:
         self.cache: Dict[str, Path] = {}
         self.search_path: Tuple[Path, ...] = None
         self.reset_search_path(default_path)
 
-    def add_search_path(
-            self, paths: Union[str, PurePath, Iterable[PurePath]]) -> None:
+    def add_search_path(self, paths: Union[str, PurePath, Iterable[PurePath]]) -> None:
         """Add directories to the beginning of the executable search path.
 
         Args:
             paths: List of paths, or a string with directories separated by
                 `os.pathsep`.
         """
+
         def _as_path(p):
             check_std(p, error=True)
             s = str(p)
@@ -641,9 +659,8 @@ class ExecutableCache(object):
 
         self.search_path = paths + self.search_path
 
-    @deprecated_str_to_path(list_args=(0, 'default_path'))
-    def reset_search_path(
-            self, default_path: Iterable[PurePath] = None) -> None:
+    @deprecated_str_to_path(list_args=(0, "default_path"))
+    def reset_search_path(self, default_path: Iterable[PurePath] = None) -> None:
         """Reset the search path to `default_path`.
 
         Args:
@@ -674,13 +691,13 @@ class ExecutableCache(object):
         else:
             check_std(executable, error=True)
 
-        exe_file = safe_check_path(
-            Path(executable), PathType.FILE, Permission.EXECUTE)
+        exe_file = safe_check_path(Path(executable), PathType.FILE, Permission.EXECUTE)
 
         if not exe_file:
             for path in self.search_path:
                 exe_file = safe_check_path(
-                    path / executable, PathType.FILE, Permission.EXECUTE)
+                    path / executable, PathType.FILE, Permission.EXECUTE
+                )
                 if exe_file:
                     break
 
@@ -727,12 +744,15 @@ class TempPath(metaclass=ABCMeta):
         permissions: The access permissions.
         path_type: 'f' = file, 'd' = directory.
     """
-    @deprecated_str_to_path(1, 'parent')
+
+    @deprecated_str_to_path(1, "parent")
     def __init__(
-            self, parent: Union[Path, 'TempPath'] = None,
-            permissions: Optional[PermissionSetArg] = 'rwx',
-            path_type: PathTypeArg = 'd',
-            root: Optional['TempPathManager'] = None) -> None:
+        self,
+        parent: Union[Path, "TempPath"] = None,
+        permissions: Optional[PermissionSetArg] = "rwx",
+        path_type: PathTypeArg = "d",
+        root: Optional["TempPathManager"] = None,
+    ) -> None:
         if isinstance(parent, Path):
             if root:
                 parent = root[parent]
@@ -779,9 +799,11 @@ class TempPath(metaclass=ABCMeta):
         return self._permissions
 
     def set_permissions(
-            self, permissions: Optional[PermissionSetArg] = None,
-            set_parent: bool = False, additive: bool = False
-            ) -> Union[PermissionSet, None]:
+        self,
+        permissions: Optional[PermissionSetArg] = None,
+        set_parent: bool = False,
+        additive: bool = False,
+    ) -> Union[PermissionSet, None]:
         """Set the permissions for the path.
 
         Args:
@@ -806,15 +828,14 @@ class TempPath(metaclass=ABCMeta):
         if set_parent and self.parent:
             self.parent.set_permissions(permissions, True, True)
         # Always set 'x' on directories, otherwise they are not listable
-        if (self.path_type == PathType.DIR and
-                Permission.EXECUTE not in permissions):
+        if self.path_type == PathType.DIR and Permission.EXECUTE not in permissions:
             permissions.add(Permission.EXECUTE)
         set_permissions(self.absolute_path, permissions)
         return permissions
 
     def _set_permissions_value(
-            self, permissions: PermissionSetArg, additive: bool = False
-            ) -> PermissionSet:
+        self, permissions: PermissionSetArg, additive: bool = False
+    ) -> PermissionSet:
         if not isinstance(permissions, PermissionSet):
             permissions = PermissionSet(permissions)
         if additive and (self._permissions or self.parent):
@@ -835,14 +856,19 @@ class TempPathDescriptor(TempPath):
             `mkstemp` or `mkdtemp`.
         path_type: 'f' (for file), 'd' (for directory), or '|' (for FIFO).
     """
-    @deprecated_str_to_path(2, 'parent')
+
+    @deprecated_str_to_path(2, "parent")
     def __init__(
-            self, name: str = None,
-            parent: Optional[Union[PurePath, TempPath]] = None,
-            permissions: Optional[PermissionSetArg] = None,
-            suffix: str = '', prefix: str = '',
-            contents: str = '', path_type: PathTypeArg = 'f',
-            root: Optional['TempPathManager'] = None) -> None:
+        self,
+        name: str = None,
+        parent: Optional[Union[PurePath, TempPath]] = None,
+        permissions: Optional[PermissionSetArg] = None,
+        suffix: str = "",
+        prefix: str = "",
+        contents: str = "",
+        path_type: PathTypeArg = "f",
+        root: Optional["TempPathManager"] = None,
+    ) -> None:
         if isinstance(path_type, str):
             path_type = PathType(path_type)
         if contents and path_type != PathType.FILE:
@@ -893,8 +919,8 @@ class TempPathDescriptor(TempPath):
             # this using a subprocess to pipe through a buffering program (such
             # as pv) to the FIFO instead
             if self.path_type != PathType.FIFO:
-                with open(self.absolute_path, 'wt') as outfile:
-                    outfile.write(self.contents or '')
+                with open(self.absolute_path, "wt") as outfile:
+                    outfile.write(self.contents or "")
         elif not os.path.exists(self.absolute_path):
             self.absolute_path.mkdir()
         if apply_permissions:
@@ -908,10 +934,11 @@ class TempPathManager:
     """Base for classes that manage mapping between paths and
     TempPathDescriptors.
     """
+
     def __init__(self) -> None:
         self.paths: Dict[Path, TempPathDescriptor] = {}
 
-    @deprecated_str_to_path(1, 'path')
+    @deprecated_str_to_path(1, "path")
     def __getitem__(self, path: Path) -> TempPathDescriptor:
         return self.paths[path]
 
@@ -943,14 +970,17 @@ class TempDir(TempPathManager, TempPath):
     before permissions are set, enabling creation of a read-only temporary file
     system.
     """
+
     def __init__(
-            self, permissions: Optional[PermissionSetArg] = 'rwx',
-            path_descriptors: Iterable[TempPathDescriptor] = None,
-            **kwargs) -> None:
+        self,
+        permissions: Optional[PermissionSetArg] = "rwx",
+        path_descriptors: Iterable[TempPathDescriptor] = None,
+        **kwargs,
+    ) -> None:
         TempPathManager.__init__(self)
         TempPath.__init__(self, permissions=permissions)
         self._absolute_path = as_path(abspath(Path(tempfile.mkdtemp(**kwargs))))
-        self._relative_path = Path('')
+        self._relative_path = Path("")
         if path_descriptors:
             self.make_paths(*path_descriptors)
         self.set_permissions()
@@ -963,7 +993,7 @@ class TempDir(TempPathManager, TempPath):
     def relative_path(self) -> Path:
         return self._relative_path
 
-    def __enter__(self) -> 'TempDir':
+    def __enter__(self) -> "TempDir":
         return self
 
     def __exit__(self, exception_type, exception_value, traceback) -> None:
@@ -976,13 +1006,13 @@ class TempDir(TempPathManager, TempPath):
             return
         # First need to make all paths removable
         for path in iter(self):
-            path.set_permissions('rwx', True)
+            path.set_permissions("rwx", True)
         shutil.rmtree(str(self.absolute_path))
         self.clear()
 
     def make_path(
-            self, desc: TempPathDescriptor = None,
-            apply_permissions: bool = True, **kwargs) -> Path:
+        self, desc: TempPathDescriptor = None, apply_permissions: bool = True, **kwargs
+    ) -> Path:
         """Create a file or directory within the TempDir.
 
         Args:
@@ -1009,11 +1039,13 @@ class TempDir(TempPathManager, TempPath):
             parent = desc.parent.absolute_path
             if desc.path_type == PathType.DIR:
                 path = tempfile.mkdtemp(
-                    prefix=desc.prefix, suffix=desc.suffix, dir=str(parent))
+                    prefix=desc.prefix, suffix=desc.suffix, dir=str(parent)
+                )
                 desc.name = os.path.basename(path)
             else:
                 path = tempfile.mkstemp(
-                    prefix=desc.prefix, suffix=desc.suffix, dir=str(parent))[1]
+                    prefix=desc.prefix, suffix=desc.suffix, dir=str(parent)
+                )[1]
                 desc.name = os.path.basename(path)
 
         desc.create(apply_permissions)
@@ -1023,8 +1055,7 @@ class TempDir(TempPathManager, TempPath):
 
         return desc.absolute_path
 
-    def make_paths(
-            self, *path_descriptors: TempPathDescriptor) -> Sequence[Path]:
+    def make_paths(self, *path_descriptors: TempPathDescriptor) -> Sequence[Path]:
         """Create multiple files/directories at once. The paths are created
         before permissions are set, enabling creation of a read-only temporary
         file system.
@@ -1037,8 +1068,8 @@ class TempDir(TempPathManager, TempPath):
         """
         # Create files/directories without permissions
         paths = [
-            self.make_path(desc, apply_permissions=False)
-            for desc in path_descriptors]
+            self.make_path(desc, apply_permissions=False) for desc in path_descriptors
+        ]
         # Now apply permissions after all paths are created
         for desc in path_descriptors:
             desc.set_permissions()
@@ -1047,27 +1078,27 @@ class TempDir(TempPathManager, TempPath):
     # Convenience methods
 
     def make_file(
-            self, desc: TempPathDescriptor = None,
-            apply_permissions: bool = True, **kwargs) -> Path:
+        self, desc: TempPathDescriptor = None, apply_permissions: bool = True, **kwargs
+    ) -> Path:
         """Convenience method; calls `make_path` with path_type='f'.
         """
-        kwargs['path_type'] = 'f'
+        kwargs["path_type"] = "f"
         return self.make_path(desc, apply_permissions, **kwargs)
 
     def make_fifo(
-            self, desc: TempPathDescriptor = None,
-            apply_permissions: bool = True, **kwargs) -> Path:
+        self, desc: TempPathDescriptor = None, apply_permissions: bool = True, **kwargs
+    ) -> Path:
         """Convenience method; calls `make_path` with path_type='|'.
         """
-        kwargs['path_type'] = '|'
+        kwargs["path_type"] = "|"
         return self.make_path(desc, apply_permissions, **kwargs)
 
     def make_directory(
-            self, desc: TempPathDescriptor = None,
-            apply_permissions: bool = True, **kwargs) -> Path:
+        self, desc: TempPathDescriptor = None, apply_permissions: bool = True, **kwargs
+    ) -> Path:
         """Convenience method; calls `make_path` with `path_type='d'`.
         """
-        kwargs['path_type'] = 'd'
+        kwargs["path_type"] = "d"
         return self.make_path(desc, apply_permissions, **kwargs)
 
     def make_empty_files(self, num_files: int, **kwargs) -> Sequence[Path]:
@@ -1080,24 +1111,23 @@ class TempDir(TempPathManager, TempPath):
         Returns:
             A sequence of paths.
         """
-        desc = list(
-            TempPathDescriptor(root=self, **kwargs)
-            for _ in range(num_files))
+        desc = list(TempPathDescriptor(root=self, **kwargs) for _ in range(num_files))
         return self.make_paths(*desc)
 
 
 # User-defined path specifications
 
 
-PATH_CLASS = WindowsPath if os.name == 'nt' else PosixPath
+PATH_CLASS = WindowsPath if os.name == "nt" else PosixPath
 
 
 class PathInst(PATH_CLASS):
     """A path-like that has a slot for variable values.
     """
-    __slots__ = 'values'
 
-    def joinpath(self, *other: PurePath) -> 'PathInst':
+    __slots__ = "values"
+
+    def joinpath(self, *other: PurePath) -> "PathInst":
         """Join two path-like objects, including merging 'values' dicts.
         """
         new_path = super().joinpath(*other)
@@ -1112,9 +1142,10 @@ class PathInst(PATH_CLASS):
 
     def __eq__(self, other: Any) -> bool:
         return (
-            isinstance(other, PathInst) and
-            super().__eq__(other) and
-            self.values == other.values)
+            isinstance(other, PathInst)
+            and super().__eq__(other)
+            and self.values == other.values
+        )
 
 
 def path_inst(path: Union[str, PurePath], values: dict = None) -> PathInst:
@@ -1132,7 +1163,7 @@ def path_inst(path: Union[str, PurePath], values: dict = None) -> PathInst:
     return pathinst
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class PathVar(Generic[T]):
@@ -1151,12 +1182,18 @@ class PathVar(Generic[T]):
     values are first checked against `pattern` (if one is specified), then
     checked against `invalid` (if specified).
     """
+
     def __init__(
-            self, name: str, optional: bool = False,
-            default: Optional[T] = None, undefined: T = None,
-            pattern: Regexp = None, valid: Iterable[T] = None,
-            invalid: Iterable[T] = None, datatype: Callable[[str], T] = None
-            ) -> None:
+        self,
+        name: str,
+        optional: bool = False,
+        default: Optional[T] = None,
+        undefined: T = None,
+        pattern: Regexp = None,
+        valid: Iterable[T] = None,
+        invalid: Iterable[T] = None,
+        datatype: Callable[[str], T] = None,
+    ) -> None:
         self.name = name
         self.optional = optional
         self.default = default
@@ -1193,8 +1230,7 @@ class PathVar(Generic[T]):
                 raise ValueError(f"{value} is not in list of valid values")
         else:
             if self.pattern and not self.pattern.fullmatch(str(value)):
-                raise ValueError(
-                    f"{value} does not match pattern {self.pattern}")
+                raise ValueError(f"{value} does not match pattern {self.pattern}")
             if self.invalid and value in self.invalid:
                 raise ValueError(f"{value} is in list of invalid values")
         if self.datatype:
@@ -1205,31 +1241,36 @@ class PathVar(Generic[T]):
     def as_pattern(self) -> str:
         """Format this variable as a regular expression capture group.
         """
-        pattern = self.pattern.pattern if self.pattern else '.*'
+        pattern = self.pattern.pattern if self.pattern else ".*"
         return "(?P<{name}>{pattern}){optional}".format(
-            name=self.name, pattern=pattern,
-            optional='?' if self.optional else '')
+            name=self.name, pattern=pattern, optional="?" if self.optional else ""
+        )
 
     def __str__(self) -> str:
         return "PathVar<{}, optional={}, default={}>".format(
-            self.name, self.optional, self.default)
+            self.name, self.optional, self.default
+        )
 
 
 class StrPathVar(PathVar[str]):
-    def __init__(self, name: str, undefined: str = '', **kwargs):
+    def __init__(self, name: str, undefined: str = "", **kwargs):
         super().__init__(name, undefined=undefined, **kwargs)
 
 
 class PathPathVar(PathVar[Path]):
     def __init__(
-            self, name: str, undefined: PurePath = Path(''),
-            datatype: Callable[[str], Path] = Path, **kwargs):
+        self,
+        name: str,
+        undefined: PurePath = Path(""),
+        datatype: Callable[[str], Path] = Path,
+        **kwargs,
+    ):
         super().__init__(name, undefined=undefined, datatype=datatype, **kwargs)
 
 
 def match_to_dict(
-        match: Match, path_vars: Dict[str, PathVar],
-        errors: bool = True) -> Union[Dict[str, Any], None]:
+    match: Match, path_vars: Dict[str, PathVar], errors: bool = True
+) -> Union[Dict[str, Any], None]:
     """Convert a regular expression Match to a dict of (name, value) for
     all PathVars.
 
@@ -1248,8 +1289,8 @@ def match_to_dict(
     match_groups = match.groupdict()
     try:
         return dict(
-            (name, var(match_groups.get(name, None)))
-            for name, var in path_vars.items())
+            (name, var(match_groups.get(name, None))) for name, var in path_vars.items()
+        )
     except ValueError:
         if errors:
             raise
@@ -1266,15 +1307,17 @@ class SpecBase(metaclass=ABCMeta):
         template: Format string for creating paths from variables.
         pattern: Regular expression for identifying matching paths.
     """
+
     def __init__(
-            self, *path_vars: PathVar, template: str = None,
-            pattern: Regexp = None) -> None:
+        self, *path_vars: PathVar, template: str = None, pattern: Regexp = None
+    ) -> None:
         self.path_vars = dict((v.name, v) for v in path_vars)
 
         if template is None:
-            template = '{{{}}}'.format(self.default_var_name)
+            template = "{{{}}}".format(self.default_var_name)
             self.path_vars[self.default_var_name] = PathVar(
-                self.default_var_name, pattern=self.default_pattern)
+                self.default_var_name, pattern=self.default_pattern
+            )
 
         self.template = template
 
@@ -1282,21 +1325,21 @@ class SpecBase(metaclass=ABCMeta):
             """Escape special characters in a string.
             """
             for char in chars:
-                strng = strng.replace(char, f"\{char}")
+                strng = strng.replace(char, f"\\{char}")
             return strng
 
         def template_to_pattern(_template: str):
             """Convert a template string to a regular expression.
             """
             _pattern = escape(
-                _template,
-                ('\\', '.', '*', '+', '?', '[', ']', '(', ')', '<', '>'))
-            _pattern += '$'
+                _template, ("\\", ".", "*", "+", "?", "[", "]", "(", ")", "<", ">")
+            )
+            _pattern += "$"
             pattern_args = dict(
-                (name, var.as_pattern())
-                for name, var in self.path_vars.items())
+                (name, var.as_pattern()) for name, var in self.path_vars.items()
+            )
             _pattern = _pattern.format(**pattern_args)
-            return escape(_pattern, ('{', '}'))
+            return escape(_pattern, ("{", "}"))
 
         if pattern is None:
             pattern = template_to_pattern(template)
@@ -1335,17 +1378,15 @@ class SpecBase(metaclass=ABCMeta):
             A PathInst.
         """
         values = dict(
-            (name, var(kwargs.get(name, None)))
-            for name, var in self.path_vars.items())
+            (name, var(kwargs.get(name, None))) for name, var in self.path_vars.items()
+        )
         path = self.template.format(**values)
         return path_inst(as_pure_path(path), values)
 
     def __call__(self, **kwargs) -> PathInst:
         return self.construct(**kwargs)
 
-    def parse(
-            self, path: Union[str, PurePath], fullpath: bool = False
-            ) -> PathInst:
+    def parse(self, path: Union[str, PurePath], fullpath: bool = False) -> PathInst:
         """Extract PathVar values from `path` and create a new PathInst.
 
         Args:
@@ -1367,8 +1408,7 @@ class SpecBase(metaclass=ABCMeta):
             raise ValueError(f"{path} does not match {self}")
         return path_inst(path, self._match_to_dict(match))
 
-    def _match_to_dict(
-            self, match: Match, errors: bool = True) -> Dict[str, Any]:
+    def _match_to_dict(self, match: Match, errors: bool = True) -> Dict[str, Any]:
         """Convert a regular expression Match to a dict of (name, value) for
         all PathVars.
 
@@ -1386,8 +1426,8 @@ class SpecBase(metaclass=ABCMeta):
         return match_to_dict(match, self.path_vars, errors)
 
     def find(
-            self, root: Optional[PurePath] = None,
-            recursive: bool = False) -> Sequence[PathInst]:
+        self, root: Optional[PurePath] = None, recursive: bool = False
+    ) -> Sequence[PathInst]:
         """Find all paths in `root` matching this spec.
 
         Args:
@@ -1400,22 +1440,29 @@ class SpecBase(metaclass=ABCMeta):
         if root is None:
             root = self.default_search_root()
         find_results = find(
-            root, self.pattern, path_types=[self.path_type],
-            recursive=recursive, return_matches=True)
+            root,
+            self.pattern,
+            path_types=[self.path_type],
+            recursive=recursive,
+            return_matches=True,
+        )
         matches = dict(
             (path, self._match_to_dict(match, errors=False))
-            for path, match in cast(
-                Sequence[Tuple[str, Match[str]]], find_results))
+            for path, match in cast(Sequence[Tuple[str, Match[str]]], find_results)
+        )
         return [
             path_inst(path, match)
             for path, match in matches.items()
-            if match is not None]
+            if match is not None
+        ]
 
     def __str__(self) -> str:
         return "{}<{}, template={}, pattern={}>".format(
             self.__class__.__name__,
-            ','.join(str(var) for var in self.path_vars.values()),
-            self.template, self.pattern)
+            ",".join(str(var) for var in self.path_vars.values()),
+            self.template,
+            self.pattern,
+        )
 
     @abstractmethod
     def path_part(self, path: Path) -> str:
@@ -1432,13 +1479,14 @@ class SpecBase(metaclass=ABCMeta):
 class DirSpec(SpecBase):
     """Spec for the directory part of a path.
     """
+
     @property
     def default_var_name(self) -> str:
-        return 'dir'
+        return "dir"
 
     @property
     def default_pattern(self) -> str:
-        return '.*'
+        return ".*"
 
     @property
     def path_type(self) -> PathType:
@@ -1449,7 +1497,7 @@ class DirSpec(SpecBase):
 
     def default_search_root(self) -> PurePath:
         try:
-            idx1 = self.template.index('{')
+            idx1 = self.template.index("{")
         except ValueError:
             return Path(self.template)
         try:
@@ -1465,8 +1513,9 @@ class FileSpec(SpecBase):
     Examples:
         spec = FileSpec(
             PathVar('id', pattern='[A-Z0-9_]+'),
-            PathVar('ext', pattern='[^\.]+'),
-            template='{id}.{ext}')
+            PathVar('ext', pattern=r'[^.]+'),
+            template='{id}.{ext}'
+        )
 
         # get a single file
         path = spec(id='ABC123', ext='txt') # => PathInst('ABC123.txt')
@@ -1479,13 +1528,14 @@ class FileSpec(SpecBase):
         # find all files that match a FileSpec in the user's home directory
         all_paths = spec.find('~') # => [PathInst...]
     """
+
     @property
     def default_var_name(self) -> str:
-        return 'file'
+        return "file"
 
     @property
     def default_pattern(self) -> str:
-        return '[^{}]*'.format(os.sep)
+        return "[^{}]*".format(os.sep)
 
     @property
     def path_type(self) -> PathType:
@@ -1503,9 +1553,10 @@ class PathSpec:
         dir_spec: A PurePath if the directory is fixed, otherwise a DirSpec.
         file_spec: A string if the filename is fixed, otherwise a FileSpec.
     """
+
     def __init__(
-            self, dir_spec: Union[PurePath, DirSpec],
-            file_spec: Union[str, FileSpec]) -> None:
+        self, dir_spec: Union[PurePath, DirSpec], file_spec: Union[str, FileSpec]
+    ) -> None:
         self.fixed_dir = self.fixed_file = False
         if not isinstance(dir_spec, DirSpec):
             dir_spec = path_inst(dir_spec)
@@ -1520,11 +1571,11 @@ class PathSpec:
             dir_spec_str = str(dir_spec)
         else:
             dir_spec_str = dir_spec.pattern.pattern
-            if dir_spec_str.endswith('$'):
+            if dir_spec_str.endswith("$"):
                 dir_spec_str = dir_spec_str[:-1]
         self.pattern = os.path.join(
-            dir_spec_str,
-            file_spec if self.fixed_file else file_spec.pattern.pattern)
+            dir_spec_str, file_spec if self.fixed_file else file_spec.pattern.pattern
+        )
 
         self.path_vars: Dict[str, PathVar] = {}
         if not self.fixed_dir:
@@ -1562,6 +1613,7 @@ class PathSpec:
 
         Returns: a PathInst
         """
+
         def parse_part(part, spec, fixed):
             """Parse part of path using 'spec'. Returns 'spec' if fixed is True.
             """
@@ -1582,11 +1634,13 @@ class PathSpec:
             file_inst = parse_part(file_part, self.file_spec, self.fixed_file)
         return dir_inst.joinpath(file_inst) if dir_inst else file_inst
 
-    @deprecated_str_to_path(1, 'root')
+    @deprecated_str_to_path(1, "root")
     def find(
-            self, root: Optional[PurePath] = None,
-            path_types: Sequence[PathTypeArg] = 'f',
-            recursive: bool = False) -> Sequence[PathInst]:
+        self,
+        root: Optional[PurePath] = None,
+        path_types: Sequence[PathTypeArg] = "f",
+        recursive: bool = False,
+    ) -> Sequence[PathInst]:
         """Find all paths matching this PathSpec. The search starts in 'root'
         if it is not None, otherwise it starts in the deepest fixed directory
         of this PathSpec's DirSpec.
@@ -1607,11 +1661,14 @@ class PathSpec:
                 root = self.dir_spec.default_search_root()
 
         files = find(
-            root, self.pattern, path_types=path_types, recursive=recursive,
-            return_matches=True)
+            root,
+            self.pattern,
+            path_types=path_types,
+            recursive=recursive,
+            return_matches=True,
+        )
 
         return [
             path_inst(path, match_to_dict(match, self.path_vars))
-            for path, match in cast(
-                Sequence[Tuple[PurePath, Match[str]]], files)
+            for path, match in cast(Sequence[Tuple[PurePath, Match[str]]], files)
         ]

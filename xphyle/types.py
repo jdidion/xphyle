@@ -10,8 +10,21 @@ import os
 from os import PathLike
 import stat
 from typing import (
-    Dict, Sequence, List, Tuple, Set, Iterator, Iterable, Text, Union, Any, IO,
-    Pattern, TypeVar, cast)
+    Dict,
+    Sequence,
+    List,
+    Tuple,
+    Set,
+    Iterator,
+    Iterable,
+    Text,
+    Union,
+    Any,
+    IO,
+    Pattern,
+    TypeVar,
+    cast,
+)
 
 
 class ModeAccess(Enum):
@@ -20,30 +33,31 @@ class ModeAccess(Enum):
     See Also:
         https://docs.python.org/3/library/functions.html#open
     """
-    READ = 'r'
+
+    READ = "r"
     """Read from file."""
-    WRITE = 'w'
+    WRITE = "w"
     """Write to file, overwriting any existing file."""
-    READWRITE = 'r+'
+    READWRITE = "r+"
     """Open file for reading and writing."""
-    TRUNCATE_READWRITE = 'w+'
+    TRUNCATE_READWRITE = "w+"
     """Open file for reading and writing, first truncating the file to 0."""
-    APPEND = 'a'
+    APPEND = "a"
     """Create file if it doesn't exist, else append to existing file."""
-    EXCLUSIVE = 'x'
+    EXCLUSIVE = "x"
     """Exclusive write (fails if file already exists)."""
-    
+
     @property
     def readable(self):
         """Whether this is readable mode.
         """
-        return any(char in self.value for char in ('r', '+'))
-    
+        return any(char in self.value for char in ("r", "+"))
+
     @property
     def writable(self):
         """Whether this is writable mode.
         """
-        return any(char in self.value for char in ('w', '+', 'a', 'x'))
+        return any(char in self.value for char in ("w", "+", "a", "x"))
 
 
 ModeAccessArg = Union[str, ModeAccess]
@@ -55,16 +69,17 @@ class ModeCoding(Enum):
     See Also:
         https://docs.python.org/3/library/functions.html#open
     """
-    TEXT = 't'
+
+    TEXT = "t"
     """Text mode."""
-    BINARY = 'b'
+    BINARY = "b"
     """Binary mode."""
 
 
 ModeCodingArg = Union[str, ModeCoding]
 
 
-FILE_MODE_CACHE: Dict[Tuple[str, ModeAccessArg, ModeCodingArg], 'FileMode'] = {}
+FILE_MODE_CACHE: Dict[Tuple[str, ModeAccessArg, ModeCodingArg], "FileMode"] = {}
 """Cache of FileMode objects."""
 
 
@@ -78,17 +93,24 @@ class FileMode(object):
         access: The file access mode (default: :attribute:`ModeAccess.READ`).
         coding: The file open mode (default: :attribute:`ModeCoding.TEXT`).
     """
+
     def __new__(
-            cls, mode: str = None, access: ModeAccessArg = None,
-            coding: ModeCodingArg = None) -> 'FileMode':
+        cls,
+        mode: str = None,
+        access: ModeAccessArg = None,
+        coding: ModeCodingArg = None,
+    ) -> "FileMode":
         key = (mode, access, coding)
         if key not in FILE_MODE_CACHE:
             FILE_MODE_CACHE[key] = super().__new__(cls)
         return FILE_MODE_CACHE[key]
-    
+
     def __init__(
-            self, mode: str = None, access: ModeAccessArg = None,
-            coding: ModeCodingArg = None) -> None:
+        self,
+        mode: str = None,
+        access: ModeAccessArg = None,
+        coding: ModeCodingArg = None,
+    ) -> None:
         if mode:
             access_val = None
             for a in ModeAccess:
@@ -109,41 +131,42 @@ class FileMode(object):
                 coding_val = ModeCoding(coding)
             else:
                 coding_val = cast(ModeCoding, coding)
-        
+
         self.access = access_val or ModeAccess.READ
         self.coding = coding_val or ModeCoding.TEXT
-        self.value = '{}{}'.format(self.access.value, self.coding.value)
-        
+        self.value = "{}{}".format(self.access.value, self.coding.value)
+
         if mode:
-            diff = set(mode) - set(str(self) + 'U')
+            diff = set(mode) - set(str(self) + "U")
             if diff:
-                raise ValueError("Invalid characters in mode string: {}".format(
-                    ''.join(diff)))
-    
+                raise ValueError(
+                    "Invalid characters in mode string: {}".format("".join(diff))
+                )
+
     @property
     def readable(self):
         """Whether this is readable mode.
         """
         return self.access.readable
-    
+
     @property
     def writable(self):
         """Whether this is writable mode.
         """
         return self.access.writable
-    
+
     @property
     def binary(self):
         """Whether this is binary mode.
         """
         return self.coding == ModeCoding.BINARY
-    
+
     @property
     def text(self):
         """Whether this is text mode.
         """
         return self.coding == ModeCoding.TEXT
-    
+
     def __contains__(self, value: Union[str, ModeAccess, ModeCoding]) -> bool:
         if isinstance(value, ModeAccess):
             return self.access == value
@@ -154,23 +177,19 @@ class FileMode(object):
                 if v not in self.access.value and v not in self.coding.value:
                     return False
             return True
-    
+
     def __eq__(self, other):
         return (
-            isinstance(other, FileMode) and
-            self.access == other.access and
-            self.coding == other.coding)
-    
+            isinstance(other, FileMode)
+            and self.access == other.access
+            and self.coding == other.coding
+        )
+
     def __repr__(self):
         return self.value
 
 
-OS_ALIASES = dict(
-    r=os.R_OK,
-    w=os.W_OK,
-    x=os.X_OK,
-    t=0
-)
+OS_ALIASES = dict(r=os.R_OK, w=os.W_OK, x=os.X_OK, t=0)
 """Dictionary mapping mode characters to :module:`os` flags"""
 
 
@@ -181,7 +200,7 @@ STAT_ALIASES = dict(
     t=stat.S_ISVTX,
     f=stat.S_IFREG,
     d=stat.S_IFDIR,
-    fifo=stat.S_IFIFO
+    fifo=stat.S_IFIFO,
 )
 """Dictionary mapping mode characters to :module:`stat` flags"""
 
@@ -191,21 +210,22 @@ class Permission(Enum):
     this isn't a full enumeration of all flags, just those pertaining to the
     permissions of the current user.
     """
-    READ = 'r'
+
+    READ = "r"
     """Read; alias of :attribute:`stat.S_IREAD` and :attribute:`os.R_OK`."""
-    WRITE = 'w'
+    WRITE = "w"
     """Write; alias of :attribute:`stat.S_IWRITE and :attribute:`os.W_OK``."""
-    EXECUTE = 'x'
+    EXECUTE = "x"
     """Execute; alias of :attribute:`stat.S_IEXEC` and :attribute:`os.X_OK`."""
-    STICKY = 't'
+    STICKY = "t"
     """The sticky bit, alias of :attribute:`stat.S_ISVTX`."""
-    
+
     @property
     def stat_flag(self):
         """Returns the :module:`stat` flag.
         """
         return STAT_ALIASES[self.value]
-    
+
     @property
     def os_flag(self):
         """Returns the :module:`os` flag.
@@ -217,8 +237,9 @@ PermissionArg = Union[str, int, Permission, ModeAccess]
 """Types from which an Permission can be inferred."""
 
 
-PERMISSION_SET_CACHE: \
-    Dict[Union[PermissionArg, Iterable[PermissionArg]], 'PermissionSet'] = {}
+PERMISSION_SET_CACHE: Dict[
+    Union[PermissionArg, Iterable[PermissionArg]], "PermissionSet"
+] = {}
 
 
 class PermissionSet(object):
@@ -228,23 +249,24 @@ class PermissionSet(object):
         flags: Sequence of flags as string ('r', 'w', 'x'), int,
             :class:`ModeAccess`, or :class:`Permission`.
     """
+
     def __new__(
-            cls, flags: Union[PermissionArg, Iterable[PermissionArg]] = None
-            ) -> 'PermissionSet':
+        cls, flags: Union[PermissionArg, Iterable[PermissionArg]] = None
+    ) -> "PermissionSet":
         if flags not in PERMISSION_SET_CACHE:
             PERMISSION_SET_CACHE[flags] = super().__new__(cls)
         return PERMISSION_SET_CACHE[flags]
-    
+
     def __init__(
-            self, flags: Union[PermissionArg, Iterable[PermissionArg]] = None
-            ) -> None:
+        self, flags: Union[PermissionArg, Iterable[PermissionArg]] = None
+    ) -> None:
         self.flags: Set[Permission] = set()
         if flags:
             if isinstance(flags, str) or is_iterable(flags):
                 self.update(cast(Iterable[PermissionArg], flags))
             else:
                 self.add(cast(Union[int, Permission, ModeAccess], flags))
-    
+
     def add(self, flag: PermissionArg) -> None:
         """Add a permission.
         
@@ -264,10 +286,8 @@ class PermissionSet(object):
                 self.add(Permission.WRITE)
         else:
             self.flags.add(flag)
-    
-    def update(
-            self, flags: Union['PermissionSet', Iterable[PermissionArg]]
-            ) -> None:
+
+    def update(self, flags: Union["PermissionSet", Iterable[PermissionArg]]) -> None:
         """Add all flags in `flags` to this `PermissionSet`.
         
         Args:
@@ -275,7 +295,7 @@ class PermissionSet(object):
         """
         for flag in flags:
             self.add(flag)
-    
+
     @property
     def stat_flags(self) -> int:
         """Returns the binary OR of the :module:`stat` flags corresponding to
@@ -285,7 +305,7 @@ class PermissionSet(object):
         for f in self.flags:
             flags |= f.stat_flag
         return flags
-    
+
     @property
     def os_flags(self) -> int:
         """Returns the binary OR of the :module:`os` flags corresponding to
@@ -295,7 +315,7 @@ class PermissionSet(object):
         for f in self.flags:
             flags |= f.os_flag
         return flags
-    
+
     def __iter__(self) -> Iterable[Permission]:
         """Iterate over flags in the same order they appear in
         :class:`Permission`.
@@ -303,35 +323,36 @@ class PermissionSet(object):
         for f in Permission:
             if f in self.flags:
                 yield f
-    
+
     def __eq__(self, other):
         return isinstance(other, PermissionSet) and self.flags == other.flags
-    
+
     def __contains__(self, access_flag: PermissionArg) -> bool:
         if isinstance(access_flag, str):
             access_flag = Permission(access_flag)
         return access_flag in self.flags
-    
+
     def __repr__(self) -> str:
-        return ''.join(f.value for f in Permission if f in self.flags)
+        return "".join(f.value for f in Permission if f in self.flags)
 
 
 class FileType(Enum):
     """Enumeration of types of files that can be opened by
     :method:`xphyle.xopen`.
     """
-    STDIO = 'std'
+
+    STDIO = "std"
     """One of stdin/stdout/stderr."""
-    LOCAL = 'local'
+    LOCAL = "local"
     """A file on the local computer."""
-    URL = 'url'
+    URL = "url"
     """A URL; schema must be recognized by :module:`urllib`."""
-    PROCESS = 'ps'
+    PROCESS = "ps"
     """A system command to be executed in a subprocess."""
-    FILELIKE = 'filelike'
+    FILELIKE = "filelike"
     """An object that implements the methods in
     :class:`xphyle.types.FileLikeInterface`."""
-    BUFFER = 'buffer'
+    BUFFER = "buffer"
     """A StringIO or BytesIO."""
 
 
@@ -339,7 +360,8 @@ class EventType(Enum):
     """Enumeration of event types that can be registered on an
     :class:`EventManager`.
     """
-    CLOSE = 'close'
+
+    CLOSE = "close"
 
 
 AnyChar = Union[bytes, Text]
@@ -354,6 +376,7 @@ class FileLikeInterface(IO, Iterable[AnyChar], metaclass=ABCMeta):
     See Also:
         https://docs.python.org/3/tutorial/inputoutput.html#methods-of-file-objects
     """
+
     @abstractmethod
     def next(self) -> AnyChar:
         pass
@@ -369,22 +392,22 @@ class FileLikeBase(FileLikeInterface):
 
     def readable(self) -> bool:
         return False
-    
+
     def read(self, n: int = -1) -> AnyChar:
         raise UnsupportedOperation()
-    
+
     def readline(self, hint: int = -1) -> AnyChar:
         raise UnsupportedOperation()
-    
+
     def readlines(self, sizehint: int = -1) -> List[AnyChar]:
         raise UnsupportedOperation()
-    
+
     def writable(self) -> bool:
         return False
-    
+
     def write(self, string: AnyChar) -> int:
         raise UnsupportedOperation()
-    
+
     def writelines(self, lines: Iterable[AnyChar]) -> None:
         raise UnsupportedOperation()
 
@@ -394,41 +417,41 @@ class FileLikeBase(FileLikeInterface):
             raise UnsupportedOperation()
         else:
             raise ValueError("Cannot call seek on a non-seekable object")
-    
+
     def seekable(self) -> bool:
         return False
-    
+
     def tell(self) -> int:
         if self.seekable():
             raise UnsupportedOperation()
         else:
             raise ValueError("Cannot call tell on a non-seekable object")
-    
+
     def isatty(self) -> bool:
         return False
-    
+
     def fileno(self) -> int:
         return -1
-    
+
     def truncate(self, size: int = None) -> int:
         if self.seekable():
             raise UnsupportedOperation()
         else:
             raise ValueError("Cannot call truncate on a non-seekable object")
-    
+
     def __enter__(self) -> Any:
         return self
-    
+
     def __exit__(self, exception_type, exception_value, traceback) -> bool:
         self.close()
         return False
-    
+
     def __iter__(self) -> Iterator[AnyChar]:
         raise UnsupportedOperation()
-    
+
     def __next__(self) -> AnyChar:
         raise UnsupportedOperation()
-    
+
     def next(self) -> AnyChar:
         return self.__next__()
 
@@ -436,11 +459,12 @@ class FileLikeBase(FileLikeInterface):
 class PathType(Enum):
     """Enumeration of supported path types (file, directory, FIFO).
     """
-    FILE = 'f'
+
+    FILE = "f"
     """Path represents a file."""
-    DIR = 'd'
+    DIR = "d"
     """Path represents a directory."""
-    FIFO = '|'
+    FIFO = "|"
     """Path represents a FIFO."""
 
 
@@ -462,7 +486,7 @@ Regexp = Union[str, Pattern]
 """A regular expression string or compiled :class:`re`."""
 
 
-CharMode = TypeVar('CharMode', bytes, Text)
+CharMode = TypeVar("CharMode", bytes, Text)
 """Type representing how data should be handled when read from a file.
 If the value is bytes (:attribute:`BinMode`), raw bytes are returned. If the
 value is a string (:attribute:`TextMode`), bytes are decoded using the system
@@ -470,11 +494,11 @@ default encoding.
 """
 
 
-BinMode = b'b'
+BinMode = b"b"
 """Value representing binary mode to use for an argument of type CharMode."""
 
 
-TextMode = 't'
+TextMode = "t"
 """Value representing text mode to use for an argument of type CharMode."""
 
 
@@ -512,5 +536,6 @@ def is_iterable(obj: Any, include_str: bool = False) -> bool:
     Returns:
         True if the object is iterable.
     """
-    return (isinstance(obj, collections.Iterable) and
-            (include_str or not isinstance(obj, str)))
+    return isinstance(obj, collections.Iterable) and (
+        include_str or not isinstance(obj, str)
+    )

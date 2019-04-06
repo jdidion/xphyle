@@ -14,15 +14,36 @@ from pathlib import PurePath, Path
 import shutil
 import sys
 from typing import (
-    Generator, Callable, Dict, List, Tuple, Any, Sequence, Generic, Iterable,
-    Iterator, Union, Optional, cast)
+    Generator,
+    Callable,
+    Dict,
+    List,
+    Tuple,
+    Any,
+    Sequence,
+    Generic,
+    Iterable,
+    Iterator,
+    Union,
+    Optional,
+    cast,
+)
 from xphyle import open_, xopen, FileWrapper, Process, popen, EventListener
 from xphyle.formats import FORMATS
 from xphyle.paths import STDIN, STDOUT, deprecated_str_to_path
 from xphyle.progress import iter_file_chunked
 from xphyle.types import (
-    PathOrFile, FileLike, FileMode, ModeAccessArg, CharMode, TextMode,
-    BinMode, CompressionArg, AnyChar, is_iterable)
+    PathOrFile,
+    FileLike,
+    FileMode,
+    ModeAccessArg,
+    CharMode,
+    TextMode,
+    BinMode,
+    CompressionArg,
+    AnyChar,
+    is_iterable,
+)
 
 
 # Reading data from/writing data to files
@@ -31,12 +52,13 @@ from xphyle.types import (
 # Raw data
 
 
-@deprecated_str_to_path(0, 'path_or_file')
+@deprecated_str_to_path(0, "path_or_file")
 def read_lines(
-        path_or_file: PathOrFile,
-        convert: Optional[Callable[[str], Any]] = None,
-        strip_linesep: bool = True, **kwargs
-        ) -> Generator[str, None, None]:
+    path_or_file: PathOrFile,
+    convert: Optional[Callable[[str], Any]] = None,
+    strip_linesep: bool = True,
+    **kwargs
+) -> Generator[str, None, None]:
     """Iterate over lines in a file.
 
     Args:
@@ -59,10 +81,10 @@ def read_lines(
         yield from itr
 
 
-@deprecated_str_to_path(0, 'path_or_file')
+@deprecated_str_to_path(0, "path_or_file")
 def read_bytes(
-        path_or_file: PathOrFile, chunksize: int = 1024, **kwargs
-        ) -> Generator[bytes, None, None]:
+    path_or_file: PathOrFile, chunksize: int = 1024, **kwargs
+) -> Generator[bytes, None, None]:
     """Iterate over a file in chunks. The mode will always be overridden
     to 'rb'.
 
@@ -75,18 +97,21 @@ def read_bytes(
         Chunks of the input file as bytes. Each chunk except the last should
         be of size `chunksize`.
     """
-    kwargs['mode'] = 'rb'
+    kwargs["mode"] = "rb"
     with open_(path_or_file, **kwargs) as fileobj:
         if fileobj is None:
             return
         yield from iter_file_chunked(fileobj, chunksize)
 
 
-@deprecated_str_to_path(1, 'path_or_file')
+@deprecated_str_to_path(1, "path_or_file")
 def write_lines(
-        iterable: Iterable[str], path_or_file: PathOrFile,
-        linesep: Optional[str] = '\n', convert: Callable[[Any], str] = str,
-        **kwargs) -> int:
+    iterable: Iterable[str],
+    path_or_file: PathOrFile,
+    linesep: Optional[str] = "\n",
+    convert: Callable[[Any], str] = str,
+    **kwargs
+) -> int:
     """Write delimiter-separated strings to a file.
 
     Args:
@@ -103,8 +128,8 @@ def write_lines(
     """
     if linesep is None:
         linesep = os.linesep
-    if 'mode' not in kwargs:
-        kwargs['mode'] = 'wt'
+    if "mode" not in kwargs:
+        kwargs["mode"] = "wt"
     written = 0
     with open_(path_or_file, **kwargs) as fileobj:
         if fileobj is None:
@@ -116,7 +141,7 @@ def write_lines(
     return written
 
 
-def to_bytes(value: Any, encoding: str = 'utf-8'):
+def to_bytes(value: Any, encoding: str = "utf-8"):
     """Convert an arbitrary value to bytes.
 
     Args:
@@ -131,11 +156,14 @@ def to_bytes(value: Any, encoding: str = 'utf-8'):
     return str(value).encode(encoding)
 
 
-@deprecated_str_to_path(1, 'path_or_file')
+@deprecated_str_to_path(1, "path_or_file")
 def write_bytes(
-        iterable: Iterable, path_or_file: PathOrFile,
-        sep: Optional[bytes] = b'', convert: Callable[[Any], bytes] = to_bytes,
-        **kwargs) -> int:
+    iterable: Iterable,
+    path_or_file: PathOrFile,
+    sep: Optional[bytes] = b"",
+    convert: Callable[[Any], bytes] = to_bytes,
+    **kwargs
+) -> int:
     """Write an iterable of bytes to a file.
 
     Args:
@@ -151,8 +179,8 @@ def write_bytes(
     """
     if sep is None:
         sep = convert(os.linesep)
-    if 'mode' not in kwargs:
-        kwargs['mode'] = 'wb'
+    if "mode" not in kwargs:
+        kwargs["mode"] = "wb"
     written = 0
     with open_(path_or_file, **kwargs) as fileobj:
         if fileobj is None:
@@ -171,11 +199,14 @@ ToStrFunc = Callable[[Any], str]  # pylint: disable=invalid-name
 RowFunc = Callable[[Sequence[str]], Any]  # pylint: disable=invalid-name
 
 
-@deprecated_str_to_path(0, 'path_or_file')
+@deprecated_str_to_path(0, "path_or_file")
 def read_dict(
-        path_or_file: PathOrFile, sep: str = '=',
-        convert: Optional[FromStrFunc] = None, ordered: bool = False, **kwargs
-        ) -> Dict[str, Any]:
+    path_or_file: PathOrFile,
+    sep: str = "=",
+    convert: Optional[FromStrFunc] = None,
+    ordered: bool = False,
+    **kwargs
+) -> Dict[str, Any]:
     """Read lines from simple property file (key=value). Comment lines (starting
     with '#') are ignored.
 
@@ -189,23 +220,30 @@ def read_dict(
     Returns:
         An OrderedDict, if 'ordered' is True, otherwise a dict.
     """
+
     def _parse_line(line: str) -> Optional[List[str]]:
         line = line.strip()
         if len(line) == 0 or line[0] == "#":
             return None
         return line.split(sep)
+
     lines = (
         (line[0], convert(line[1]) if convert else line[1])
         for line in read_lines(path_or_file, convert=_parse_line, **kwargs)
-        if line is not None)
+        if line is not None
+    )
     return OrderedDict(lines) if ordered else dict(lines)
 
 
-@deprecated_str_to_path(1, 'path_or_file')
+@deprecated_str_to_path(1, "path_or_file")
 def write_dict(
-        dictobj: Dict[str, Any], path_or_file: PathOrFile, sep: str = '=',
-        linesep: Optional[str] = '\n', convert: ToStrFunc = str,
-        **kwargs) -> int:
+    dictobj: Dict[str, Any],
+    path_or_file: PathOrFile,
+    sep: str = "=",
+    linesep: Optional[str] = "\n",
+    convert: ToStrFunc = str,
+    **kwargs
+) -> int:
     """Write a dict to a file as name=value lines.
 
     Args:
@@ -222,22 +260,23 @@ def write_dict(
     """
     if linesep is None:
         linesep = os.linesep
-    lines = (
-        "{}{}{}".format(key, sep, convert(val))
-        for key, val in dictobj.items())
+    lines = ("{}{}{}".format(key, sep, convert(val)) for key, val in dictobj.items())
     return write_lines(lines, path_or_file, linesep=linesep, **kwargs)
 
 
 # Other delimited files
 
 
-@deprecated_str_to_path(0, 'path_or_file')
+@deprecated_str_to_path(0, "path_or_file")
 def read_delimited(
-        path_or_file: PathOrFile, sep: str = '\t',
-        header: Union[bool, Sequence[str]] = False,
-        converters: Optional[Union[FromStrFunc, Iterable[FromStrFunc]]] = None,
-        yield_header: bool = True, row_type: Union[str, RowFunc] = 'list',
-        **kwargs) -> Generator[Union[Tuple, Dict, Any], None, None]:
+    path_or_file: PathOrFile,
+    sep: str = "\t",
+    header: Union[bool, Sequence[str]] = False,
+    converters: Optional[Union[FromStrFunc, Iterable[FromStrFunc]]] = None,
+    yield_header: bool = True,
+    row_type: Union[str, RowFunc] = "list",
+    **kwargs
+) -> Generator[Union[Tuple, Dict, Any], None, None]:
     """Iterate over rows in a delimited file.
 
     Args:
@@ -257,7 +296,7 @@ def read_delimited(
         is the header row, and its type is always a list. Converters are not
         applied to the header row.
     """
-    if row_type == 'dict' and not header:
+    if row_type == "dict" and not header:
         raise ValueError("Header must be specified for row_type=dict")
 
     with open_(path_or_file, **kwargs) as fileobj:
@@ -278,16 +317,16 @@ def read_delimited(
             elif callable(converters):
                 converter_itr = cycle([converters])
             else:
-                raise ValueError(
-                    "'converters' must be iterable or callable")
+                raise ValueError("'converters' must be iterable or callable")
 
             reader = (
                 [fn(x) if fn else x for fn, x in zip(converter_itr, row)]
-                for row in reader)
+                for row in reader
+            )
 
-        if row_type == 'tuple':
+        if row_type == "tuple":
             reader = (tuple(row) for row in reader)
-        elif row_type == 'dict':
+        elif row_type == "dict":
             if header_row is not None:
                 reader = (dict(zip(header_row, row)) for row in reader)
         elif callable(row_type):
@@ -296,12 +335,14 @@ def read_delimited(
         yield from reader
 
 
-@deprecated_str_to_path(0, 'path_or_file')
+@deprecated_str_to_path(0, "path_or_file")
 def read_delimited_as_dict(
-        path_or_file: PathOrFile, sep: str = '\t',
-        header: Union[bool, Sequence[str]] = False,
-        key: Union[int, str, RowFunc] = 0,
-        **kwargs) -> Dict[Any, Any]:
+    path_or_file: PathOrFile,
+    sep: str = "\t",
+    header: Union[bool, Sequence[str]] = False,
+    key: Union[int, str, RowFunc] = 0,
+    **kwargs
+) -> Dict[Any, Any]:
     """Parse rows in a delimited file and add rows to a dict based on a a
     specified key index or function.
 
@@ -325,10 +366,9 @@ def read_delimited_as_dict(
 
     if isinstance(key, str):
         if not header:
-            raise ValueError(
-                "'header' must be specified if 'key' is a column name")
+            raise ValueError("'header' must be specified if 'key' is a column name")
         if header is True:
-            kwargs['yield_header'] = True
+            kwargs["yield_header"] = True
             itr = read_delimited(path_or_file, sep, True, **kwargs)
             header_seq = tuple(str(h) for h in next(itr))
         else:
@@ -337,15 +377,17 @@ def read_delimited_as_dict(
 
     # pylint: disable=redefined-variable-type
     if isinstance(key, int):
+
         def keyfn(_row):
             return _row[key]
+
     elif callable(key):
         keyfn = key
     else:
         raise ValueError("'key' must be an column name, index, or callable")
 
     if itr is None:
-        kwargs['yield_header'] = False
+        kwargs["yield_header"] = False
         itr = read_delimited(path_or_file, sep, header, **kwargs)
 
     objects: Dict[Any, Any] = {}
@@ -360,12 +402,16 @@ def read_delimited_as_dict(
 # Compressed files
 
 
-@deprecated_str_to_path(0, 'source_file', 1, 'compressed_file')
+@deprecated_str_to_path(0, "source_file", 1, "compressed_file")
 def compress_file(
-        source_file: PathOrFile, compressed_file: PathOrFile = None,
-        compression: CompressionArg = None, keep: bool = True,
-        compresslevel: int = None, use_system: bool = True,
-        **kwargs) -> Path:
+    source_file: PathOrFile,
+    compressed_file: PathOrFile = None,
+    compression: CompressionArg = None,
+    keep: bool = True,
+    compresslevel: int = None,
+    use_system: bool = True,
+    **kwargs
+) -> Path:
     """Compress an existing file, either in-place or to a separate file.
 
     Args:
@@ -392,19 +438,23 @@ def compress_file(
                 name = cast(FileLike, compressed_file).name
             compression = FORMATS.guess_compression_format(name)
         else:
-            raise ValueError(
-                "'compressed_file' or 'compression' must be specified")
+            raise ValueError("'compressed_file' or 'compression' must be specified")
 
     fmt = FORMATS.get_compression_format(compression)
     return fmt.compress_file(
-        source_file, compressed_file, keep, compresslevel, use_system, **kwargs)
+        source_file, compressed_file, keep, compresslevel, use_system, **kwargs
+    )
 
 
-@deprecated_str_to_path(0, 'compressed_file', 1, 'dest_file')
+@deprecated_str_to_path(0, "compressed_file", 1, "dest_file")
 def decompress_file(
-        compressed_file: PathOrFile, dest_file: PathOrFile = None,
-        compression: CompressionArg = None, keep: bool = True,
-        use_system: bool = True, **kwargs) -> Path:
+    compressed_file: PathOrFile,
+    dest_file: PathOrFile = None,
+    compression: CompressionArg = None,
+    keep: bool = True,
+    use_system: bool = True,
+    **kwargs
+) -> Path:
     """Decompress an existing file, either in-place or to a separate file.
 
     Args:
@@ -425,22 +475,24 @@ def decompress_file(
     """
     if not isinstance(compression, str):
         if not isinstance(compressed_file, PurePath):
-            source_path = Path(getattr(compressed_file, 'name'))
+            source_path = Path(getattr(compressed_file, "name"))
         else:
             source_path = cast(PurePath, compressed_file)
         compression = FORMATS.guess_compression_format(source_path)
     fmt = FORMATS.get_compression_format(compression)
-    return fmt.decompress_file(
-        compressed_file, dest_file, keep, use_system, **kwargs)
+    return fmt.decompress_file(compressed_file, dest_file, keep, use_system, **kwargs)
 
 
-@deprecated_str_to_path(0, 'source_file', 1, 'dest_file')
+@deprecated_str_to_path(0, "source_file", 1, "dest_file")
 def transcode_file(
-        source_file: PathOrFile, dest_file: PathOrFile,
-        source_compression: CompressionArg = True,
-        dest_compression: CompressionArg = True, use_system: bool = True,
-        source_open_args: Optional[dict] = None,
-        dest_open_args: Optional[dict] = None) -> None:
+    source_file: PathOrFile,
+    dest_file: PathOrFile,
+    source_compression: CompressionArg = True,
+    dest_compression: CompressionArg = True,
+    use_system: bool = True,
+    source_open_args: Optional[dict] = None,
+    dest_open_args: Optional[dict] = None,
+) -> None:
     """Convert from one file format to another.
 
     Args:
@@ -461,24 +513,24 @@ def transcode_file(
             destination file.
     """
     src_args = copy.copy(source_open_args) if source_open_args else {}
-    if 'mode' not in src_args:
-        src_args['mode'] = 'rb'
+    if "mode" not in src_args:
+        src_args["mode"] = "rb"
     dst_args = copy.copy(dest_open_args) if dest_open_args else {}
-    if 'mode' not in dst_args:
-        dst_args['mode'] = 'wb'
+    if "mode" not in dst_args:
+        dst_args["mode"] = "wb"
     with open_(
-            source_file, compression=source_compression,
-            use_system=use_system, **src_args) as src, \
-        open_(
-            dest_file, compression=dest_compression,
-            use_system=use_system, **dst_args) as dst:
+        source_file, compression=source_compression, use_system=use_system, **src_args
+    ) as src, open_(
+        dest_file, compression=dest_compression, use_system=use_system, **dst_args
+    ) as dst:
         for chunk in iter_file_chunked(src):
             dst.write(chunk)
 
 
-@deprecated_str_to_path(0, 'source_file', 1, 'dest_file')
+@deprecated_str_to_path(0, "source_file", 1, "dest_file")
 def uncompressed_size(
-        path: PurePath, compression: CompressionArg = None) -> Optional[int]:
+    path: PurePath, compression: CompressionArg = None
+) -> Optional[int]:
     """Get the uncompressed size of the compressed file.
 
     Args:
@@ -509,6 +561,7 @@ def uncompressed_size(
 class CompressOnClose(EventListener[FileWrapper]):
     """Compress a file after it is closed.
     """
+
     compressed_path = None
 
     def execute(self, wrapper: FileWrapper, **kwargs) -> None:
@@ -518,15 +571,15 @@ class CompressOnClose(EventListener[FileWrapper]):
 class MoveOnClose(EventListener[FileWrapper]):
     """Move a file after it is closed.
     """
-    def execute(
-            self, wrapper: FileWrapper, dest: PurePath = None, **kwargs
-            ) -> None:
+
+    def execute(self, wrapper: FileWrapper, dest: PurePath = None, **kwargs) -> None:
         shutil.move(wrapper.path, str(dest))
 
 
 class RemoveOnClose(EventListener[FileWrapper]):
     """Remove a file after it is closed.
     """
+
     def execute(self, wrapper: FileWrapper, **kwargs) -> None:
         os.remove(wrapper.path)
 
@@ -534,8 +587,7 @@ class RemoveOnClose(EventListener[FileWrapper]):
 # Processes
 
 
-def exec_process(
-        *args, inp: AnyChar = None, timeout: int = None, **kwargs) -> Process:
+def exec_process(*args, inp: AnyChar = None, timeout: int = None, **kwargs) -> Process:
     """Shortcut to execute a process, wait for it to terminate, and return the
     results.
 
@@ -577,17 +629,17 @@ class FileManager(Sized):
         header: A header to write when opening writable files.
         kwargs: Default arguments to pass to xopen.
     """
-    @deprecated_str_to_path(1, 'files')
+
+    @deprecated_str_to_path(1, "files")
     def __init__(self, files: FilesArg = None, header=None, **kwargs) -> None:
-        self._files: OrderedDict[Any, Union[FileLike, Dict]] = \
-            OrderedDict()
+        self._files: OrderedDict[Any, Union[FileLike, Dict]] = OrderedDict()
         self._paths: Dict[Any, PurePath] = {}
         self.header = header
         self.default_open_args = kwargs
         if files:
             self.add_all(files)
 
-    def __enter__(self) -> 'FileManager':
+    def __enter__(self) -> "FileManager":
         return self
 
     def __exit__(self, exception_type, exception_value, traceback) -> None:
@@ -605,7 +657,7 @@ class FileManager(Sized):
             raise KeyError(key)
         return fileobj
 
-    @deprecated_str_to_path(2, 'path_or_file')
+    @deprecated_str_to_path(2, "path_or_file")
     def __setitem__(self, key: Any, path_or_file: PathOrFile) -> None:
         """Add a file.
 
@@ -619,10 +671,10 @@ class FileManager(Sized):
     def __contains__(self, key: Any):
         return key in self._files
 
-    @deprecated_str_to_path(1, 'path_or_file')
+    @deprecated_str_to_path(1, "path_or_file")
     def add(
-            self, path_or_file: PathOrFile, key: Optional[Any] = None,
-            **kwargs) -> None:
+        self, path_or_file: PathOrFile, key: Optional[Any] = None, **kwargs
+    ) -> None:
         """Add a file.
 
         Args:
@@ -637,7 +689,7 @@ class FileManager(Sized):
             fileobj = copy.copy(self.default_open_args)
             fileobj.update(kwargs)
         else:
-            path = Path(getattr(path_or_file, 'name'))
+            path = Path(getattr(path_or_file, "name"))
             fileobj = cast(FileLike, path_or_file)
         if key is None:
             key = path
@@ -646,10 +698,8 @@ class FileManager(Sized):
         self._files[key] = fileobj
         self._paths[key] = path
 
-    @deprecated_str_to_path(1, 'files', dict_args=(1, 'files'))
-    def add_all(
-            self, files: Union[FilesArg, Dict[Any, PathOrFile]], **kwargs
-            ) -> None:
+    @deprecated_str_to_path(1, "files", dict_args=(1, "files"))
+    def add_all(self, files: Union[FilesArg, Dict[Any, PathOrFile]], **kwargs) -> None:
         """Add all files from an iterable or dict.
 
         Args:
@@ -687,7 +737,7 @@ class FileManager(Sized):
                 return None
         if isinstance(fileobj, dict):
             path = self._paths[key]
-            fileobj['context_wrapper'] = True
+            fileobj["context_wrapper"] = True
             fileobj = xopen(path, **fileobj)
             if self.header and fileobj.writable():
                 fileobj.write(self.header)
@@ -727,7 +777,7 @@ class FileManager(Sized):
     def close(self) -> None:
         """Close all files being tracked.
         """
-        if not hasattr(self, '_files'):
+        if not hasattr(self, "_files"):
             return
         for fileobj in self._files.values():
             if fileobj and not (isinstance(fileobj, dict) or fileobj.closed):
@@ -749,17 +799,16 @@ class FileInput(FileManager, Generic[CharMode], Iterator[CharMode]):
         required to specify the mode, or use one of the convenience methods
         (:method:`textinput` or :method:`byteinput`).
     """
-    @deprecated_str_to_path(1, 'files')
-    def __init__(
-            self, files: FilesArg = None, char_mode: CharMode = None
-            ) -> None:
-        super().__init__(mode='rt' if char_mode is TextMode else 'rb')
+
+    @deprecated_str_to_path(1, "files")
+    def __init__(self, files: FilesArg = None, char_mode: CharMode = None) -> None:
+        super().__init__(mode="rt" if char_mode is TextMode else "rb")
         self.char_mode: CharMode = char_mode
         self.fileno: int = -1
         self._startlineno: int = 0
         self.filelineno: int = 0
         self._pending: bool = True
-        self._nextline: Callable[[], CharMode] = None
+        self._nextline: Optional[Callable[[], CharMode]] = None
         if files:
             self.add_all(files)
 
@@ -791,10 +840,10 @@ class FileInput(FileManager, Generic[CharMode], Iterator[CharMode]):
         """
         return self.fileno >= len(self)
 
-    @deprecated_str_to_path(1, 'path_or_file')
+    @deprecated_str_to_path(1, "path_or_file")
     def add(
-            self, path_or_file: PathOrFile, key: Optional[Any] = None, **kwargs
-            ) -> None:
+        self, path_or_file: PathOrFile, key: Optional[Any] = None, **kwargs
+    ) -> None:
         """Overrides FileManager.add() to prevent file-specific open args.
         """
         # If we've already finished reading all the files,
@@ -804,7 +853,7 @@ class FileInput(FileManager, Generic[CharMode], Iterator[CharMode]):
             self.fileno -= 1
         super().add(path_or_file, key)
 
-    def __iter__(self) -> 'FileInput':
+    def __iter__(self) -> "FileInput":
         return self
 
     def __next__(self) -> CharMode:
@@ -835,7 +884,8 @@ class FileInput(FileManager, Generic[CharMode], Iterator[CharMode]):
                 else:  # pragma: no-cover
                     raise Exception(
                         "File associated with key {} is not iterable and does "
-                        "not have a 'readline' method".format(self.filekey))
+                        "not have a 'readline' method".format(self.filekey)
+                    )
             self._pending = False
         return not self.finished
 
@@ -849,13 +899,13 @@ class FileInput(FileManager, Generic[CharMode], Iterator[CharMode]):
         try:
             return next(self)
         except StopIteration:
-            return cast(CharMode, b'' if self.char_mode == BinMode else '')
+            return cast(CharMode, b"" if self.char_mode == BinMode else "")
 
 
-@deprecated_str_to_path(0, 'files')
+@deprecated_str_to_path(0, "files")
 def fileinput(
-        files: FileOrFilesArg = None,
-        char_mode: CharMode = None) -> FileInput[CharMode]:
+    files: FileOrFilesArg = None, char_mode: CharMode = None
+) -> FileInput[CharMode]:
     """Convenience method that creates a new ``FileInput``.
 
     Args:
@@ -877,7 +927,7 @@ def fileinput(
     return FileInput(files, char_mode)
 
 
-@deprecated_str_to_path(0, 'files')
+@deprecated_str_to_path(0, "files")
 def textinput(files: FileOrFilesArg = None):
     """Convenience method that creates a new ``FileInput`` in text mode.
 
@@ -891,7 +941,7 @@ def textinput(files: FileOrFilesArg = None):
     return fileinput(files, TextMode)
 
 
-@deprecated_str_to_path(0, 'files')
+@deprecated_str_to_path(0, "files")
 def byteinput(files: FileOrFilesArg = None):
     """Convenience method that creates a new ``FileInput`` in bytes mode.
 
@@ -921,20 +971,24 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
         future version, `char_mode` and `linesep` will default to None and
         must be explicitly defined.
     """
-    @deprecated_str_to_path(1, 'files')
+
+    @deprecated_str_to_path(1, "files")
     def __init__(
-            self, files: FilesArg = None, access: ModeAccessArg = 'w',
-            char_mode: Optional[CharMode] = None,
-            linesep: Optional[CharMode] = None,
-            encoding: str = 'utf-8', header: Optional[CharMode] = None) -> None:
+        self,
+        files: FilesArg = None,
+        access: ModeAccessArg = "w",
+        char_mode: Optional[CharMode] = None,
+        linesep: Optional[CharMode] = None,
+        encoding: str = "utf-8",
+        header: Optional[CharMode] = None,
+    ) -> None:
         super().__init__(
-            mode=FileMode(
-                access=access, coding='t' if char_mode == TextMode else 'b'),
-            header=header)
+            mode=FileMode(access=access, coding="t" if char_mode == TextMode else "b"),
+            header=header,
+        )
         self.access = access
         self.char_mode: CharMode = char_mode
-        self._empty: CharMode = \
-            cast(CharMode, b'' if char_mode == BinMode else '')
+        self._empty: CharMode = cast(CharMode, b"" if char_mode == BinMode else "")
         self.encoding: str = encoding
         self.num_lines: int = 0
         self.linesep: CharMode = linesep
@@ -971,9 +1025,8 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
         Returns:
             The tuple (lines_written, chars_written).
         """
-        line_counts, char_counts = zip(*list(
-            self.writeline(line) for line in lines))
-        return (sum(line_counts), sum(char_counts))
+        line_counts, char_counts = zip(*list(self.writeline(line) for line in lines))
+        return sum(line_counts), sum(char_counts)
 
     def writeline(self, line: Optional[AnyChar] = None) -> Tuple[int, int]:
         """Write a line to the output(s).
@@ -986,7 +1039,7 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
         """
         char_count = self._writeline(self._encode(line))
         self.num_lines += 1
-        return (1, char_count)
+        return 1, char_count
 
     @abstractmethod
     def _writeline(self, line: CharMode) -> int:
@@ -1009,8 +1062,7 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
             line = cast(bytes, line).decode(self.encoding)
         return cast(CharMode, line)
 
-    def _write_to_file(
-            self, fileobj: FileLike, line: CharMode) -> int:
+    def _write_to_file(self, fileobj: FileLike, line: CharMode) -> int:
         """Writes a line to a file, gracefully handling the (rare? nonexistant?)
         case where the file has a `writelines` but not a `write` method.
 
@@ -1033,6 +1085,7 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
 class TeeFileOutput(Generic[CharMode], FileOutput[CharMode]):
     """Write output to mutliple files simultaneously.
     """
+
     def _writeline(self, line: CharMode = None) -> int:
         char_count = None
         for _, fileobj in self.iter_files():
@@ -1051,10 +1104,11 @@ class CycleFileOutput(FileOutput):
         files: A list of files.
         char_mode: The character mode.
     """
-    @deprecated_str_to_path(1, 'files')
+
+    @deprecated_str_to_path(1, "files")
     def __init__(
-            self, files: FilesArg = None,
-            char_mode: CharMode = None, **kwargs) -> None:
+        self, files: FilesArg = None, char_mode: CharMode = None, **kwargs
+    ) -> None:
         super().__init__(files=files, char_mode=char_mode, **kwargs)
 
     def _writeline(self, line: CharMode = None) -> int:
@@ -1070,10 +1124,15 @@ class NCycleFileOutput(FileOutput):
         num_lines: How many lines to write to a file before moving on to the
             next file.
     """
-    @deprecated_str_to_path(1, 'files')
+
+    @deprecated_str_to_path(1, "files")
     def __init__(
-            self, files: FilesArg = None, char_mode: CharMode = None,
-            lines_per_file: int = 1, **kwargs) -> None:
+        self,
+        files: FilesArg = None,
+        char_mode: CharMode = None,
+        lines_per_file: int = 1,
+        **kwargs
+    ) -> None:
         super().__init__(files=files, char_mode=char_mode, **kwargs)
         self.lines_per_file: int = lines_per_file
 
@@ -1091,9 +1150,13 @@ class TokenFileOutput(FileOutput):
         char_mode: The character mode.
         kwargs: Additional args.
     """
+
     def __init__(
-            self, filename_pattern: Optional[str] = None,
-            char_mode: Optional[CharMode] = None, **kwargs) -> None:
+        self,
+        filename_pattern: Optional[str] = None,
+        char_mode: Optional[CharMode] = None,
+        **kwargs
+    ) -> None:
         super().__init__(char_mode=char_mode, **kwargs)
         self.filename_pattern: str = filename_pattern
 
@@ -1128,14 +1191,16 @@ class PatternFileOutput(TokenFileOutput):
             this is the identity function, which is almost never what you want.
         kwargs: Additional args.
     """
+
     def __init__(
-            self, filename_pattern: Optional[str] = None,
-            char_mode: Optional[CharMode] = None,
-            token_func: Callable[[AnyChar], Dict[AnyChar, Any]] =
-            lambda x: {x: x}, **kwargs) -> None:
+        self,
+        filename_pattern: Optional[str] = None,
+        char_mode: Optional[CharMode] = None,
+        token_func: Callable[[AnyChar], Dict[AnyChar, Any]] = lambda x: {x: x},
+        **kwargs
+    ) -> None:
         if not isinstance(filename_pattern, str):
-            filename_pattern = cast(
-                Tuple[Any, PathOrFile], filename_pattern)[0]
+            filename_pattern = cast(Tuple[Any, PathOrFile], filename_pattern)[0]
         super().__init__(filename_pattern, char_mode, **kwargs)
         self.token_func: Callable[[AnyChar], Dict[AnyChar, Any]] = token_func
 
@@ -1154,10 +1219,14 @@ class RollingFileOutput(TokenFileOutput):
         num_lines: The max number of lines to write to each file.
         kwargs: Additional args.
     """
+
     def __init__(
-            self, filename_pattern: Union[str, Iterable[str]] = None,
-            char_mode: CharMode = None,
-            lines_per_file: int = 1, **kwargs) -> None:
+        self,
+        filename_pattern: Union[str, Iterable[str]] = None,
+        char_mode: CharMode = None,
+        lines_per_file: int = 1,
+        **kwargs
+    ) -> None:
         if isinstance(filename_pattern, str):
             filepat_str = filename_pattern
         else:
@@ -1166,7 +1235,7 @@ class RollingFileOutput(TokenFileOutput):
         self.lines_per_file: int = lines_per_file
 
     def _get_outfile_tokens(self, line: CharMode = None) -> dict:
-        return {'index': self.num_lines // self.lines_per_file}
+        return {"index": self.num_lines // self.lines_per_file}
 
 
 PatternOrFileOrFilesArg = Optional[Union[str, PathOrFile, FilesArg]]
@@ -1174,13 +1243,15 @@ PatternOrFileOrFilesArg = Optional[Union[str, PathOrFile, FilesArg]]
 
 
 def fileoutput(
-        files: PatternOrFileOrFilesArg = None, char_mode: CharMode = None,
-        linesep: CharMode = None, encoding: str = 'utf-8',
-        file_output_type:
-        Callable[..., FileOutput[CharMode]] = TeeFileOutput[CharMode],
-        **kwargs) -> FileOutput[CharMode]:
+    files: PatternOrFileOrFilesArg = None,
+    char_mode: CharMode = None,
+    linesep: CharMode = None,
+    encoding: str = "utf-8",
+    file_output_type: Callable[..., FileOutput[CharMode]] = TeeFileOutput[CharMode],
+    **kwargs
+) -> FileOutput[CharMode]:
     """Convenience function to create a fileoutput.
-    
+
     Args:
         files: The files to write to. Can include '-'/'_' for stdout/stderr.
         char_mode: The write mode ('t' or b'b').
@@ -1188,10 +1259,10 @@ def fileoutput(
         encoding: The default file encoding to use.
         file_output_type: The specific subclass of FileOutput to create.
         kwargs: additional arguments to pass to the FileOutput constructor.
-    
+
     Returns:
         A FileOutput instance.
-    
+
     Notes:
         Default values are not allowed for generically typed parameters.
         Use :method:`textoutput` or :method:`byteoutput` instead.
@@ -1206,14 +1277,15 @@ def fileoutput(
         else:
             linesep = cast(CharMode, os.linesep.encode(encoding))
     return file_output_type(
-        files, char_mode=char_mode, linesep=linesep, encoding=encoding,
-        **kwargs)
+        files, char_mode=char_mode, linesep=linesep, encoding=encoding, **kwargs
+    )
 
 
 def textoutput(
-        files: FileOrFilesArg = None,
-        file_output_type: Callable[..., FileOutput[str]] = TeeFileOutput[str],
-        **kwargs) -> FileOutput[str]:
+    files: FileOrFilesArg = None,
+    file_output_type: Callable[..., FileOutput[str]] = TeeFileOutput[str],
+    **kwargs
+) -> FileOutput[str]:
     """Convenience function to create a fileoutput in text mode.
 
     Args:
@@ -1225,37 +1297,48 @@ def textoutput(
         A FileOutput instance.
     """
     return fileoutput(
-        files, char_mode=TextMode, linesep=os.linesep,
-        file_output_type=file_output_type, **kwargs)
+        files,
+        char_mode=TextMode,
+        linesep=os.linesep,
+        file_output_type=file_output_type,
+        **kwargs
+    )
 
 
 def byteoutput(
-        files: FileOrFilesArg = None,
-        file_output_type:
-        Callable[..., FileOutput[bytes]] = TeeFileOutput[bytes],
-        **kwargs) -> FileOutput[bytes]:
+    files: FileOrFilesArg = None,
+    file_output_type: Callable[..., FileOutput[bytes]] = TeeFileOutput[bytes],
+    **kwargs
+) -> FileOutput[bytes]:
     """Convenience function to create a fileoutput in bytes mode.
-    
+
     Args:
         files: The files to write to.
         file_output_type: The specific subclass of FileOutput to create.
         kwargs: additional arguments to pass to the FileOutput constructor.
-    
+
     Returns:
         A FileOutput instance.
     """
     return fileoutput(
-        files, char_mode=BinMode, linesep=os.linesep.encode(),
-        file_output_type=file_output_type, **kwargs)
+        files,
+        char_mode=BinMode,
+        linesep=os.linesep.encode(),
+        file_output_type=file_output_type,
+        **kwargs
+    )
 
 
 # Misc
 
 
-@deprecated_str_to_path(1, 'path_or_file')
+@deprecated_str_to_path(1, "path_or_file")
 def linecount(
-        path_or_file: PathOrFile, linesep: Optional[bytes] = None,
-        buffer_size: int = 1024 * 1024, **kwargs) -> int:
+    path_or_file: PathOrFile,
+    linesep: Optional[bytes] = None,
+    buffer_size: int = 1024 * 1024,
+    **kwargs
+) -> int:
     """Fastest pythonic way to count the lines in a file.
 
     Args:
@@ -1272,9 +1355,9 @@ def linecount(
         raise ValueError("'buffer_size' must be >= ")
     if linesep is None:
         linesep = os.linesep.encode()
-    if 'mode' not in kwargs:
-        kwargs['mode'] = 'rb'
-    elif FileMode(kwargs['mode']).value != 'rb':
+    if "mode" not in kwargs:
+        kwargs["mode"] = "rb"
+    elif FileMode(kwargs["mode"]).value != "rb":
         raise ValueError("File must be opened with mode 'rb'")
     with open_(path_or_file, **kwargs) as fileobj:
         if fileobj is None:

@@ -17,21 +17,24 @@ from xphyle.types import PathType, Permission, FileLike
 
 class IterableProgress:
     """Manages the python-level wrapper.
-    
+
     Args:
         default_wrapper: Callable (typically a class) that returns a Callable
             with the signature of ``wrap``.
     """
+
     def __init__(self, default_wrapper: Callable = progress_iter) -> None:
         self.enabled = False
-        self.wrapper: Callable[..., Iterable] = None
+        self.wrapper: Optional[Callable[..., Iterable]] = None
         self.default_wrapper = default_wrapper
-    
+
     def update(
-            self, enable: Optional[bool] = None,
-            wrapper: Optional[Callable[..., Iterable]] = None) -> None:
+        self,
+        enable: Optional[bool] = None,
+        wrapper: Optional[Callable[..., Iterable]] = None,
+    ) -> None:
         """Enable the python progress bar and/or set a new wrapper.
-        
+
         Args:
             enable: Whether to enable use of a progress wrapper.
             wrapper: A callable that takes three arguments, itr, desc, size,
@@ -39,7 +42,7 @@ class IterableProgress:
         """
         if enable is not None:
             self.enabled = enable
-        
+
         if wrapper:
             self.wrapper = wrapper
         elif self.enabled and not self.wrapper:
@@ -48,18 +51,19 @@ class IterableProgress:
             except ImportError as err:
                 raise ValueError(
                     "Could not create default python wrapper; valid wrapper "
-                    "must be specified") from err
-    
+                    "must be specified"
+                ) from err
+
     def wrap(
-            self, itr: Iterable, desc: Optional[str] = None,
-            size: Optional[int] = None) -> Iterable:
+        self, itr: Iterable, desc: Optional[str] = None, size: Optional[int] = None
+    ) -> Iterable:
         """Wrap an iterable in a progress bar.
-        
+
         Args:
             itr: The Iterable to wrap.
             desc: Optional description.
             size: Optional max value of the progress bar.
-        
+
         Returns:
             The wrapped Iterable.
         """
@@ -76,15 +80,15 @@ ITERABLE_PROGRESS = IterableProgress()
 
 
 def system_progress_command(
-        exe: Union[str, PathLike], *args, require: bool = False
-        ) -> Tuple:  # pragma: no-cover
+    exe: Union[str, PathLike], *args, require: bool = False
+) -> Tuple:  # pragma: no-cover
     """Resolve a system-level progress bar command.
-    
+
     Args:
         exe: The executable name or absolute path.
         args: A list of additional command line arguments.
         require: Whether to raise an exception if the command does not exist.
-    
+
     Returns:
         A tuple of (executable_path, *args).
     """
@@ -99,34 +103,37 @@ def system_progress_command(
 def pv_command(require: bool = False) -> Tuple:  # pragma: no-cover
     """Default system wrapper command.
     """
-    return system_progress_command('pv', '-pre', require=require)
+    return system_progress_command("pv", "-pre", require=require)
 
 
 class ProcessProgress:
     """Manage the system-level progress wrapper.
-    
+
     Args:
         default_wrapper: Callable that returns the argument list for the
             default wrapper command.
     """
+
     def __init__(self, default_wrapper: Callable = pv_command) -> None:
         self.enabled = False
-        self.wrapper: Sequence[str] = None
+        self.wrapper: Optional[Sequence[str]] = None
         self.default_wrapper = default_wrapper
-    
+
     def update(
-            self, enable: Optional[bool] = None,
-            wrapper: Optional[Union[str, Sequence[str]]] = None) -> None:
+        self,
+        enable: Optional[bool] = None,
+        wrapper: Optional[Union[str, Sequence[str]]] = None,
+    ) -> None:
         """Enable the python system progress bar and/or set the wrapper
         command.
-        
+
         Args:
             enable: Whether to enable use of a progress wrapper.
             wrapper: A command string or sequence of command arguments.
         """
         if enable is not None:
             self.enabled = enable
-        
+
         if wrapper:
             if isinstance(wrapper, str):
                 self.wrapper = tuple(shlex.split(wrapper))
@@ -138,16 +145,17 @@ class ProcessProgress:
             except IOError as err:
                 raise ValueError(
                     "Could not create default system wrapper; valid wrapper "
-                    "must be specified") from err
-    
+                    "must be specified"
+                ) from err
+
     def wrap(
-            self, cmd: Sequence[str], stdin: FileLike, stdout: FileLike,
-            **kwargs) -> Popen:  # pragma: no-cover
+        self, cmd: Sequence[str], stdin: FileLike, stdout: FileLike, **kwargs
+    ) -> Popen:  # pragma: no-cover
         """Pipe a system command through a progress bar program.
-        
+
         For the process to be wrapped, one of ``stdin``, ``stdout`` must not be
         None.
-        
+
         Args:
             cmd: Command arguments.
             stdin: File-like object to read into the process stdin, or None to
@@ -155,13 +163,13 @@ class ProcessProgress:
             stdout: File-like object to write from the process stdout, or None
                 to use `PIPE`.
             kwargs: Additional arguments to pass to Popen.
-        
+
         Returns:
             Open process.
         """
         if not self.enabled or (stdin is None and stdout is None):
             return Popen(cmd, stdin=stdin, stdout=stdout, **kwargs)
-        
+
         if stdin is not None:
             proc1 = Popen(self.wrapper, stdin=stdin, stdout=PIPE)
             proc2 = Popen(cmd, stdin=proc1.stdout, stdout=stdout)
@@ -181,14 +189,15 @@ PROCESS_PROGRESS = ProcessProgress()
 def iter_file_chunked(fileobj: FileLike, chunksize: int = 1024) -> Iterable:
     """Returns a progress bar-wrapped iterator over a file that reads
     fixed-size chunks.
-    
+
     Args:
         fileobj: A file-like object.
         chunksize: The maximum size in bytes of each chunk.
-    
+
     Returns:
         An iterable over the chunks of the file.
     """
+
     def _itr():
         while True:
             data = fileobj.read(chunksize)
@@ -196,9 +205,9 @@ def iter_file_chunked(fileobj: FileLike, chunksize: int = 1024) -> Iterable:
                 yield data
             else:
                 break
-    
+
     name = None
-    if hasattr(fileobj, 'name'):
-        name = getattr(fileobj, 'name')
-        
+    if hasattr(fileobj, "name"):
+        name = getattr(fileobj, "name")
+
     return ITERABLE_PROGRESS.wrap(_itr(), desc=name)

@@ -34,8 +34,11 @@ def parse_url(url_string: str) -> Optional[ParseResult]:
 
 
 def open_url(
-        url_string: str, byte_range: Optional[Range] = None,
-        headers: Optional[dict] = None, **kwargs) -> Any:
+    url_string: str,
+    byte_range: Optional[Range] = None,
+    headers: Optional[dict] = None,
+    **kwargs
+) -> Any:
     """Open a URL for reading.
     
     Args:
@@ -55,14 +58,14 @@ def open_url(
     """
     headers = copy.copy(headers) if headers else {}
     if byte_range:
-        headers['Range'] = 'bytes={}-{}'.format(*byte_range)
+        headers["Range"] = "bytes={}-{}".format(*byte_range)
     try:
         request = Request(url_string, headers=headers, **kwargs)
         response = urlopen(request)
         # HTTPResponse didn't have 'peek' until 3.5
-        if response and not hasattr(response, 'peek'):
+        if response and not hasattr(response, "peek"):
             # ISSUE: HTTPResponse inherits BufferedIOBase (rather than
-            # RawIOBase), but for this purpose it's completely compatible 
+            # RawIOBase), but for this purpose it's completely compatible
             # with BufferedReader. Not sure how to make it type-compatible.
             return io.BufferedReader(cast(HTTPResponse, response))
         else:
@@ -81,17 +84,17 @@ def get_url_mime_type(response: Any) -> Optional[str]:
     Returns:
         The content type, or None if the response lacks a 'Content-Type' header.
     """
-    if hasattr(response, 'headers') and 'Content-Type' in response.headers:
-        return response.headers['Content-Type']
+    if hasattr(response, "headers") and "Content-Type" in response.headers:
+        return response.headers["Content-Type"]
     return None
 
 
-CONTENT_DISPOSITION_RE = re.compile('filename=([^;]+)')
+CONTENT_DISPOSITION_RE = re.compile("filename=([^;]+)")
 
 
 def get_url_file_name(
-        response: Any, parsed_url: Optional[ParseResult] = None
-        ) -> Optional[str]:
+    response: Any, parsed_url: Optional[ParseResult] = None
+) -> Optional[str]:
     """If a response object has HTTP-like headers, extract the filename
     from the Content-Disposition header.
     
@@ -102,14 +105,12 @@ def get_url_file_name(
     Returns:
         The file name, or None if it could not be determined.
     """
-    if (hasattr(response, 'headers') and
-            'Content-Disposition' in response.headers):
-        match = CONTENT_DISPOSITION_RE.search(
-            response.headers['Content-Disposition'])
+    if hasattr(response, "headers") and "Content-Disposition" in response.headers:
+        match = CONTENT_DISPOSITION_RE.search(response.headers["Content-Disposition"])
         if match:
             return match.group(1)
     if not parsed_url:
         parsed_url = parse_url(response.geturl())
-    if parsed_url and hasattr(parsed_url, 'path'):
+    if parsed_url and hasattr(parsed_url, "path"):
         return parsed_url.path
     return None
