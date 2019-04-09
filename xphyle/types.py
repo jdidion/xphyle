@@ -8,6 +8,7 @@ from enum import Enum
 from io import IOBase, UnsupportedOperation
 import os
 from os import PathLike
+from pathlib import PurePath
 import stat
 from typing import (
     Dict,
@@ -29,7 +30,7 @@ from typing import (
 
 class ModeAccess(Enum):
     """Enumeration of the access modes allowed when opening files.
-    
+
     See Also:
         https://docs.python.org/3/library/functions.html#open
     """
@@ -65,7 +66,7 @@ ModeAccessArg = Union[str, ModeAccess]
 
 class ModeCoding(Enum):
     """Enumeration of file open modes (text or binary).
-    
+
     See Also:
         https://docs.python.org/3/library/functions.html#open
     """
@@ -86,7 +87,7 @@ FILE_MODE_CACHE: Dict[Tuple[str, ModeAccessArg, ModeCodingArg], "FileMode"] = {}
 class FileMode(object):
     """Definition of a file mode as composed of a :class:`ModeAccess` and a
     :class:`ModeCoding`.
-    
+
     Args:
         mode: Specify the mode as a string; mutually exclusive with `access`
             and `coding`.
@@ -244,7 +245,7 @@ PERMISSION_SET_CACHE: Dict[
 
 class PermissionSet(object):
     """A set of :class:`Permission`s.
-    
+
     Args:
         flags: Sequence of flags as string ('r', 'w', 'x'), int,
             :class:`ModeAccess`, or :class:`Permission`.
@@ -269,7 +270,7 @@ class PermissionSet(object):
 
     def add(self, flag: PermissionArg) -> None:
         """Add a permission.
-        
+
         Args:
             flag: Permission to add.
         """
@@ -289,7 +290,7 @@ class PermissionSet(object):
 
     def update(self, flags: Union["PermissionSet", Iterable[PermissionArg]]) -> None:
         """Add all flags in `flags` to this `PermissionSet`.
-        
+
         Args:
             flags: Flags to add.
         """
@@ -372,7 +373,7 @@ class FileLikeInterface(IO, Iterable[AnyChar], metaclass=ABCMeta):
     """This is a marker interface for classes that implement methods (listed
     below) to make them behave like python file objects. Provides a subset of
     methods from typing.io.IO, plus next() and __iter__.
-    
+
     See Also:
         https://docs.python.org/3/tutorial/inputoutput.html#methods-of-file-objects
     """
@@ -474,8 +475,10 @@ FileLike = Union[IO, IOBase, FileLikeInterface]
 """
 
 
-PathOrFile = Union[PathLike, FileLike]
-"""Either a PathLike or FileLike."""
+PathOrFile = Union[PathLike, PurePath, FileLike]
+"""Either a PathLike or FileLike. PurePath is only included because PathLike is
+not statically assigned as a superclass of PurePath in python 3.6.
+"""
 
 
 Range = Tuple[int, int]
