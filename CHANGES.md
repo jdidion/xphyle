@@ -1,5 +1,9 @@
 # Changes
 
+v4.0.9 (Unpublished)
+--------------------
+* Adjusted default compression levels based on benchmarking of compression tools.
+
 v4.0.8 (2019.04.08)
 -------------------
 * Add pathlib.PurePath as a member of the PathLike type, to work around the lack of os.PathLike as a static superclass of PurePath in python 3.6
