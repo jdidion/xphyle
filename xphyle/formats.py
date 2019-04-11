@@ -1233,7 +1233,7 @@ class Gzip(SingleExeCompressionFormat):
 
     @property
     def default_compresslevel(self) -> int:
-        return 6
+        return 4
 
     @property
     def magic_bytes(self) -> Tuple[Tuple[int, ...], ...]:
@@ -1338,6 +1338,10 @@ class BGzip(DualExeCompressionFormat):
         return "bgzip", "bgz"
 
     @property
+    def default_compresslevel(self) -> Optional[int]:
+        return 4
+
+    @property
     def compress_commands(self) -> Tuple[str, ...]:
         return "bgzip",
 
@@ -1433,7 +1437,7 @@ class BZip2(SingleExeCompressionFormat):
 
     @property
     def default_compresslevel(self) -> int:
-        return 6
+        return 9
 
     @property
     def magic_bytes(self) -> Tuple[Tuple[int, ...], ...]:
@@ -1508,7 +1512,7 @@ class Lzma(SingleExeCompressionFormat):
 
     @property
     def default_compresslevel(self) -> int:
-        return 6
+        return 2
 
     @property
     def magic_bytes(self) -> Tuple[Tuple[int, ...], ...]:
