@@ -76,7 +76,7 @@ lines = list(read_lines('infile.gz'))
 total = sum(read_lines('infile.gz', convert=int))
 ```
 
-See the [Documentation](https://xphyle.readthedocs.io/en/stable/) for full usage information.
+See the [Documentation](https://xphyle.readthedocs.io/en/latest/) for full usage information.
 
 # Issues
 
