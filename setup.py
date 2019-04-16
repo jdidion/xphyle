@@ -19,29 +19,30 @@ with open(
 
 
 setup(
-    name='xphyle',
+    name="xphyle",
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
-    description='Utilities for working with files.',
+    description="Utilities for working with files.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url='https://github.com/jdidion/xphyle',
-    author='John Didion',
-    author_email='github@didion.net',
-    license='MIT',
-    packages=['xphyle'],
-    install_requires=['pokrok'],
+    url="https://github.com/jdidion/xphyle",
+    author="John Didion",
+    author_email="github@didion.net",
+    license="MIT",
+    packages=["xphyle"],
+    install_requires=["pokrok"],
     extras_require={
-        'performance': ['lorem']
+        "performance": ["lorem"],
+        "zstd": ["zstandard"]
     },
-    tests_require=['pytest', 'pytest-cov'],
+    tests_require=["pytest", "pytest-cov"],
     classifiers=[
-        'Development Status :: 5 - Production/Stable',
-        'Intended Audience :: Developers',
-        'Topic :: Software Development :: Libraries :: Python Modules',
-        'License :: OSI Approved :: MIT License',
-        'License :: Public Domain',
-        'Programming Language :: Python :: 3 :: Only',
-        'Programming Language :: Python :: 3.6'
+        "Development Status :: 5 - Production/Stable",
+        "Intended Audience :: Developers",
+        "Topic :: Software Development :: Libraries :: Python Modules",
+        "License :: OSI Approved :: MIT License",
+        "License :: Public Domain",
+        "Programming Language :: Python :: 3 :: Only",
+        "Programming Language :: Python :: 3.6"
     ]
 )

@@ -100,6 +100,10 @@ class FileFormat(ABC):
         pass
 
     @property
+    def module_name(self):
+        return self.name
+
+    @property
     def lib(self):
         """Caches and returns the python module assocated with this file format.
 
@@ -110,7 +114,7 @@ class FileFormat(ABC):
             ImportError if the module cannot be imported.
         """
         if not self._lib:
-            self._lib = import_module(self.name)
+            self._lib = import_module(self.module_name)
         return self._lib
 
 
@@ -313,11 +317,10 @@ class CompressionFormat(FileFormat):
         return self.exts
 
     @property
-    @abstractmethod
     def system_commands(self) -> Tuple[str, ...]:
         """The names of the system-level commands, in order of preference.
         """
-        pass
+        return self.name,
 
     @property
     def default_compresslevel(self) -> Optional[int]:  # pragma: no-cover
@@ -1214,6 +1217,9 @@ class DualExeCompressionFormat(
             self._decompress_resolved = True
 
 
+# TODO: make a shared superclass for formats that clone the gzip CLI
+
+
 @compression_format
 class Gzip(SingleExeCompressionFormat):
     """Implementation of CompressionFormat for gzip files.
@@ -1326,6 +1332,10 @@ class BGzip(DualExeCompressionFormat):
         return "bgzip"
 
     @property
+    def module_name(self):
+        return "gzip"
+
+    @property
     def exts(self) -> Tuple[str, ...]:
         return "bgz",
 
@@ -1410,6 +1420,113 @@ class BGzip(DualExeCompressionFormat):
             )
         compressed_file = self.lib.open(path_or_file, mode.value, **kwargs)
         if mode.binary:
+            compressed_file = io.BufferedWriter(compressed_file)
+        return compressed_file
+
+
+@compression_format
+class Zstd(SingleExeCompressionFormat):
+    """Implementation of CompressionFormat for zstd (.zst) files.
+
+    Todo:
+     * zstd can compress/decompress in other formats. Benchmark to
+       see if it is faster than those specialized tools and, if so,
+       default to using zstd for every format for which it is faster.
+     * Investigate whether there is a difference between pzstd -p and
+       zstd -T.
+    """
+
+    @property
+    def name(self) -> str:
+        return "zstd"
+
+    @property
+    def module_name(self):
+        return "zstandard"
+
+    @property
+    def exts(self) -> Tuple[str, ...]:
+        return "zst",
+
+    @property
+    def compresslevel_range(self) -> Tuple[int, int]:
+        return 1, 22
+
+    @property
+    def default_compresslevel(self) -> int:
+        return 3
+
+    @property
+    def magic_bytes(self) -> Tuple[Tuple[int, ...], ...]:
+        return (
+            (0xFD, 0x2F, 0xB5, 0x1E),  # v0.1
+            (0xFD, 0x2F, 0xB5, 0x22),  # v0.2
+            (0xFD, 0x2F, 0xB5, 0x23),  # v0.3
+            (0xFD, 0x2F, 0xB5, 0x24),  # v0.4
+        )
+
+    @property
+    def mime_types(self) -> Tuple[str, ...]:
+        return (
+            "application/zstd",
+            "application/x-zstd"
+        )
+
+    def get_command(
+        self,
+        operation: str,
+        src: PurePath = STDIN,
+        stdout: bool = True,
+        compresslevel: int = None,
+    ) -> List[str]:
+        cmd = [str(self.executable_path)]
+        if operation == "c":
+            compresslevel = self._get_compresslevel(compresslevel)
+            if compresslevel > 19:
+                cmd.append("--ultra")
+            cmd.append("-{}".format(compresslevel))
+        elif operation == "d":
+            cmd.append("-d")
+        if stdout:
+            cmd.append("-c")
+        threads = THREADS.threads
+        if threads == 1:
+            cmd.append(f"--single-thread")
+        elif threads > 1:
+            # zstd spawns an additional thread for I/O
+            cmd.append(f"-T{threads-1}")
+        if src != STDIN:
+            cmd.append(str(src))
+        return cmd
+
+    def get_list_command(self, path: PurePath) -> List[str]:
+        return [str(self.executable_path), "-l", str(path)]
+
+    def parse_file_listing(self, listing: str) -> Tuple[int, int, float]:
+        parsed = re.split(" +", listing.splitlines(keepends=False)[1].strip())
+        ratio = float(parsed[2][:-1]) / 100
+        return int(parsed[0]), int(parsed[1]), ratio
+
+    def open_file_python(
+        self, path_or_file: PathOrFile, mode: ModeArg, **kwargs
+    ) -> FileLike:
+        # pylint: disable=redefined-variable-type
+        if isinstance(mode, str):
+            mode = FileMode(mode)
+        if mode.binary:
+            raw_mode = mode
+        else:
+            raw_mode = FileMode(access=mode.access, coding=ModeCoding.BINARY)
+        raw_file = open(path_or_file, raw_mode.value, **kwargs)
+        if mode.readable:
+            compressed_file = self.lib.ZstdDecompressor().stream_reader(raw_file)
+        else:
+            compressed_file = self.lib.ZstdCompressor().stream_writer(raw_file)
+        if not mode.binary:
+            compressed_file = io.TextIOWrapper(compressed_file)
+        elif mode.readable:
+            compressed_file = io.BufferedReader(compressed_file)
+        else:
             compressed_file = io.BufferedWriter(compressed_file)
         return compressed_file
 
