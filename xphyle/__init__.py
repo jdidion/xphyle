@@ -42,6 +42,7 @@ from xphyle.paths import (
     check_writable_file,
     safe_check_readable_file,
     deprecated_str_to_path,
+    convert_std_placeholder
 )
 from xphyle.progress import ITERABLE_PROGRESS, PROCESS_PROGRESS
 from xphyle.types import (
@@ -946,6 +947,9 @@ def xopen(
             raise ValueError("Invalid compression format: {}".format(compression))
         else:
             compression = cannonical_fmt_name
+
+    # Convert placeholder strings ("-", "_") to paths
+    target = convert_std_placeholder(target)
 
     # Whether the file object is stdin/stdout/stderr
     is_std = target in (STDIN, STDOUT, STDERR)

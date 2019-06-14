@@ -1,8 +1,10 @@
 # Changes
 
-v4.0.9 (Unpublished)
+v4.1.0 (2019.06.14)
 --------------------
+* Add support for zstd
 * Adjusted default compression levels based on benchmarking of compression tools.
+* Handle placeholder strings ('-', '_') as arguments to xopen
 
 v4.0.8 (2019.04.08)
 -------------------

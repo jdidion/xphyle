@@ -39,6 +39,7 @@ bgz_decompress_path = get_format('bgz').decompress_path
 bz_path = get_format('bz2').executable_path
 no_pbzip2 = bz_path is None or get_format('bz2').executable_name != 'pbzip2'
 xz_path = get_format('xz').executable_path
+zstd_path = get_format('zstd').executable_path
 
 
 class ThreadsTests(TestCase):
@@ -64,7 +65,7 @@ class CompressionTests(TestCase):
 
     def test_list_formats(self):
         self.assertSetEqual(
-            {'gzip', 'bgzip', 'bz2', 'lzma'},
+            {'gzip', 'bgzip', 'bz2', 'lzma', 'zstd'},
             set(FORMATS.list_compression_formats()))
         self.assertSetEqual(
             {'gzip', 'gz', 'pigz'},
@@ -74,7 +75,8 @@ class CompressionTests(TestCase):
         self.assertSetEqual(
             {
                 '.gz', '.bgz', '.bz2', '.bzip', '.bzip2', '.xz', '.lzma',
-                '.7z', '.7zip'},
+                '.7z', '.7zip', '.zst'
+            },
             set(FORMATS.list_extensions(True)))
 
     def test_guess_format(self):
@@ -146,7 +148,7 @@ class CompressionTests(TestCase):
         assert bgz.default_ext == 'bgz'
         self.assertEqual(
             bgz.get_command('c'),
-            [str(bgz_compress_path), '-c', '-@', '2'])
+            [str(bgz_compress_path), '-l', '4', '-c', '-@', '2'])
         self.assertEqual(
             bgz.get_command('c', 'foo.bar', compresslevel=5),
             [str(bgz_compress_path), '-l', '5', '-c', '-@', '2', 'foo.bar'])
@@ -244,6 +246,35 @@ class CompressionTests(TestCase):
             xz.get_command('d'),
             [str(xz_path), '-d', '-c', '-T', '2'])
 
+    @skipIf(zstd_path is None, "'zstd' not available")
+    def test_zstd(self):
+        zstd = get_format('zstd')
+        self._test_format(zstd)
+        assert zstd.default_ext == 'zst'
+        self.assertEqual(
+            zstd.get_command('c', compresslevel=5),
+            [str(zstd_path), '-5', '-c', '--single-thread'])
+        self.assertEqual(
+            zstd.get_command('c', 'foo.bar', compresslevel=5),
+            [str(zstd_path), '-5', '-c', '--single-thread', 'foo.bar'])
+        self.assertEqual(
+            zstd.get_command('d'),
+            [str(zstd_path), '-d', '-c', '--single-thread'])
+        self.assertEqual(
+            zstd.get_command('d', 'foo.xz'),
+            [str(zstd_path), '-d', '-c', '--single-thread', 'foo.xz'])
+        # Test with threads
+        THREADS.update(3)
+        self.assertEqual(
+            zstd.get_command('c', compresslevel=5),
+            [str(zstd_path), '-5', '-c', '-T2'])
+        self.assertEqual(
+            zstd.get_command('c', 'foo.bar', compresslevel=5),
+            [str(zstd_path), '-5', '-c', '-T2', 'foo.bar'])
+        self.assertEqual(
+            zstd.get_command('d'),
+            [str(zstd_path), '-d', '-c', '-T2'])
+
 
 class FileTests(TestCase):
     def setUp(self):
@@ -304,6 +335,10 @@ class FileTests(TestCase):
     @skipIf(xz_path is None, "'xz' not available")
     def test_system_lzma(self):
         self.write_read_file('.xz', True)
+
+    @skipIf(zstd_path is None, "'zstd' not available")
+    def test_system_zstd(self):
+        self.write_read_file('.zst', True)
 
     def test_compress_path(self):
         b = (True, False) if gz_path else (False,)

@@ -182,9 +182,25 @@ def as_pure_path(
         stdin/stdout/stderr placeholder, the actual return type is a Path
         instance.
     """
+    if isinstance(path, str):
+        path = convert_std_placeholder(path, access)
     if isinstance(path, PurePath):
         return cast(PurePath, path)
-    elif path == STDERR_STR:
+
+    url = parse_url(path)
+    if url:
+        if url.scheme == "file":
+            return Path(url.path)
+        else:
+            raise IOError(f"Cannot convert URL {path} to path", path)
+
+    return Path(path)
+
+
+def convert_std_placeholder(
+    path: str, access: Optional[ModeAccessArg] = None
+) -> Union[str, PurePath]:
+    if path == STDERR_STR:
         return STDERR
     elif path == STDIN_OR_STDOUT_STR:
         if access:
@@ -195,15 +211,8 @@ def as_pure_path(
             return STDIN if access_val.readable else STDOUT
         else:
             return STDIN_OR_STDOUT
-
-    url = parse_url(path)
-    if url:
-        if url.scheme == "file":
-            return Path(url.path)
-        else:
-            raise IOError(f"Cannot convert URL {path} to path", path)
-
-    return Path(path)
+    else:
+        return path
 
 
 def as_path(path: Union[str, PurePath], access: Optional[ModeAccessArg] = None) -> Path:
