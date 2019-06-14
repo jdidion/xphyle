@@ -34,6 +34,8 @@ from typing import (
 )
 import warnings
 from xphyle.types import (
+    FileMode,
+    ModeArg,
     ModeAccess,
     ModeAccessArg,
     Permission,
@@ -198,14 +200,16 @@ def as_pure_path(
 
 
 def convert_std_placeholder(
-    path: str, access: Optional[ModeAccessArg] = None
+    path: str, access: Optional[Union[ModeArg, ModeAccessArg]] = None
 ) -> Union[str, PurePath]:
     if path == STDERR_STR:
         return STDERR
     elif path == STDIN_OR_STDOUT_STR:
         if access:
             if isinstance(access, str):
-                access_val = ModeAccess(access)
+                access_val = FileMode(access)
+            elif isinstance(access, FileMode):
+                access_val = cast(FileMode, access)
             else:
                 access_val = cast(ModeAccess, access)
             return STDIN if access_val.readable else STDOUT

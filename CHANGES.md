@@ -1,5 +1,9 @@
 # Changes
 
+v4.1.2 (2019.06.14)
+--------------------
+* Correctly handle file modes when detecting placeholders
+
 v4.1.1 (2019.06.14)
 --------------------
 * Correctly handle placeholder strings ('-', '_') as arguments to xopen
