@@ -139,16 +139,31 @@ class XphyleTests(TestCase):
         # Try stdin
         with intercept_stdin('foo\n'):
             with xopen(
+                    "-", 'r', context_wrapper=True, compression=False) as i:
+                content = i.read()
+                assert content == 'foo\n'
+        with intercept_stdin('foo\n'):
+            with xopen(
                     STDIN, 'r', context_wrapper=True, compression=False) as i:
                 content = i.read()
                 assert content == 'foo\n'
         # Try stdout
         with intercept_stdout() as i:
             with xopen(
+                    "-", 'w', context_wrapper=True, compression=False) as o:
+                o.write('foo')
+            assert i.getvalue() == 'foo'
+        with intercept_stdout() as i:
+            with xopen(
                     STDOUT, 'w', context_wrapper=True, compression=False) as o:
                 o.write('foo')
             assert i.getvalue() == 'foo'
         # Try stderr
+        with intercept_stderr() as i:
+            with xopen(
+                    "_", 'w', context_wrapper=True, compression=False) as o:
+                o.write('foo')
+            assert i.getvalue() == 'foo'
         with intercept_stderr() as i:
             with xopen(
                     STDERR, 'w', context_wrapper=True, compression=False) as o:

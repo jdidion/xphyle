@@ -160,6 +160,12 @@ class PathTests(TestCase):
     def test_filename(self):
         assert filename(Path('/path/to/foo.tar.gz')) == 'foo'
 
+    def test_convert_std_placeholder(self):
+        assert STDIN == convert_std_placeholder("-", "r")
+        assert STDOUT == convert_std_placeholder("-", "w")
+        assert STDERR == convert_std_placeholder("_", "w")
+        assert "foo" == convert_std_placeholder("foo")
+
     def test_resolve_std(self):
         assert STDOUT == resolve_path(STDOUT)
         assert STDERR == resolve_path(STDERR)

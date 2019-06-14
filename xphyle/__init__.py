@@ -949,7 +949,7 @@ def xopen(
             compression = cannonical_fmt_name
 
     # Convert placeholder strings ("-", "_") to paths
-    target = convert_std_placeholder(target)
+    target = convert_std_placeholder(target, mode)
 
     # Whether the file object is stdin/stdout/stderr
     is_std = target in (STDIN, STDOUT, STDERR)

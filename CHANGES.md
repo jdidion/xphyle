@@ -1,5 +1,9 @@
 # Changes
 
+v4.1.1 (2019.06.14)
+--------------------
+* Correctly handle placeholder strings ('-', '_') as arguments to xopen
+
 v4.1.0 (2019.06.14)
 --------------------
 * Add support for zstd
