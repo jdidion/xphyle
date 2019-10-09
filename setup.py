@@ -1,3 +1,4 @@
+import codecs
 import os
 from setuptools import setup
 import sys
@@ -11,20 +12,20 @@ if version_info < (3, 6):
     sys.exit(1)
 
 
-with open(
-    os.path.join(os.path.abspath(os.path.dirname(__file__)), "README.md"),
-    encoding="utf-8"
-) as f:
-    long_description = f.read()
-
-
 setup(
     name="xphyle",
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
     description="Utilities for working with files.",
-    long_description=long_description,
     long_description_content_type="text/markdown",
+    long_description=codecs.open(
+        os.path.join(
+            os.path.dirname(os.path.realpath(__file__)),
+            "README.md"
+        ),
+        "rb",
+        "utf-8"
+    ).read(),
     url="https://github.com/jdidion/xphyle",
     author="John Didion",
     author_email="github@didion.net",
