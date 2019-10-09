@@ -1,5 +1,9 @@
 # Changes
 
+v4.1.3 (2019.10.09)
+-------------------
+* Fixed issue with opening bgzip files
+
 v4.1.2 (2019.06.14)
 --------------------
 * Correctly handle file modes when detecting placeholders

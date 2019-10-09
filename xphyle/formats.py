@@ -1420,7 +1420,7 @@ class BGzip(DualExeCompressionFormat):
             )
         compressed_file = self.lib.open(path_or_file, mode.value, **kwargs)
         if mode.binary:
-            compressed_file = io.BufferedWriter(compressed_file)
+            compressed_file = io.BufferedReader(compressed_file)
         return compressed_file
 
 

@@ -8,18 +8,13 @@ desc = ''
 # Use this option to show full stack trace for errors
 #pytestopts = "--full-trace"
 
-BUILD = python setup.py install
-TEST  = py.test -m "not perf" -vv --cov --cov-report term-missing $(pytestopts) $(tests)
-
-all:
-	$(BUILD)
-	$(TEST)
+all: install test
 
 install:
-	$(BUILD)
+	python setup.py install
 
 test:
-	$(TEST)
+	py.test -m "not perf" -vv --cov --cov-report term-missing $(pytestopts) $(tests)
 
 perftest:
 	py.test -m "perf" $(tests)
@@ -33,17 +28,13 @@ clean:
 	rm -Rf .pytest_cache
 	rm -Rf .coverage
 
-release: clean
-	echo "Releasing version $(version)"
-	# tag
+tag:
 	git tag $(version)
-	# build
-	$(BUILD)
-	$(TEST)
-	python setup.py sdist bdist_wheel
+
+release: clean tag install test
+	echo "Releasing version $(version)"
 	# release
-	#python setup.py upload -r pypi
-	twine upload dist/*
+	python setup.py sdist bdist_wheel upload -r pypi
 	# push new tag after successful build
 	git push origin --tags
 	# create release in GitHub
