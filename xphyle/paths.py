@@ -17,20 +17,21 @@ import stat
 import sys
 import tempfile
 from typing import (
-    Sequence,
-    List,
-    Tuple,
-    Union,
-    Iterable,
-    Dict,
-    Pattern,
-    Match,
     Any,
     Callable,
+    Dict,
     Generic,
-    TypeVar,
+    Iterable,
+    List,
+    Match,
     Optional,
+    Pattern,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
     cast,
+    overload,
 )
 import warnings
 from xphyle.types import (
@@ -535,8 +536,8 @@ def check_writable_file(path: PurePath, mkdirs: bool = True) -> PurePath:
 
 @deprecated_str_to_path(0, "path")
 def safe_check_path(path: PurePath, *args, **kwargs) -> Optional[PurePath]:
-    """Safe vesion of `check_path`. Returns None rather than throw an
-    exception.
+    """
+    Safe vesion of `check_path`. Returns None rather than throw an exception.
     """
     try:
         return check_path(path, *args, **kwargs)
@@ -546,8 +547,8 @@ def safe_check_path(path: PurePath, *args, **kwargs) -> Optional[PurePath]:
 
 @deprecated_str_to_path(0, "path")
 def safe_check_readable_file(path: PurePath) -> Optional[PurePath]:
-    """Safe vesion of `check_readable_file`. Returns None rather than throw an
-    exception.
+    """
+    Safe vesion of `check_readable_file`. Returns None rather than throw an exception.
     """
     try:
         return check_readable_file(path)
@@ -564,6 +565,20 @@ def safe_check_writable_file(path: PurePath) -> Optional[PurePath]:
         return check_writable_file(path)
     except IOError:
         return None
+
+
+@overload
+def find(
+        root: PurePath, pattern: Regexp, return_matches: True, **kwargs
+        ) -> Sequence[Tuple[PurePath, Match]]:
+    pass
+
+
+@overload
+def find(
+        root: PurePath, pattern: Regexp, return_matches: False, **kwargs
+        ) -> Sequence[PurePath]:
+    pass
 
 
 @deprecated_str_to_path(0, "root")
@@ -816,7 +831,7 @@ class TempPath(metaclass=ABCMeta):
         permissions: Optional[PermissionSetArg] = None,
         set_parent: bool = False,
         additive: bool = False,
-    ) -> Union[PermissionSet, None]:
+    ) -> Optional[PermissionSet]:
         """Set the permissions for the path.
 
         Args:
@@ -1283,7 +1298,7 @@ class PathPathVar(PathVar[Path]):
 
 def match_to_dict(
     match: Match, path_vars: Dict[str, PathVar], errors: bool = True
-) -> Union[Dict[str, Any], None]:
+) -> Optional[Dict[str, Any]]:
     """Convert a regular expression Match to a dict of (name, value) for
     all PathVars.
 
