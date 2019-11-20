@@ -1275,11 +1275,17 @@ def guess_file_format(path: PurePath) -> str:
     return fmt
 
 
-def get_compressor(path: Union[str, PurePath]) -> Optional[CompressionFormat]:
+def get_compressor(name_or_path: Union[str, PurePath]) -> Optional[CompressionFormat]:
     """
-    Returns the `CompressionFormat` for the given path.
+    Returns the `CompressionFormat` for the given path or compression type name.
     """
-    fmt = guess_file_format(path)
+    fmt = FORMATS.guess_compression_format(name_or_path)
+    if (
+        fmt is None and
+        isinstance(name_or_path, PurePath) and
+        safe_check_readable_file(cast(PurePath, name_or_path))
+    ):
+        fmt = FORMATS.guess_format_from_file_header(name_or_path)
     if fmt:
         return FORMATS.get_compression_format(fmt)
 
