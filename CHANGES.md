@@ -3,6 +3,7 @@
 ## v4.2.0 (2019.11.20)
 
 * Add `xphyle.get_compressor`
+* Fix Python 3.8 issue with importing from collections
 
 ## v4.1.3 (2019.10.09)
 
