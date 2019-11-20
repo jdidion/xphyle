@@ -539,6 +539,6 @@ def is_iterable(obj: Any, include_str: bool = False) -> bool:
     Returns:
         True if the object is iterable.
     """
-    return isinstance(obj, collections.Iterable) and (
+    return isinstance(obj, collections.abc.Iterable) and (
         include_str or not isinstance(obj, str)
     )

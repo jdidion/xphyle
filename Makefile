@@ -14,10 +14,10 @@ install:
 	python setup.py install
 
 test:
-	py.test -m "not perf" -vv --cov --cov-report term-missing $(pytestopts) $(tests)
+	pytest -m "not perf" -vv --cov --cov-report term-missing $(pytestopts) $(tests)
 
 perftest:
-	py.test -m "perf" $(tests)
+	pytest -m "perf" $(tests)
 
 clean:
 	rm -Rf __pycache__

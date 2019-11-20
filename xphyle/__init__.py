@@ -32,7 +32,7 @@ from typing import (
     cast,
 )
 
-from xphyle.formats import FORMATS, THREADS
+from xphyle.formats import FORMATS, THREADS, CompressionFormat
 from xphyle.paths import (
     STDIN,
     STDOUT,
@@ -1259,8 +1259,9 @@ def xopen(
 
 @deprecated_str_to_path(0, "path")
 def guess_file_format(path: PurePath) -> str:
-    """Try to guess the file format, first from the extension, and then
-    from the header bytes.
+    """
+    Try to guess the file format, first from the extension, and then from the header
+    bytes.
 
     Args:
         path: The path to the file
@@ -1272,6 +1273,15 @@ def guess_file_format(path: PurePath) -> str:
     if fmt is None and safe_check_readable_file(path):
         fmt = FORMATS.guess_format_from_file_header(path)
     return fmt
+
+
+def get_compressor(path: Union[str, PurePath]) -> Optional[CompressionFormat]:
+    """
+    Returns the `CompressionFormat` for the given path.
+    """
+    fmt = guess_file_format(path)
+    if fmt:
+        return FORMATS.get_compression_format(fmt)
 
 
 PopenStdParamsArg = Union[
