@@ -73,7 +73,6 @@ release = __version__
 # directories to ignore when looking for source files.
 exclude_patterns = [
     'tests',
-    'versioneer.py',
     'setup.py',
     'build',
     'dist',

@@ -72,7 +72,6 @@ copyright_ = u'Public domain (government work), by John P Didion'
 # directories to ignore when looking for source files.
 exclude_patterns = [
     'tests',
-    'versioneer.py',
     'setup.py',
     'build',
     'dist',

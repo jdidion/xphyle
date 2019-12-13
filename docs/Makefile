@@ -54,7 +54,7 @@ clean:
 	rm -rf $(BUILDDIR)/*
 
 api:
-	$(SPHINXAPI) -f -o api .. ../setup.py ../versioneer.py ../tests/*
+	$(SPHINXAPI) -f -o api .. ../setup.py ../tests/*
 
 html:
 	$(SPHINXBUILD) -b html $(MOSTSPHINXOPTS) api $(BUILDDIR)/html
