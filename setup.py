@@ -2,7 +2,6 @@ import codecs
 import os
 from setuptools import setup
 import sys
-import versioneer
 
 
 version_info = sys.version_info
@@ -14,8 +13,7 @@ if version_info < (3, 6):
 
 setup(
     name="xphyle",
-    version=versioneer.get_version(),
-    cmdclass=versioneer.get_cmdclass(),
+    use_scm_version=True,
     description="Utilities for working with files.",
     long_description_content_type="text/markdown",
     long_description=codecs.open(
@@ -31,6 +29,7 @@ setup(
     author_email="github@didion.net",
     license="MIT",
     packages=["xphyle"],
+    setup_requires=["setuptools_scm"],
     install_requires=["pokrok"],
     extras_require={
         "performance": ["lorem"],

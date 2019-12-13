@@ -7,7 +7,6 @@ import collections
 from enum import Enum
 from io import IOBase, UnsupportedOperation
 import os
-from os import PathLike
 from pathlib import PurePath
 import stat
 from typing import (
@@ -475,10 +474,13 @@ FileLike = Union[IO, IOBase, FileLikeInterface]
 """
 
 
+PathLike = Union[os.PathLike, PurePath]
+"""PurePath is only included because PathLike is not statically assigned as a 
+superclass of PurePath in python 3.6."""
+
+
 PathOrFile = Union[PathLike, PurePath, FileLike]
-"""Either a PathLike or FileLike. PurePath is only included because PathLike is
-not statically assigned as a superclass of PurePath in python 3.6.
-"""
+"""Either a PathLike or FileLike."""
 
 
 Range = Tuple[int, int]

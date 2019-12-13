@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-"""The main xphyle methods -- xopen, popen, and open_.
-"""
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from contextlib import contextmanager
@@ -31,6 +28,8 @@ from typing import (
     Type,
     cast,
 )
+
+import pkg_resources
 
 from xphyle.formats import FORMATS, THREADS, CompressionFormat
 from xphyle.paths import (
@@ -63,15 +62,10 @@ from xphyle.types import (
 from xphyle.urls import parse_url, open_url, get_url_file_name
 
 
-# pylint: disable=protected-access
-# noinspection PyProtectedMember
-from xphyle._version import get_versions
-
-__version__ = get_versions()["version"]
-del get_versions
-
-
-# Classes
+try:
+    __version__ = pkg_resources.get_distribution(__name__).version
+except pkg_resources.DistributionNotFound:
+    __version__ = "Unknown"
 
 
 E = TypeVar("E", bound="EventManager")
@@ -450,7 +444,7 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
         **kwargs,
     ) -> None:
         Popen.__init__(
-            cast(Popen, self), args, stdin=stdin, stdout=stdout, stderr=stderr, **kwargs
+            self, args, stdin=stdin, stdout=stdout, stderr=stderr, **kwargs
         )
         EventManager.__init__(self)
         # Construct a dict of name=(stream, wrapper, is_pipe) for std streams
