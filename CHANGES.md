@@ -1,5 +1,9 @@
 # Changes
 
+## v4.2.1 (2019.12.13)
+
+* Switch from versioneer to setup_tools_scm for version managment.
+
 ## v4.2.0 (2019.11.20)
 
 * Add `xphyle.get_compressor`
