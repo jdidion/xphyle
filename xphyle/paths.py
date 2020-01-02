@@ -158,7 +158,8 @@ def deprecated_str_to_path(
 
 
 def deprecated(msg: str):
-    """Issue a deprecation warning:
+    """
+    Issues a deprecation warning:
 
     Args:
         msg: The warning message to display.
@@ -171,7 +172,8 @@ def deprecated(msg: str):
 def as_pure_path(
     path: Union[str, PurePath], access: Optional[ModeAccessArg] = None
 ) -> PurePath:
-    """Convert a string to a PurePath.
+    """
+    Converts a string to a PurePath.
 
     Args:
         path: String to convert. May be a string path, a stdin/stdout/stderr
@@ -221,7 +223,8 @@ def convert_std_placeholder(
 
 
 def as_path(path: Union[str, PurePath], access: Optional[ModeAccessArg] = None) -> Path:
-    """Convert a string to a Path. Note that trying to use STDIN/STDOUT/STDERR
+    """
+    Converts a string to a Path. Note that trying to use STDIN/STDOUT/STDERR
     as actual paths on Windows will result in an error.
 
     Args:
@@ -238,17 +241,20 @@ def as_path(path: Union[str, PurePath], access: Optional[ModeAccessArg] = None) 
         ValueError if 'path' is a stdin/stdout placeholder and 'access' is None.
     """
     pure_path = as_pure_path(path, access)
+
     if pure_path == STDIN_OR_STDOUT:
         raise ValueError(
             "Cannot convert stdin/stdout placeholder ('-') to a path without "
             "the access mode."
         )
+
     return Path(pure_path)
 
 
 @deprecated_str_to_path(0, "path")
 def check_std(path: PurePath, error: bool = False) -> bool:
-    """Check whether the path is '-' (stdout) or '_' (stderr).
+    """
+    Checks whether the path is '-' (stdout) or '_' (stderr).
 
     Args:
         path: The path to check.
@@ -270,7 +276,8 @@ def check_std(path: PurePath, error: bool = False) -> bool:
 
 @deprecated_str_to_path(0, "path")
 def get_permissions(path: PurePath) -> PermissionSet:
-    """Get the permissions of a file/directory.
+    """
+    Gets the permissions of a file/directory.
 
     Args:
         path: Path of file/directory.
@@ -286,7 +293,8 @@ def get_permissions(path: PurePath) -> PermissionSet:
 
 @deprecated_str_to_path(0, "path")
 def set_permissions(path: PurePath, permissions: PermissionSetArg) -> PermissionSet:
-    """Sets file stat flags (using chmod).
+    """
+    Sets file stat flags (using chmod).
 
     Args:
         path: The file to chmod.
@@ -306,7 +314,8 @@ def set_permissions(path: PurePath, permissions: PermissionSetArg) -> Permission
 def check_access(
     path: PurePath, permissions: Union[PermissionArg, PermissionSetArg]
 ) -> PermissionSet:
-    """Check that `path` is accessible with the given set of permissions.
+    """
+    Check that `path` is accessible with the given set of permissions.
 
     Args:
         path: The path to check.
@@ -321,6 +330,7 @@ def check_access(
         permission_set = PermissionSet(
             cast(Union[PermissionArg, Sequence[PermissionArg]], permissions)
         )
+
     if check_std(path):
         if path == STDIN_OR_STDOUT and not any(
             flag in permission_set for flag in {Permission.READ, Permission.WRITE}
@@ -334,15 +344,18 @@ def check_access(
             raise IOError(errno.EACCES, "STDOUT/STDERR permissions must be w", path)
     elif not os.access(path, permission_set.os_flags):
         raise IOError(errno.EACCES, f"{path} not accessable", path)
+
     return permission_set
 
 
 @deprecated_str_to_path(0, "path")
-def abspath(path: PurePath) -> PurePath:
-    """Returns the fully resolved path associated with `path`.
+def abspath(path: PurePath, strict: bool = False) -> PurePath:
+    """
+    Returns the fully resolved path associated with `path`.
 
     Args:
         path: Relative or absolute path
+        strict: Whether to raise an exception if the path does not exist.
 
     Returns:
         A PurePath - typically a pathlib.Path, but may be STDOUT or STDERR.
@@ -353,12 +366,14 @@ def abspath(path: PurePath) -> PurePath:
     """
     if check_std(path):
         return path
-    return as_path(path).expanduser().resolve()
+
+    return as_path(path).expanduser().resolve(strict=strict)
 
 
 @deprecated_str_to_path(0, "path")
 def get_root(path: Optional[PurePath] = None) -> str:
-    """Get the root directory.
+    """
+    Gets the root directory.
 
     Args:
         path: A path, or '.' to get the root of the working directory, or None
@@ -379,7 +394,8 @@ def get_root(path: Optional[PurePath] = None) -> str:
 def split_path(
     path: PurePath, keep_seps: bool = True, resolve: bool = True
 ) -> Tuple[str, ...]:
-    """Splits a path into a (parent_dir, name, *ext) tuple.
+    """
+    Splits a path into a (parent_dir, name, *ext) tuple.
 
     Args:
         path: The path. Stdout and stderr are not valid arguments.
@@ -413,7 +429,9 @@ def split_path(
 
 @deprecated_str_to_path(0, "path")
 def filename(path: PurePath) -> str:
-    """Equivalent to `split_path(path)[1]`.
+    """
+
+    Equivalent to `split_path(path)[1]`.
 
     Args:
         The path
@@ -426,7 +444,8 @@ def filename(path: PurePath) -> str:
 
 @deprecated_str_to_path(0, "path")
 def resolve_path(path: PurePath, parent: PurePath = None) -> PurePath:
-    """Resolves the absolute path of the specified file and ensures that the
+    """
+    Resolves the absolute path of the specified file and ensures that the
     file/directory exists.
 
     Args:
@@ -441,13 +460,17 @@ def resolve_path(path: PurePath, parent: PurePath = None) -> PurePath:
     """
     if check_std(path):
         return path
+
     if parent:
         path = abspath(parent) / path
     else:
         path = abspath(path)
+
     path = as_path(path)
+
     if not path.exists():
         raise IOError(errno.ENOENT, f"{path} does not exist", path)
+
     return path
 
 
@@ -457,8 +480,9 @@ def check_path(
     path_type: PathTypeArg = None,
     permissions: Union[PermissionArg, PermissionSetArg] = None,
 ) -> PurePath:
-    """Resolves the path (using `resolve_path`) and checks that the path is
-    of the specified type and allows the specified access.
+    """
+    Resolves the path (using `resolve_path`) and checks that the path is of the
+    specified type and allows the specified access.
 
     Args:
         path: The path to check.
@@ -473,25 +497,32 @@ def check_path(
         or doesn't allow the specified access.
     """
     path = resolve_path(path)
+
     if path_type:
         if isinstance(path_type, str):
             path_type = PathType(path_type)
+
         if not check_std(path):
             path = cast(Path, path)
-            if path_type == PathType.FILE and not path.is_file():
+            is_dir = path.resolve().is_dir()
+
+            if path_type == PathType.FILE and is_dir:
                 raise IOError(errno.EISDIR, f"{path} not a file", path)
-            elif path_type == PathType.DIR and not path.is_dir():
+            elif path_type == PathType.DIR and not is_dir:
                 raise IOError(errno.ENOTDIR, f"{path} not a directory", path)
         elif path_type is not PathType.FILE:
             raise IOError(errno.EISDIR, f"{path} not a file", path)
+
     if permissions is not None:
         check_access(path, permissions)
+
     return path
 
 
 @deprecated_str_to_path(0, "path")
 def check_readable_file(path: PurePath) -> PurePath:
-    """Check that `path` exists and is readable.
+    """
+    Checks that `path` exists and is readable.
 
     Args:
         path: The path to check
@@ -504,8 +535,9 @@ def check_readable_file(path: PurePath) -> PurePath:
 
 @deprecated_str_to_path(0, "path")
 def check_writable_file(path: PurePath, mkdirs: bool = True) -> PurePath:
-    """If `path` exists, check that it is writable, otherwise check that
-    its parent directory exists and is writable.
+    """
+    If `path` exists, check that it is writable, otherwise check that its parent
+    directory exists and is writable.
 
     Args:
         path: The path to check.
@@ -518,15 +550,18 @@ def check_writable_file(path: PurePath, mkdirs: bool = True) -> PurePath:
         return check_path(path, PathType.FILE, Permission.WRITE)
 
     path = as_path(path)
+
     if path.exists():
         return check_path(path, PathType.FILE, Permission.WRITE)
     else:
         path = cast(Path, abspath(path))
         dirpath = path.parent
+
         if dirpath.exists():
             check_path(dirpath, PathType.DIR, Permission.WRITE)
         elif mkdirs:
             dirpath.mkdir(parents=True)
+
         return path
 
 
@@ -569,15 +604,15 @@ def safe_check_writable_file(path: PurePath) -> Optional[PurePath]:
 
 @overload
 def find(
-        root: PurePath, pattern: Regexp, return_matches: True, **kwargs
-        ) -> Sequence[Tuple[PurePath, Match]]:
+    root: PurePath, pattern: Regexp, return_matches: True, **kwargs
+) -> Sequence[Tuple[PurePath, Match]]:
     pass
 
 
 @overload
 def find(
-        root: PurePath, pattern: Regexp, return_matches: False, **kwargs
-        ) -> Sequence[PurePath]:
+    root: PurePath, pattern: Regexp, return_matches: False, **kwargs
+) -> Sequence[PurePath]:
     pass
 
 

@@ -1299,8 +1299,25 @@ class Gzip(SingleExeCompressionFormat):
 
     def parse_file_listing(self, listing: str) -> Tuple[int, int, float]:
         parsed = re.split(" +", listing.splitlines(keepends=False)[1].strip())
-        ratio = float(parsed[2][:-1]) / 100
-        return int(parsed[0]), int(parsed[1]), ratio
+
+        compressed = int(parsed[0])
+
+        # pigz can sometimes return a guess for the uncompressed file size (ending
+        # with '?' and 'unk' for the ratio
+
+        if parsed[1].endswith("?"):
+            uncompressed = int(parsed[1][:-1])
+        else:
+            uncompressed = int(parsed[1])
+
+        if parsed[2] == "unk":
+            ratio = compressed / uncompressed
+        else:
+            ratio = float(parsed[2][:-1]) / 100
+            if ratio < 0:
+                ratio = 1 - ratio
+
+        return compressed, uncompressed, ratio
 
     def open_file_python(
         self, path_or_file: PathOrFile, mode: ModeArg, **kwargs

@@ -551,6 +551,7 @@ def uncompressed_size(
         if compression is not None:
             fmt = FORMATS.get_compression_format(compression)
             return fmt.uncompressed_size(path)
+
     # Assume the file is not compressed to begin with
     return Path(path).stat().st_size
 

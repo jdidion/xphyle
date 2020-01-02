@@ -1,5 +1,9 @@
 # Changes
 
+## v4.2.2 (2020.01.02)
+
+* Handle differences between gzip and pigz -l output
+
 ## v4.2.1 (2019.12.13)
 
 * Switch from versioneer to setup_tools_scm for version managment.
