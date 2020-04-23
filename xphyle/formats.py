@@ -24,6 +24,8 @@ from typing import (
     cast,
 )
 
+import safer
+
 # noinspection PyUnresolvedReferences
 from types import ModuleType
 from xphyle.paths import (
@@ -246,8 +248,8 @@ class SystemWriter(SystemIO):
         self.command = command or [self.executable_name]
         if isinstance(mode, str):
             mode = FileMode(mode)
-        self.outfile = open(path, mode.value)
-        self.devnull = open(os.devnull, "w")
+        self.outfile = safer.open(path, mode.value)
+        self.devnull = safer.open(os.devnull, "w")
         try:
             self.process = Popen(
                 self.command, stdin=PIPE, stdout=self.outfile, stderr=self.devnull
@@ -668,7 +670,7 @@ class CompressionFormat(FileFormat):
                     prc_src = cast(FileLike, source)
                 if dest_is_path:
                     dest_name = str(dest)
-                    dest_file = open(dest_name, "wb")
+                    dest_file = safer.open(dest_name, "wb")
                 else:
                     dest_file = cast(FileLike, dest)
                     dest_name = dest_file.name
@@ -680,7 +682,7 @@ class CompressionFormat(FileFormat):
                 self.handle_command_return(proc.returncode, cmd, stderr)
             else:
                 if source_is_path:
-                    source_file = open(source, "rb")
+                    source_file = safer.open(source, "rb")
                 else:
                     source_file = cast(FileLike, source)
                 dest_name = str(dest)
@@ -754,7 +756,7 @@ class CompressionFormat(FileFormat):
             dest_is_path = isinstance(dest, PurePath)
         if dest_is_path:
             dest_name = str(check_writable_file(cast(PurePath, dest)))
-            dest_file = open(dest_name, "wb")
+            dest_file = safer.open(dest_name, "wb")
         else:
             dest_file = cast(FileLike, dest)
             dest_name = dest_file.name
@@ -961,7 +963,7 @@ class Formats:
             The format name, or ``None`` if it could not be guessed.
         """
         check_std(path, error=True)
-        with open(path, "rb") as infile:
+        with safer.open(path, "rb") as infile:
             magic = infile.read(self.max_magic_bytes)
         return self.guess_format_from_header_bytes(magic)
 
@@ -1534,7 +1536,7 @@ class Zstd(SingleExeCompressionFormat):
             raw_mode = mode
         else:
             raw_mode = FileMode(access=mode.access, coding=ModeCoding.BINARY)
-        raw_file = open(path_or_file, raw_mode.value, **kwargs)
+        raw_file = safer.open(path_or_file, raw_mode.value, **kwargs)
         if mode.readable:
             compressed_file = self.lib.ZstdDecompressor().stream_reader(raw_file)
         else:

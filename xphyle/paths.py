@@ -34,6 +34,9 @@ from typing import (
     overload,
 )
 import warnings
+
+import safer
+
 from xphyle.types import (
     FileMode,
     ModeArg,
@@ -982,7 +985,7 @@ class TempPathDescriptor(TempPath):
             # this using a subprocess to pipe through a buffering program (such
             # as pv) to the FIFO instead
             if self.path_type != PathType.FIFO:
-                with open(self.absolute_path, "wt") as outfile:
+                with safer.open(self.absolute_path, "wt") as outfile:
                     outfile.write(self.contents or "")
         elif not os.path.exists(self.absolute_path):
             self.absolute_path.mkdir()

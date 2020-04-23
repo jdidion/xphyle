@@ -30,6 +30,7 @@ from typing import (
 )
 
 import pkg_resources
+import safer
 
 from xphyle.formats import FORMATS, THREADS, CompressionFormat
 from xphyle.paths import (
@@ -1227,7 +1228,7 @@ def xopen(
         )
         is_std = False
     elif not fileobj:
-        fileobj = open(target, mode.value, **kwargs)
+        fileobj = safer.open(target, mode.value, **kwargs)
     elif mode.text and is_bin and (is_std or file_type is FileType.FILELIKE):
         fileobj = io.TextIOWrapper(fileobj)
         fileobj.mode = mode.value

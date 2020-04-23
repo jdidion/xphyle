@@ -30,7 +30,7 @@ setup(
     license="MIT",
     packages=["xphyle"],
     setup_requires=["setuptools_scm"],
-    install_requires=["pokrok"],
+    install_requires=["pokrok", "safer"],
     extras_require={
         "performance": ["lorem"],
         "zstd": ["zstandard"]
