@@ -1,2 +1,2 @@
-sphinxcontrib-napoleon==0.6.1
-pokrok
+sphinx==3.0.2
+pokrok==0.2.0
