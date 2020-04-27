@@ -85,3 +85,12 @@ Please report bugs and request enhancements using the [issue tracker](https://gi
 # Roadmap
 
 Future releases are mapped out using [GitHub Projects](https://github.com/jdidion/xphyle/projects).
+
+# Citing xphyle
+
+[Didion, JP (2017) xphyle: Extraordinarily simple file handling. Journal of Open Source Software; doi:10.21105/joss.00255](https://joss.theoj.org/papers/10.21105/joss.00255#)
+
+# Acknowledgements
+
+* [Dependencies scanned by PyUp.io](http://pyup.io/)
+* Thanks to @ctb for reviewing the xphyle paper

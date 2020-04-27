@@ -1,0 +1,14 @@
+Didion, JP (2017) xphyle: Extraordinarily simple file handling. Journal of Open Source Software; [doi:10.21105/joss.00255](https://doi.org/10.21105/joss.00255)
+
+@article{Didion2017,
+  doi = {10.21105/joss.00255},
+  url = {https://doi.org/10.21105/joss.00255},
+  year = {2017},
+  publisher = {The Open Journal},
+  volume = {2},
+  number = {14},
+  pages = {255},
+  author = {John Didion},
+  title = {xphyle: Extraordinarily simple file handling},
+  journal = {Journal of Open Source Software}
+}
