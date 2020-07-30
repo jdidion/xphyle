@@ -16,7 +16,7 @@ Installation
 ------------
 
 xphyle is available from pypi::
-    
+
     pip install xphyle
 
 xphyle tries to use the compression programs installed on your local machine (e.g. gzip, bzip2); if it can't, it will use the built-in python libraries (which are slower). Thus, xphyle has no required dependencies, but we recommend that if you install gzip, etc. if you don't already have them.
@@ -26,7 +26,7 @@ xphyle will use `pigz <http://zlib.net/pigz/>`_ for multi-threaded gzip compress
     xphyle.configure(threads=4)
 
 or, to automatically set it to the number of cores available on your system::
-    
+
     xphyle.configure(threads=True)
 
 If you have programs installed at a location that is not on your path, you can add those locations to xphyle's executable search::
@@ -38,22 +38,22 @@ If you would like progress bars displayed for file operations, you need to confi
 For python-level operations, the `pokrok <https://pypi.python.org/pypi/pokrok>`_ API is used by default. Pokrok provides access to many popular progress bar libraries with a single, standard interface. Please see the documentation for more information about which libraries are currently supported and how to configure them. To enable this::
 
     > pip install pokrok
-    
+
     xphyle.configure(progress=True)
 
 You can also use you own preferred progress bar by passing a callable, which must take a single iterable argument and two optional keyword arguments and return an iterable::
 
     def my_progress_wrapper(itr, desc='My progress bar', size=None):
         ...
-    
+
     xphyle.configure(progress=my_progress_wrapper)
 
 For system-level operations, an executable is required that reads from stdin and writes to stdout; `pv <http://www.ivarch.com/programs/quickref/pv.shtml>`_ is used by default. To enable this::
-    
+
     xphyle.configure(system_progress=True)
 
 You can also use your own preferred program by passing a tuple with the command and arguments (:py:func:`<xphyle.progress.system_progress_command>` simplifies this)::
-    
+
     xphyle.configure(system_progress=xphyle.progress.system_progress_command(
         'pv', '-pre', require=True))
 
@@ -63,10 +63,10 @@ Working with files
 The heart of xphyle is the simplicity of working with files. There is a single interface -- ``xopen`` -- for opening "file-like objects", regardless of whether they represent local files, remote files (referenced by URLs), or system streams (stdin, stdout, stderr); and regardless of whether they are compressed.
 
 The following are functionally equivalent ways to open a gzip file::
-    
+
     import gzip
     f = gzip.open('input.gz', 'rt')
-    
+
     from xphyle import xopen
     f = xopen('input.gz', 'rt')
 
@@ -76,21 +76,21 @@ So then why use xphyle? Two reasons:
 2. The ``gzip.open`` method of opening a gzip file uses python code to decompress the file. It's well written, highly optimized python code, but unfortunately it's still slower than your natively compiled system-level applications (e.g. pigz or gzip). The ``xopen`` method of opening a gzip file first tries to use pigz or gzip to decompress the file and provides access to the resulting stream of decompressed data (as a file-like object), and only falls back to ``gzip.open`` if neither program is available.
 
 If you want to be explicit about whether to expect a compressed file, what type of compression to expect, or whether to try and use system programs, you can::
-    
+
     from xphyle import xopen
     from xphyle.paths import STDIN
-    
+
     # Expect the file to not be compressed
     f = xopen('input', 'rb', compression=False)
-    
+
     # Open a remote file. Expect the file to be compressed, and throw an error
     # if it's not, or if the compression format cannot be determined.
     f = xopen('http://foo.com/input.gz', 'rt', compression=True)
-    
+
     # Open stdin. Expect the input to be gzip compressed, and throw an error if
     # it's not
     f = xopen(STDIN, 'rt', compression='gzip')
-    
+
     # Do not try to use the system-level gzip program for decompression
     f = xopen('input.gz', 'rt', compression='gzip', use_system=False)
 
@@ -99,7 +99,7 @@ By default, ``xopen`` returns the file. If desired, ``xopen`` can also wrap the 
 * A file iterator is wrapped in a progress bar (if they have been enabled via the ``configure`` method described above).
 * A simple event system that enables callbacks to be registered for various events. Currently, the only supported event is closing the file. The ``xphyle.utils`` package provides a few useful event listeners, e.g. to compress, move, or delete the file when it is closed.
 * ContextManager functionality, such that the file is always compatible with ``with``, e.g.::
-    
+
     def print_lines(path):
         # this works whether path refers to a local file, URL or STDIN
         with xopen(path, context_wrapper=True) as infile:
@@ -107,15 +107,15 @@ By default, ``xopen`` returns the file. If desired, ``xopen`` can also wrap the 
                 print(line)
 
 The wrapping behavior can be enabled by passing ``context_wrapper=True`` to ``xopen``. You can configure ``xopen`` to wrap files by default::
-    
+
     xphyle.configure(default_xopen_context_wrapper=True)
 
 **Note that this represents a change from xphyle 1.x, in which wrapping occurred by default.**
 
 Another common pattern is to write functions that accept either a path or an open file object. Rather than having to test whether the user passed a path or a file and handle each differently, you can use the ``open_`` convenience method::
-    
+
     from xphyle import open_
-    
+
     def print_lines(path_or_file):
         with open_(path_or_file) as infile:
             for line in infile:
@@ -133,7 +133,7 @@ Also supported is block-based gzip (bgzip), a format commonly used in bioinforma
     f = xopen('input.gz', 'rt', compression='bgzip', validate=False)
 
 Additional compression formats may be added in the future. To get the most up-to-date list::
-    
+
     from xphyle.formats import FORMATS
     print(', '.join(FORMATS.list_compression_formats())
 
@@ -148,28 +148,28 @@ As of xphyle 2.0.0, you can easily open subprocesses using the ``xphyle.popen`` 
         proc.write('foo')
     finally:
         proc.close()
-        
+
     # equivalent to:
-    with popen('cat', stdin=PIPE, stdout='myfile.gz'):
+    with popen('cat', stdin=PIPE, stdout='myfile.gz') as proc:
         proc.write('foo')
-    
+
     # and also to:
     popen('cat', stdin=PIPE, stdout='myfile.gz').communicate('foo')
-    
+
     # for the common case above, there's also a shortcut method
     from xphyle.utils import exec_process
     exec_process('cat', 'foo', stdout='myfile.gz')
 
 In addition, ``open_`` and ``xopen`` can open subprocesses. The primary difference is that ``popen`` enables customization of stdin, stdout, and stderr, whereas opening a process through ``open_`` or ``xopen`` uses default behavior of opening PIPEs for all of the streams, and wrapping the PIPE indicated by the file mode. For example::
-    
+
     # write to the process stdin
     with open_('|cat', 'wt') as proc:
         proc.write('foo')
-    
+
     # this command wraps stdin with gzip compression
     with open_('|zcat', 'wt', compression='gzip') as proc:
         proc.write('foo')
-    
+
     # this command wraps stdout with gzip decompression;
     # furthermore, the compression format is determined
     # automatically
@@ -186,7 +186,7 @@ As of xphyle 2.1.0, ``open_`` and ``xopen`` can also open buffer types. A buffer
     with open_(str) as buf:
         buf.write('foo')
     string_foo = buf.getvalue()
-    
+
     # with compression, type must be 'bytes'
     with open_(bytes, compression='gzip') as buf:
         buf.write('foo')
@@ -203,7 +203,7 @@ Reading/writing data
 The ``xphyle.utils`` module provides methods for many of the common operations that you'll want to perform on files. A few examples are shown below; you can read the `API docs <api/modules.html#module-xphyle.utils>`_ for a full list of methods and more detailed descriptions of each.
 
 There are pairs of methods for reading/writing text and binary data using iterators::
-    
+
     # Copy from one file to another, changing the line separator from
     # unix to windows
     from xphyle.utils import read_lines, write_lines
@@ -211,7 +211,7 @@ There are pairs of methods for reading/writing text and binary data using iterat
         read_lines('linux_file.txt')
         'windows_file.txt',
         linesep='\r')
-    
+
     # Copy from one binary file to another, changing the encoding from
     # ascii to utf-8
     from xphyle.utils import read_bytes, write_bytes
@@ -224,7 +224,7 @@ There are pairs of methods for reading/writing text and binary data using iterat
         'utf8-file.txt')
 
 There's another pair of methods for reading/writing key=value files::
-    
+
     from collections import OrderedDict
     from xphyle.utils import read_dict, write_dict
     cats = OrderedDict((fluffy,'calico'), (droopy,'tabby'), (sneezy,'siamese'))
@@ -235,9 +235,9 @@ There's another pair of methods for reading/writing key=value files::
         'cats.tsv', sep='\t')
 
 You can also read from delimited files such as csv and tsv::
-    
+
     from xphyle.utils import read_delimited, read_delimited_as_dict
-    
+
     class Dog(object):
         def __init__(self, name, age, breed):
             self.name = name
@@ -245,13 +245,13 @@ You can also read from delimited files such as csv and tsv::
             self.breed = breed
         def pet(self): ...
         def say(self, message): ...
-    
+
     for dog in read_delimited(
             'dogs.txt.gz', header=True,
             converters=(str,int,str),
             row_type=Dog):
         dog.pet()
-    
+
     dogs = read_delimited_as_dict(
             'dogs.txt.gz', header=True,
             key='name', converters=(str,int,str),
@@ -259,63 +259,63 @@ You can also read from delimited files such as csv and tsv::
     dogs['Barney'].say('Good Boy!')
 
 There are convenience methods for compressing and decompressing files::
-    
+
     from xphyle.utils import compress_file, decompress_file, transcode_file
-    
+
     # Gzip compress recipes.txt, and delete the original
     compress_file('recipes.txt', compression='gzip', keep=False)
-    
+
     # decompress a remote compressed file to a local file
     decompress_file('http://recipes.com/allrecipes.txt.gz',
                     'local_recipes.txt')
-    
+
     # Change from gzip to bz2 compression:
     transcode_file('http://recipes.com/allrecipes.txt.gz',
                    'local_recipes.txt.bz2')
 
 There is a replacement for ``fileinput``::
-    
+
     from xphyle.utils import fileinput
-    
+
     # By default, read from the files specified as command line arguments,
     # or stdin if there are no command line arguments, and autodetect
     # the compression format
     for line in fileinput():
         print(line)
-    
+
     # Read from multiple files as if they were one
     for line in fileinput(('myfile.txt', 'myotherfile.txt.gz')):
         print(line)
 
 There's also a set of classes for writing to multiple files::
-    
+
     from xphyle.utils import fileoutput
     from xphyle.utils import TeeFileOutput, CycleFileOutput, NCycleFileOutput
-    
+
     # write all lines in sourcefile.txt to both file1 and file2.gz
     with fileoutput(
-            ('file1', 'file2.gz'), 
+            ('file1', 'file2.gz'),
             file_output_type=TeeFileOutput) as out:
         out.writelines(read_lines('sourcefile.txt'))
-    
+
     # Alternate writing each line in sourcefile.txt to file1 and file2.gz
     with fileoutput(
-            ('file1', 'file2.gz'), 
+            ('file1', 'file2.gz'),
             file_output_type=CycleFileOutput) as out:
         out.writelines(read_lines('sourcefile.txt'))
-    
+
     # Alternate writing four lines in sourcefile.txt to file1 and file2.gz
     with fileoutput(
-            ('file1', 'file2.gz'), 
+            ('file1', 'file2.gz'),
             file_output_type=NCycleFileOutput, n=4) as out:
         out.writelines(read_lines('sourcefile.txt'))
-    
+
     # Write up to 10,000 lines in each file before opening the next file
     with RollingFileOutput('file{}.gz', n=10000) as out:
         out.writelines(read_lines('sourcefile.txt'))
-    
+
 And finally, there's some miscellaneous methods such as linecount::
-    
+
     from xphyle.utils import linecount
     print("There are {} lines in file {}".format(
         linecount(path), path))
@@ -324,9 +324,9 @@ File paths
 ~~~~~~~~~~
 
 The ``xphyle.paths`` module provides methods for working with file paths. The `API docs <api/modules.html#module-xphyle.paths>`_ have a full list of methods and more detailed descriptions of each. Here are a few examples::
-    
+
     from xphyle.paths import *
-    
+
     # Get the absolute path, being smart about STDIN/STDOUT/STDERR and
     # home directory shortcuts
     abspath('/foo/bar/baz') # -> /foo/bar/baz
@@ -339,29 +339,29 @@ The ``xphyle.paths`` module provides methods for working with file paths. The `A
         # dir = '/home/joe'
         # name = 'foo'
         # extensions = ['txt', 'gz']
-    
+
     # Check that a path exists, is a file, and allows reading
     # Raises IOError if any of the expectations are violated,
     # otherwise returns the fully resolved path
     path = check_path('file.txt.gz', 'f', 'r')
-    
+
     # Shortcuts to check whether a file is readable/writeable
     path = check_readable_file('file.txt')
     path = check_writeable_file('file.txt')
-    
+
     # There are also 'safe' versions of the methods that return
     # None rather than raise IOError
     path = safe_check_readable_file('nonexistant_file.txt') # path = None
-    
+
     # Find all files in a directory (recursively) that match a
     # regular expression pattern
     find('mydir', 'file.*\.txt\.gz')
-    
+
     # Lookup the path to an executable
     gzip_path = get_executable_path('gzip')
 
 `TempDir <api/modules.html#xphyle.paths.TempDir>`_ is a particularly useful class, especially for unit testing. In fact, it us used extensively for unit testing xphyle itself. TempDir can be thought of as a virtual file system. It creates a temporary directory, and it provides methods to create subdirectories and files within that directory. When the ``close()`` method is called, the entire temporary directory is deleted. ``TempDir`` can also be used as a ContextManager::
-    
+
     with TempDir() as temp:
         # create three randomly named files under 'tempdir'
         paths = temp.make_empty_files(3)
@@ -372,7 +372,7 @@ The ``xphyle.paths`` module provides methods for working with file paths. The `A
         gzfile = temp[foo].make_file(suffix='.gz')
 
 Another useful set of classes is `FileSpec <api/modules.html#xphyle.paths.FileSpec>`_, `DirSpec <api/modules.html#xphyle.paths.DirSpec>`_, and `PathSpec <api/modules.html#xphyle.paths.PathSpec>`_. These classes help with the common problem of working files that match a specific pattern, especially when you need to then extract some pieces of information from the file names. For example, you may need to find all the files starting with 'foo' within any subdirectory of '/bar', and then performing different operations depending on the extension. You could use a PathSpec for this::
-    
+
     spec = PathSpec(
         DirSpec(PathVar('subdir'), template=os.path.join('/bar', '{subdir}')),
         FileSpec(
@@ -402,40 +402,41 @@ Extending xphyle
 ----------------
 
 You can add support for another compression format by extending one of the base classes in :py:mod:`<xphyle.format>`::
-    
+
     import xphyle.formats
-    
+
     class FooFormat(xphyle.formats.SingleExeCompressionFormat):
         """Implementation of CompressionFormat for foo files.
         """
         @property
         def name(self) -> str:
             return 'foo'
-        
+
         @property
         def exts(self) -> Tuple[str, ...]:
             return ('foo',)
-        
+
         @property
         def system_commands(self) -> Tuple[str, ...]:
             return ('foo',)
-        
+
         @property
         def compresslevel_range(self) -> Tuple[int, int]:
+            # because of course it goes to 11
             return (1, 11)
-        
+
         @property
         def default_compresslevel(self) -> int:
             return 6
-            
+
         @property
         def magic_bytes(self) -> Tuple[Tuple[int, ...], ...]:
             return ((0x0F, 0x00),)
-        
+
         @property
         def mime_types(self) -> Tuple[str, ...]:
             return ('application/foo',)
-        
+
         # build the system command
         # op = 'c' for compress, 'd' for decompress
         # src = the source file, or STDIN if input should be read from stdin
@@ -456,7 +457,7 @@ You can add support for another compression format by extending one of the base 
             if src != STDIN:
                 cmd.append(src)
             return cmd
-        
+
         def open_file_python(self, filename, mode, **kwargs):
             # self.lib is a property that lazily imports and returns the
             # python library named in the ``name`` member above
@@ -467,6 +468,6 @@ Then, register your format::
     xphyle.formats.register_compression_format(FooFormat)
 
 Also, note that you can support custom URL schemes by the standard method of adding `urllib <https://docs.python.org/3/library/urllib.request.html#openerdirector-objects>`_ handlers::
-    
+
     import urllib.request
     urllib.request.OpenerDirector.add_handler(my_handler)
