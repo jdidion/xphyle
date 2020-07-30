@@ -1235,11 +1235,11 @@ class Gzip(SingleExeCompressionFormat):
 
     @property
     def system_commands(self) -> Tuple[str, ...]:
-        return "pigz", "gzip"
+        return "igzip", "pigz", "gzip"
 
     @property
     def default_compresslevel(self) -> int:
-        return 4
+        return 1 if self.executable_name == "igzip" else 4
 
     @property
     def magic_bytes(self) -> Tuple[Tuple[int, ...], ...]:
@@ -1259,7 +1259,9 @@ class Gzip(SingleExeCompressionFormat):
         """The compression level; pigz allows 0-11 (har har) while
         gzip allows 0-9.
         """
-        if self.executable_name == "pigz":
+        if self.executable_name == "igzip":
+            return 0, 3
+        elif self.executable_name == "pigz":
             return 0, 11
         else:
             return 1, 9
@@ -1279,9 +1281,13 @@ class Gzip(SingleExeCompressionFormat):
             cmd.append("-d")
         if stdout:
             cmd.append("-c")
-        threads = THREADS.threads
-        if self.executable_name == "pigz" and threads > 1:
-            cmd.extend(("-p", str(threads)))
+        if operation == "c":
+            # multi-threading only works for compression
+            threads = THREADS.threads
+            if self.executable_name == "igzip" and threads > 1:
+                cmd.extend(("-T", str(threads)))
+            elif self.executable_name == "pigz" and threads > 1:
+                cmd.extend(("-p", str(threads)))
         if src != STDIN:
             cmd.append(str(src))
         return cmd
@@ -1295,7 +1301,12 @@ class Gzip(SingleExeCompressionFormat):
         super().handle_command_return(returncode, cmd, stderr)
 
     def get_list_command(self, path: PurePath) -> List[str]:
-        return [str(self.executable_path), "-l", str(path)]
+        if self.executable_name == "igzip":
+            # igzip doesn't have a -l option
+            exe_path = EXECUTABLE_CACHE.resolve_exe(["gzip", "pigz"])[0]
+        else:
+            exe_path = self.executable_path
+        return [str(exe_path), "-l", str(path)]
 
     def parse_file_listing(self, listing: str) -> Tuple[int, int, float]:
         parsed = re.split(" +", listing.splitlines(keepends=False)[1].strip())
@@ -1415,9 +1426,6 @@ class BGzip(DualExeCompressionFormat):
         cmd = [str(self.decompress_path), "-d"]
         if stdout:
             cmd.append("-c")
-        threads = THREADS.threads
-        if self.decompress_name == "pigz" and threads > 1:
-            cmd.extend(("-p", str(threads)))
         if src != STDIN:
             if src.suffix != ".gz":
                 # bgzip does not support decompression of files without a .gz extension

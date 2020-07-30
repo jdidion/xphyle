@@ -33,7 +33,9 @@ def create_truncated_file(path, fmt):
 
 
 gz_path = get_format('gz').executable_path
+# TODO: enable executable to be injected so we can test all variants
 no_pigz = gz_path is None or get_format('gz').executable_name != 'pigz'
+no_igzip = gz_path is None or get_format('gz').executable_name != 'igzip'
 bgz_compress_path = get_format('bgz').compress_path
 bgz_decompress_path = get_format('bgz').decompress_path
 bz_path = get_format('bz2').executable_path
@@ -68,7 +70,7 @@ class CompressionTests(TestCase):
             {'gzip', 'bgzip', 'bz2', 'lzma', 'zstd'},
             set(FORMATS.list_compression_formats()))
         self.assertSetEqual(
-            {'gzip', 'gz', 'pigz'},
+            {'gzip', 'gz', 'pigz', 'igzip'},
             set(get_format('gzip').aliases))
 
     def test_list_extensions(self):
@@ -136,10 +138,28 @@ class CompressionTests(TestCase):
             [str(gz_path), '-5', '-c', '-p', '2', 'foo.bar'])
         self.assertEqual(
             gz.get_command('d'),
-            [str(gz_path), '-d', '-c', '-p', '2'])
+            [str(gz_path), '-d', '-c'])
         self.assertEqual(
             gz.get_command('d', 'foo.gz'),
-            [str(gz_path), '-d', '-c', '-p', '2', 'foo.gz'])
+            [str(gz_path), '-d', '-c', 'foo.gz'])
+
+    @skipIf(no_igzip, "'igzip' not available")
+    def test_igzip(self):
+        THREADS.update(2)
+        gz = get_format('gz')
+        assert gz.default_ext == 'gz'
+        self.assertEqual(
+            gz.get_command('c', compresslevel=2),
+            [str(gz_path), '-2', '-c', '-T', '2'])
+        self.assertEqual(
+            gz.get_command('c', 'foo.bar', compresslevel=2),
+            [str(gz_path), '-2', '-c', '-T', '2', 'foo.bar'])
+        self.assertEqual(
+            gz.get_command('d'),
+            [str(gz_path), '-d', '-c'])
+        self.assertEqual(
+            gz.get_command('d', 'foo.gz'),
+            [str(gz_path), '-d', '-c', 'foo.gz'])
 
     @skipIf(bgz_compress_path is None, "'bgzip' not available")
     def test_bgzip_compress(self):
@@ -160,14 +180,14 @@ class CompressionTests(TestCase):
         if bgz.decompress_name == 'pigz':
             self.assertEqual(
                 bgz.get_command('d'),
-                [str(bgz_decompress_path), '-d', '-c', '-p', '2'])
+                [str(bgz_decompress_path), '-d', '-c'])
             self.assertEqual(
                 bgz.get_command('d', PurePath('foo.gz')),
-                [str(bgz_decompress_path), '-d', '-c', '-p', '2', 'foo.gz'])
+                [str(bgz_decompress_path), '-d', '-c', 'foo.gz'])
             self.assertEqual(
                 bgz.get_command('d', PurePath('foo.bar')),
                 [
-                    str(bgz_decompress_path), '-d', '-c', '-p', '2', '-S', '.bar',
+                    str(bgz_decompress_path), '-d', '-c', '-S', '.bar',
                     'foo.bar'
                 ])
         else:

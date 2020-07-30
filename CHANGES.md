@@ -1,5 +1,10 @@
 # Changes
 
+## v4.3.0 (2020.07.30)
+
+* Add support for igzip
+* Remove useless -p argument when decompressing with pigz
+
 ## v4.2.2 (2020.01.02)
 
 * Handle differences between gzip and pigz -l output
