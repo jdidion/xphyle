@@ -101,4 +101,4 @@ Future releases are mapped out using [GitHub Projects](https://github.com/jdidio
 # Acknowledgements
 
 * [Dependencies scanned by PyUp.io](http://pyup.io/)
-* Thanks to @ctb for reviewing the xphyle paper
+* Thanks to [@ctb](https://github.com/ctb) for reviewing the xphyle paper
