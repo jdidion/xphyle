@@ -80,11 +80,11 @@ See the [Documentation](https://xphyle.readthedocs.io/en/latest/) for full usage
 
 # Supported compression formats
 
-* gzip (uses igzip or pigz if available)
-* bgzip
-* bzip2 (uses pbzip2 if available)
-* Lzma
-* zstd
+* `gzip` (uses `igzip` or `pigz` if available)
+* `bgzip`
+* `bzip2` (uses `pbzip2` if available)
+* `lzma`
+* `zstd`
 
 # Issues
 
