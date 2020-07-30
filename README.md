@@ -78,6 +78,14 @@ total = sum(read_lines('infile.gz', convert=int))
 
 See the [Documentation](https://xphyle.readthedocs.io/en/latest/) for full usage information.
 
+# Supported compression formats
+
+* gzip (uses igzip or pigz if available)
+* bgzip
+* bzip2 (uses pbzip2 if available)
+* Lzma
+* zstd
+
 # Issues
 
 Please report bugs and request enhancements using the [issue tracker](https://github.com/jdidion/xphyle).
