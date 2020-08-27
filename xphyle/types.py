@@ -59,6 +59,10 @@ class ModeAccess(Enum):
         """
         return any(char in self.value for char in ("w", "+", "a", "x"))
 
+    @property
+    def readwritable(self) -> bool:
+        return "+" in self.value
+
 
 ModeAccessArg = Union[str, ModeAccess]
 
@@ -156,16 +160,38 @@ class FileMode(object):
         return self.access.writable
 
     @property
+    def readwritable(self):
+        """Whether this is read+write mode.
+        """
+        return self.access.readwritable
+
+    @property
     def binary(self):
         """Whether this is binary mode.
         """
         return self.coding == ModeCoding.BINARY
+
+    def as_binary(self):
+        """Converts this mode to binary
+        """
+        if self.coding == ModeCoding.BINARY:
+            return self
+        else:
+            return FileMode(access=self.access, coding=ModeCoding.BINARY)
 
     @property
     def text(self):
         """Whether this is text mode.
         """
         return self.coding == ModeCoding.TEXT
+
+    def as_text(self):
+        """Converts this mode to text
+        """
+        if self.coding == ModeCoding.TEXT:
+            return self
+        else:
+            return FileMode(access=self.access, coding=ModeCoding.TEXT)
 
     def __contains__(self, value: Union[str, ModeAccess, ModeCoding]) -> bool:
         if isinstance(value, ModeAccess):

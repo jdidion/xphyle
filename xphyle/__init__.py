@@ -2,6 +2,7 @@ from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from contextlib import contextmanager
 import io
+import mmap
 import os
 from pathlib import Path, PurePath
 import shlex
@@ -41,7 +42,7 @@ from xphyle.paths import (
     check_writable_file,
     safe_check_readable_file,
     deprecated_str_to_path,
-    convert_std_placeholder
+    convert_std_placeholder,
 )
 from xphyle.progress import ITERABLE_PROGRESS, PROCESS_PROGRESS
 from xphyle.types import (
@@ -66,6 +67,9 @@ try:
     __version__ = pkg_resources.get_distribution(__name__).version
 except pkg_resources.DistributionNotFound:
     __version__ = "Unknown"
+
+
+DEFAULTS: Dict[str, Any] = dict(xopen_context_wrapper=False, mmap_max_length=0)
 
 
 E = TypeVar("E", bound="EventManager")
@@ -319,6 +323,7 @@ class FileWrapper(FileLikeWrapper):
         compression: CompressionArg = False,
         name: Union[str, PurePath] = None,
         close_fileobj: bool = True,
+        memory_mapped: bool = False,
         **kwargs,
     ) -> None:
         if isinstance(source, Path):
@@ -329,16 +334,18 @@ class FileWrapper(FileLikeWrapper):
             if name is None and hasattr(source_fileobj, "name"):
                 name = str(getattr(source_fileobj, "name"))
             self._path = Path(name) if name else None
+
+        if mode is None and hasattr(source, "mode"):
+            mode = getattr(source_fileobj, "mode")
+        if mode:
+            mode = str(mode)
+
         super().__init__(
             source_fileobj, compression=compression, close_fileobj=close_fileobj
         )
         self._name = str(name)
-        if mode is None and hasattr(source, "mode"):
-            self._mode = getattr(source_fileobj, "mode")
-        if mode:
-            self._mode = str(mode)
-        else:
-            self._mode = None
+        self._mode = mode
+        self.memory_mapped = memory_mapped
 
     @property
     def name(self) -> str:
@@ -443,9 +450,7 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
         stderr: PopenStdArg = None,
         **kwargs,
     ) -> None:
-        Popen.__init__(
-            self, args, stdin=stdin, stdout=stdout, stderr=stderr, **kwargs
-        )
+        Popen.__init__(self, args, stdin=stdin, stdout=stdout, stderr=stderr, **kwargs)
         EventManager.__init__(self)
         # Construct a dict of name=(stream, wrapper, is_pipe) for std streams
         self._name = " ".join(args)
@@ -738,10 +743,6 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
 
 # Methods
 
-
-DEFAULTS: Dict[str, Any] = dict(xopen_context_wrapper=False)
-
-
 # noinspection PyShadowingNames
 def configure(
     default_xopen_context_wrapper: Optional[bool] = None,
@@ -751,6 +752,7 @@ def configure(
     system_progress_wrapper: Optional[Union[str, Sequence[str]]] = None,
     threads: Optional[Union[int, bool]] = None,
     executable_path: Optional[Union[PurePath, Sequence[PurePath]]] = None,
+    mmap_max_length: Optional[int] = None,
 ) -> None:
     """Conifgure xphyle.
 
@@ -768,10 +770,13 @@ def configure(
             the local machine.
         executable_path: List of paths where xphyle should look for system
             executables. These will be searched before the default system path.
+        mmap_max_length: Maximum memory to use (in bytes) when memory-mapping a file.
     """
     if default_xopen_context_wrapper is not None:
         # ISSUE: mypy doesn't recognize valid generator statement
         DEFAULTS.update(xopen_context_wrapper=default_xopen_context_wrapper)
+    if mmap_max_length is not None:
+        DEFAULTS.update(mmap_max_length=mmap_max_length)
     if progress is not None:
         ITERABLE_PROGRESS.update(progress, progress_wrapper)
     if system_progress is not None:
@@ -856,6 +861,39 @@ def open_(
                     yield None
 
 
+def _maybe_mmap(
+    fileobj: OpenArg,
+    mode: Optional[FileMode],
+    mmap_max_length: int,
+    mmap_mode: Optional[dict],
+):
+    is_path = isinstance(fileobj, (str, bytes, os.PathLike))
+    mmapped = False
+
+    if is_path or hasattr(fileobj, "fileno"):
+        if is_path:
+            fileobj = open(fileobj, mode.value)
+
+        if mmap_mode is None:
+            if mode is None or mode.readwritable:
+                # read-write - this is the default in Unix and will raise an error
+                # on Windows
+                mmap_mode = {}
+            elif mode.readable:
+                mmap_mode = {"access": mmap.ACCESS_READ}
+            else:
+                mmap_mode = {"access": mmap.ACCESS_WRITE}
+
+        try:
+            fileobj = mmap.mmap(fileobj.fileno(), length=mmap_max_length, **mmap_mode)
+            mmapped = True
+        except:
+            # this will also happen if we're trying to mmap an empty file
+            mmapped = False
+
+    return fileobj, mmapped
+
+
 def xopen(
     target: OpenArg,
     mode: ModeArg = None,
@@ -867,6 +905,9 @@ def xopen(
     validate: bool = True,
     overwrite: bool = True,
     close_fileobj: bool = True,
+    memory_map: bool = False,
+    mmap_max_length: int = DEFAULTS["mmap_max_length"],
+    mmap_mode: Optional[dict] = None,
     **kwargs,
 ) -> FileLike:
     """
@@ -905,6 +946,10 @@ def xopen(
         close_fileobj: When `path` is a file-like object / `file_type` is
             FileType.FILELIKE, and `context_wrapper` is True, whether to close
             the underlying file when closing the wrapper.
+        memory_map: Whether to memory-map the file. Ignored unless the target is a
+            regular file (i.e. it has a system `fileno`).
+        mmap_max_length:
+        mmap_mode:
         kwargs: Additional keyword arguments to pass to ``open``.
 
     `path` is interpreted as follows:
@@ -1219,18 +1264,36 @@ def xopen(
     elif compression is True:
         raise ValueError(f"Could not guess compression format from {target}")
 
+    mmapped = False
+
     if compression:
         fmt = FORMATS.get_compression_format(str(compression))
         compression = fmt.name
+        if memory_map and not use_system:
+            fileobj, mmapped = _maybe_mmap(
+                fileobj or target, mode.as_binary(), mmap_max_length, mmap_mode
+            )
         fileobj = fmt.open_file(
             fileobj or target, mode, use_system=use_system, **kwargs
         )
         is_std = False
-    elif not fileobj:
-        fileobj = open(target, mode.value, **kwargs)
-    elif mode.text and is_bin and (is_std or file_type is FileType.FILELIKE):
-        fileobj = io.TextIOWrapper(fileobj)
-        fileobj.mode = mode.value
+    else:
+        if fileobj:
+            wrap = mode.text and is_bin and (is_std or file_type is FileType.FILELIKE)
+        elif memory_map:
+            fileobj = open(target, mode.as_binary().value)
+            wrap = True
+        else:
+            fileobj = open(target, mode.value, **kwargs)
+            wrap = False
+
+        if memory_map:
+            fileobj, mmapped = _maybe_mmap(fileobj, mode, mmap_max_length, mmap_mode)
+            wrap = mmapped and mode.text
+
+        if wrap:
+            fileobj = io.TextIOWrapper(fileobj, **kwargs)
+            fileobj.mode = mode.value
 
     if context_wrapper:
         if is_std:
@@ -1246,6 +1309,7 @@ def xopen(
                 mode=mode,
                 compression=compression,
                 close_fileobj=close_fileobj,
+                memory_mapped=mmapped,
             )
 
     return fileobj
@@ -1275,9 +1339,9 @@ def get_compressor(name_or_path: Union[str, PurePath]) -> Optional[CompressionFo
     """
     fmt = FORMATS.guess_compression_format(name_or_path)
     if (
-        fmt is None and
-        isinstance(name_or_path, PurePath) and
-        safe_check_readable_file(cast(PurePath, name_or_path))
+        fmt is None
+        and isinstance(name_or_path, PurePath)
+        and safe_check_readable_file(cast(PurePath, name_or_path))
     ):
         fmt = FORMATS.guess_format_from_file_header(name_or_path)
     if fmt:
@@ -1332,7 +1396,7 @@ def popen(
         if isinstance(arg, tuple):
             path, path_args = arg
             if not isinstance(path_args, dict):
-                path_args = dict(mdoe=path_args)
+                path_args = dict(mode=path_args)
         elif isinstance(arg, dict):
             path = PIPE
             path_args = arg
