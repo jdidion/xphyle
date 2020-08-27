@@ -1,5 +1,9 @@
 # Changes
 
+## v4.4.0 (2020.08.27)
+
+* Add support for memory mapping, using the `memory_map` argument to `open_`/`xopen`
+
 ## v4.3.0 (2020.07.30)
 
 * Add support for igzip
