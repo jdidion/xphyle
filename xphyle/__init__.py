@@ -421,6 +421,12 @@ class StdWrapper(FileLikeWrapper):
 
 PopenStdArg = Union[PathOrFile, int]  # pylint: disable=invalid-name
 
+# SIGPIPE is Unix-only https://docs.python.org/3/library/signal.html#signal.SIGPIPE
+if platform.system() == "Windows":
+    VALID_RETURN_CODES = (0, None)
+else:
+    VALID_RETURN_CODES = (0, None, signal.SIGPIPE, signal.SIGPIPE + 128)
+
 
 # noinspection PyAbstractClass
 class Process(Popen, EventManager, FileLikeBase, Iterable):
@@ -718,9 +724,7 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
 
         return self.returncode
 
-    def check_valid_returncode(
-        self, valid: Container[int] = (0, None, signal.SIGPIPE, signal.SIGPIPE + 128)
-    ):
+    def check_valid_returncode(self, valid: Container[int] = VALID_RETURN_CODES):
         """Check that the returncodes does not have a value associated with
         an error state.
 
