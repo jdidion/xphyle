@@ -7,6 +7,7 @@ from contextlib import contextmanager
 import io
 import os
 from pathlib import Path, PurePath
+import platform
 import shlex
 import signal
 from subprocess import Popen, PIPE, TimeoutExpired
@@ -42,7 +43,7 @@ from xphyle.paths import (
     check_writable_file,
     safe_check_readable_file,
     deprecated_str_to_path,
-    convert_std_placeholder
+    convert_std_placeholder,
 )
 from xphyle.progress import ITERABLE_PROGRESS, PROCESS_PROGRESS
 from xphyle.types import (
@@ -420,6 +421,12 @@ class StdWrapper(FileLikeWrapper):
 
 PopenStdArg = Union[PathOrFile, int]  # pylint: disable=invalid-name
 
+# SIGPIPE is Unix-only https://docs.python.org/3/library/signal.html#signal.SIGPIPE
+if platform.system() == "Windows":
+    VALID_RETURN_CODES = (0, None)
+else:
+    VALID_RETURN_CODES = (0, None, signal.SIGPIPE, signal.SIGPIPE + 128)
+
 
 # noinspection PyAbstractClass
 class Process(Popen, EventManager, FileLikeBase, Iterable):
@@ -719,9 +726,7 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
 
         return self.returncode
 
-    def check_valid_returncode(
-        self, valid: Container[int] = (0, None, signal.SIGPIPE, signal.SIGPIPE + 128)
-    ):
+    def check_valid_returncode(self, valid: Container[int] = VALID_RETURN_CODES):
         """Check that the returncodes does not have a value associated with
         an error state.
 
@@ -1281,9 +1286,9 @@ def get_compressor(name_or_path: Union[str, PurePath]) -> Optional[CompressionFo
     """
     fmt = FORMATS.guess_compression_format(name_or_path)
     if (
-        fmt is None and
-        isinstance(name_or_path, PurePath) and
-        safe_check_readable_file(cast(PurePath, name_or_path))
+        fmt is None
+        and isinstance(name_or_path, PurePath)
+        and safe_check_readable_file(cast(PurePath, name_or_path))
     ):
         fmt = FORMATS.guess_format_from_file_header(name_or_path)
     if fmt:

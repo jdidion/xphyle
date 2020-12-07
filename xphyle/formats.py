@@ -320,7 +320,7 @@ class CompressionFormat(FileFormat):
     def system_commands(self) -> Tuple[str, ...]:
         """The names of the system-level commands, in order of preference.
         """
-        return self.name,
+        return (self.name,)
 
     @property
     def default_compresslevel(self) -> Optional[int]:  # pragma: no-cover
@@ -941,7 +941,7 @@ class Formats:
             return self.compression_format_aliases[name]
         i = name.rfind(os.extsep)
         if i >= 0:
-            ext = name[(i + 1):]
+            ext = name[(i + 1) :]
             if ext in self.compression_format_aliases:
                 return self.compression_format_aliases[ext]
         return None
@@ -1231,7 +1231,7 @@ class Gzip(SingleExeCompressionFormat):
 
     @property
     def exts(self) -> Tuple[str, ...]:
-        return "gz",
+        return ("gz",)
 
     @property
     def system_commands(self) -> Tuple[str, ...]:
@@ -1243,7 +1243,7 @@ class Gzip(SingleExeCompressionFormat):
 
     @property
     def magic_bytes(self) -> Tuple[Tuple[int, ...], ...]:
-        return (0x1F, 0x8B),
+        return ((0x1F, 0x8B),)
 
     @property
     def mime_types(self) -> Tuple[str, ...]:
@@ -1337,7 +1337,7 @@ class BGzip(DualExeCompressionFormat):
 
     @property
     def exts(self) -> Tuple[str, ...]:
-        return "bgz",
+        return ("bgz",)
 
     @property
     def allowed_exts(self) -> Tuple[str, ...]:
@@ -1353,7 +1353,7 @@ class BGzip(DualExeCompressionFormat):
 
     @property
     def compress_commands(self) -> Tuple[str, ...]:
-        return "bgzip",
+        return ("bgzip",)
 
     @property
     def decompress_commands(self) -> Tuple[str, ...]:
@@ -1361,7 +1361,7 @@ class BGzip(DualExeCompressionFormat):
 
     @property
     def magic_bytes(self) -> Tuple[Tuple[int, ...], ...]:
-        return (0x1F, 0x8B, 0x08, 0x04),
+        return ((0x1F, 0x8B, 0x08, 0x04),)
 
     @property
     def mime_types(self) -> Tuple[str, ...]:
@@ -1446,7 +1446,7 @@ class Zstd(SingleExeCompressionFormat):
 
     @property
     def exts(self) -> Tuple[str, ...]:
-        return "zst",
+        return ("zst",)
 
     @property
     def compresslevel_range(self) -> Tuple[int, int]:
@@ -1467,10 +1467,7 @@ class Zstd(SingleExeCompressionFormat):
 
     @property
     def mime_types(self) -> Tuple[str, ...]:
-        return (
-            "application/zstd",
-            "application/x-zstd"
-        )
+        return ("application/zstd", "application/x-zstd")
 
     def get_command(
         self,
@@ -1558,7 +1555,7 @@ class BZip2(SingleExeCompressionFormat):
 
     @property
     def magic_bytes(self) -> Tuple[Tuple[int, ...], ...]:
-        return (0x42, 0x5A, 0x68),
+        return ((0x42, 0x5A, 0x68),)
 
     @property
     def mime_types(self) -> Tuple[str, ...]:

@@ -569,15 +569,15 @@ def safe_check_writable_file(path: PurePath) -> Optional[PurePath]:
 
 @overload
 def find(
-        root: PurePath, pattern: Regexp, return_matches: True, **kwargs
-        ) -> Sequence[Tuple[PurePath, Match]]:
+    root: PurePath, pattern: Regexp, return_matches: True, **kwargs
+) -> Sequence[Tuple[PurePath, Match]]:
     pass
 
 
 @overload
 def find(
-        root: PurePath, pattern: Regexp, return_matches: False, **kwargs
-        ) -> Sequence[PurePath]:
+    root: PurePath, pattern: Regexp, return_matches: False, **kwargs
+) -> Sequence[PurePath]:
     pass
 
 
