@@ -3,9 +3,15 @@ language: python
 cache:
   directories:
     - $HOME/.cache/pip
+os:
+  - linux
+  - osx
+  - windows
 python:
   - 3.6
-  #- "3.7-dev"
+  - 3.7
+  - 3.8
+  - 3.9
 install:
   - pip install --upgrade pip wheel
   - pip install pytest-cov
