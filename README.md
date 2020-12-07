@@ -16,6 +16,8 @@ files. Most importantly, xphyle will use the appropriate program (e.g. 'gzip') t
 
 Recent version of xphyle (4.0.0+) require python 3.6. Older versions of xphyle support python 3.4+.
 
+Please note that xphyle may work on Windows, but it is not tested.
+
 # Installation
 
 ```

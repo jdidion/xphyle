@@ -1,5 +1,9 @@
 # Changes
 
+## v4.4.1 (2020.12.06)
+
+* Fix #41 - Windows does not support SIGPIPE
+
 ## v4.4.0 (2020.08.27)
 
 * Add support for memory mapping, using the `memory_map` argument to `open_`/`xopen`
