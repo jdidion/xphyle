@@ -5,6 +5,7 @@ import io
 import mmap
 import os
 from pathlib import Path, PurePath
+import platform
 import shlex
 import signal
 from subprocess import Popen, PIPE, TimeoutExpired
