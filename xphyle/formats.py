@@ -363,8 +363,9 @@ class CompressionFormat(FileFormat):
 
     @property
     @abstractmethod
-    def magic_bytes(self) -> Tuple[Tuple[int, ...], ...]:
+    def magic_bytes(self) -> Optional[Tuple[Tuple[int, ...], ...]]:
         """The initial bytes that indicate the file type.
+        Returns None if the format does not have any set inital bytes.
         """
         pass
 
@@ -819,7 +820,9 @@ class CompressionFormat(FileFormat):
             A tuple (<compressed size in bytes>, <uncompressed size in bytes>,
             <compression ratio>).
         """
-        raise UnsupportedOperation()
+        raise UnsupportedOperation(
+            f"parse_file_listing not supported for format {self.name}"
+        )
 
     def uncompressed_size(self, path: PurePath) -> Optional[int]:
         """Get the uncompressed size of a compressed file.
@@ -872,9 +875,11 @@ class Formats:
             # TODO: warn about overriding existing format?
             self.compression_format_aliases[alias] = fmt.name
 
-        for magic in fmt.magic_bytes:
-            self.max_magic_bytes = max(self.max_magic_bytes, len(magic))
-            self.magic_bytes[magic[0]].append((fmt.name, magic[1:]))
+        if fmt.magic_bytes is not None:
+            for magic in fmt.magic_bytes:
+                self.max_magic_bytes = max(self.max_magic_bytes, len(magic))
+                self.magic_bytes[magic[0]].append((fmt.name, magic[1:]))
+
         for mime in fmt.mime_types:
             self.mime_types[mime] = fmt.name
 
@@ -1242,7 +1247,7 @@ class Gzip(SingleExeCompressionFormat):
         return 1 if self.executable_name == "igzip" else 4
 
     @property
-    def magic_bytes(self) -> Tuple[Tuple[int, ...], ...]:
+    def magic_bytes(self) -> Optional[Tuple[Tuple[int, ...], ...]]:
         return ((0x1F, 0x8B),)
 
     @property
@@ -1300,7 +1305,7 @@ class Gzip(SingleExeCompressionFormat):
             returncode = 1
         super().handle_command_return(returncode, cmd, stderr)
 
-    def get_list_command(self, path: PurePath) -> List[str]:
+    def get_list_command(self, path: PurePath) -> Optional[List[str]]:
         if self.executable_name == "igzip":
             # igzip doesn't have a -l option
             exe_path = EXECUTABLE_CACHE.resolve_exe(["gzip", "pigz"])[0]
@@ -1388,7 +1393,7 @@ class BGzip(DualExeCompressionFormat):
         return "pigz", "gzip"
 
     @property
-    def magic_bytes(self) -> Tuple[Tuple[int, ...], ...]:
+    def magic_bytes(self) -> Optional[Tuple[Tuple[int, ...], ...]]:
         return ((0x1F, 0x8B, 0x08, 0x04),)
 
     @property
@@ -1482,7 +1487,7 @@ class Zstd(SingleExeCompressionFormat):
         return 3
 
     @property
-    def magic_bytes(self) -> Tuple[Tuple[int, ...], ...]:
+    def magic_bytes(self) -> Optional[Tuple[Tuple[int, ...], ...]]:
         return (
             (0xFD, 0x2F, 0xB5, 0x1E),  # v0.1
             (0xFD, 0x2F, 0xB5, 0x22),  # v0.2
@@ -1521,7 +1526,7 @@ class Zstd(SingleExeCompressionFormat):
             cmd.append(str(src))
         return cmd
 
-    def get_list_command(self, path: PurePath) -> List[str]:
+    def get_list_command(self, path: PurePath) -> Optional[List[str]]:
         return [str(self.executable_path), "-l", str(path)]
 
     def parse_file_listing(self, listing: str) -> Tuple[int, int, float]:
@@ -1579,7 +1584,7 @@ class BZip2(SingleExeCompressionFormat):
         return 9
 
     @property
-    def magic_bytes(self) -> Tuple[Tuple[int, ...], ...]:
+    def magic_bytes(self) -> Optional[Tuple[Tuple[int, ...], ...]]:
         return ((0x42, 0x5A, 0x68),)
 
     @property
@@ -1654,7 +1659,7 @@ class Lzma(SingleExeCompressionFormat):
         return 2
 
     @property
-    def magic_bytes(self) -> Tuple[Tuple[int, ...], ...]:
+    def magic_bytes(self) -> Optional[Tuple[Tuple[int, ...], ...]]:
         return (
             (0x4C, 0x5A, 0x49, 0x50),  # lz
             (0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00),  # xz
@@ -1694,7 +1699,7 @@ class Lzma(SingleExeCompressionFormat):
             cmd.append(str(src))
         return cmd
 
-    def get_list_command(self, path: PurePath) -> List[str]:
+    def get_list_command(self, path: PurePath) -> Optional[List[str]]:
         return [str(self.executable_path), "-lv", str(path)]
 
     def parse_file_listing(self, listing: str) -> Tuple[int, int, float]:
@@ -1735,3 +1740,68 @@ class Lzma(SingleExeCompressionFormat):
 #         if src != STDIN:
 #             cmd.append(src)
 #         return cmd
+
+
+@compression_format
+class Brotli(SingleExeCompressionFormat):
+    @property
+    def name(self) -> str:
+        return "brotli"
+
+    @property
+    def exts(self) -> Tuple[str, ...]:
+        return "br",
+
+    @property
+    def system_commands(self) -> Tuple[str, ...]:
+        return "brotli",
+
+    @property
+    def compresslevel_range(self) -> Tuple[int, int]:
+        return 0, 11
+
+    @property
+    def default_compresslevel(self) -> int:
+        # although 11 is the default when using the command line
+        # tool, 4 gives the best tradeoff in speed and compression
+        # ratio (both faster and better ratio than gzip)
+        return 4
+
+    @property
+    def magic_bytes(self) -> Optional[Tuple[Tuple[int, ...], ...]]:
+        return None
+
+    @property
+    def mime_types(self) -> Tuple[str, ...]:
+        # none of these are official, but they are used in the wild
+        return (
+            "application/brotli",
+            "application/x-brotli",
+            "application/x-br"
+        )
+
+    def get_command(
+        self,
+        operation: str,
+        src: PurePath = STDIN,
+        stdout: bool = True,
+        compresslevel: Optional[int] = 6,
+    ) -> List[str]:
+        cmd = [str(self.executable_path)]
+        if operation == "c":
+            compresslevel = self._get_compresslevel(compresslevel)
+            cmd.append("-{}".format(compresslevel))
+        elif operation == "d":
+            cmd.append("-d")
+        if stdout:
+            cmd.append("-c")
+        if src != STDIN:
+            cmd.append(str(src))
+        return cmd
+
+    def open_file_python(
+        self, path_or_file: PathOrFile, mode: ModeArg, **kwargs
+    ) -> FileLike:
+        raise UnsupportedOperation(
+            "the brotli python library does not have an open() function"
+        )

@@ -68,7 +68,7 @@ class CompressionTests(TestCase):
 
     def test_list_formats(self):
         self.assertSetEqual(
-            {"gzip", "bgzip", "bz2", "lzma", "zstd"},
+            {"gzip", "bgzip", "bz2", "lzma", "zstd", "brotli"},
             set(FORMATS.list_compression_formats()),
         )
         self.assertSetEqual(
@@ -88,6 +88,7 @@ class CompressionTests(TestCase):
                 ".7z",
                 ".7zip",
                 ".zst",
+                ".br"
             },
             set(FORMATS.list_extensions(True)),
         )
