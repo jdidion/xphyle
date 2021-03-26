@@ -21,7 +21,12 @@ xphyle is available from pypi::
 
 xphyle tries to use the compression programs installed on your local machine (e.g. gzip, bzip2); if it can't, it will use the built-in python libraries (which are slower). Thus, xphyle has no required dependencies, but we recommend that if you install gzip, etc. if you don't already have them.
 
-xphyle will use `pigz <http://zlib.net/pigz/>`_ for multi-threaded gzip compression if it is available. Multithreading support is disabled by default; to set the number of threads that xphyle should use::
+xphyle will use alternative programs for multi-threaded compression if it is available:
+
+* gzip: `igzip <https://github.com/intel/isa-l/tree/master/igzip>`_ or `pigz <http://zlib.net/pigz/>`_.
+* bzip2: `pbzip2 <https://github.com/ruanhuabin/pbzip2>`_
+
+Multithreading support is disabled by default; to set the number of threads that xphyle should use::
 
     xphyle.configure(threads=4)
 
@@ -126,9 +131,13 @@ Note that ``open_`` wraps files by default, including already open file-like obj
 Supported file formats
 ~~~~~~~~~~~~~~~~~~~~~~
 
-Currently, xphyle supports the most commonly used file formats: gzip, bzip2/7zip, and lzma/xz.
+xphyle supports the most commonly used file formats: gzip, bzip2/7zip, and lzma/xz.
 
-Also supported is block-based gzip (bgzip), a format commonly used in bioinformatics. Somewhat confusingly, '.gz' is an acceptable extension for bgzip files, and gzip will decompress bgzip files. Thus, to specifically use bgzip, either use a '.bgz' file extension or specify 'bgzip' as the compression format::
+Also supported are:
+
+* zstandard
+* Brotli
+* block-based gzip (bgzip), a format commonly used in bioinformatics. Somewhat confusingly, '.gz' is an acceptable extension for bgzip files, and gzip will decompress bgzip files. Thus, to specifically use bgzip, either use a '.bgz' file extension or specify 'bgzip' as the compression format::
 
     f = xopen('input.gz', 'rt', compression='bgzip', validate=False)
 
@@ -136,6 +145,8 @@ Additional compression formats may be added in the future. To get the most up-to
 
     from xphyle.formats import FORMATS
     print(', '.join(FORMATS.list_compression_formats())
+
+When a file is opened for decompression, its extension is used to determine which decompressor to use. If the extension is not recognized, or if the filename is not available (e.g. when decompressing a stream or buffer), then xphyle attempts to determine the file format from the "magic bytes" at the beginning of the file.
 
 Processes
 ~~~~~~~~~
@@ -181,7 +192,7 @@ Note that with ``open_`` and ``xopen``, the system command must be specified as 
 Buffers
 ~~~~~~~
 
-As of xphyle 2.1.0, ``open_`` and ``xopen`` can also open buffer types. A buffer is an instance of ``io.StringIO`` or ``io.BytesIO`` (or similar) -- basically an in memory read/write buffer. Passing open buffer objects worked before (they were treated as file-like), but now there is a special file type -- ``FileType.BUFFER`` -- that will cause them to be handled  a bit differently. In addition, you can now pass ``str`` or ``bytes`` (the type objects) to automatically create the corresponding buffer type::
+As of xphyle 2.1.0, ``open_`` and ``xopen`` can also open buffer types. A buffer is an instance of ``io.StringIO`` or ``io.BytesIO`` (or similar) -- basically an in memory read/write buffer. Passing open buffer objects worked before (they were treated as file-like), but now there is a special file type -- ``FileType.BUFFER`` -- that will cause them to be handled a bit differently. In addition, you can now pass ``str`` or ``bytes`` (the type objects) to automatically create the corresponding buffer type::
 
     with open_(str) as buf:
         buf.write('foo')
