@@ -322,8 +322,8 @@ class PathTests(TestCase):
         base = path.name
 
         spec = FileSpec(
-            StrPathVar('id', pattern='[A-Z0-9_]+', invalid=('XYZ999',)),
-            StrPathVar('ext', pattern='[^\.]+', valid=('txt', 'exe')),
+            StrPathVar('id', pattern=r'[A-Z0-9_]+', invalid=('XYZ999',)),
+            StrPathVar('ext', pattern=r'[^\.]+', valid=('txt', 'exe')),
             template='{id}.{ext}')
 
         # get a single file
@@ -415,12 +415,12 @@ class PathTests(TestCase):
         spec = PathSpec(
             DirSpec(
                 PathPathVar('root'),
-                StrPathVar('subdir', pattern='[A-Z0-9_]+', invalid=('XYZ999',)),
-                StrPathVar('leaf', pattern='[^_]+', valid=('AAA', 'BBB')),
+                StrPathVar('subdir', pattern=r'[A-Z0-9_]+', invalid=('XYZ999',)),
+                StrPathVar('leaf', pattern=r'[^_]+', valid=('AAA', 'BBB')),
                 template=os.path.join('{root}', '{subdir}', '{leaf}')),
             FileSpec(
-                StrPathVar('id', pattern='[A-Z0-9_]+', invalid=('ABC123',)),
-                StrPathVar('ext', pattern='[^\.]+', valid=('txt', 'exe')),
+                StrPathVar('id', pattern=r'[A-Z0-9_]+', invalid=('ABC123',)),
+                StrPathVar('ext', pattern=r'[^\.]+', valid=('txt', 'exe')),
                 template='{id}.{ext}'))
 
         path_var_values = dict(root=base, subdir='ABC123', leaf='AAA',
@@ -466,8 +466,8 @@ class PathTests(TestCase):
         spec = PathSpec(
             level2,
             FileSpec(
-                StrPathVar('id', pattern='[A-Z0-9_]+', invalid=('ABC123',)),
-                StrPathVar('ext', pattern='[^\.]+', valid=('txt', 'exe')),
+                StrPathVar('id', pattern=r'[A-Z0-9_]+', invalid=('ABC123',)),
+                StrPathVar('ext', pattern=r'[^\.]+', valid=('txt', 'exe')),
                 template='{id}.{ext}'))
         assert path_inst(path, dict(id='FFF555', ext='txt')) == spec.parse(path)
         with self.assertRaises(ValueError):
@@ -492,8 +492,8 @@ class PathTests(TestCase):
 
     def test_default_search(self):
         spec = FileSpec(
-            StrPathVar('id', pattern='[A-Z0-9_]+', invalid=('XYZ999',)),
-            StrPathVar('ext', pattern='[^\.]+', valid=('txt', 'exe')),
+            StrPathVar('id', pattern=r'[A-Z0-9_]+', invalid=('XYZ999',)),
+            StrPathVar('ext', pattern=r'[^\.]+', valid=('txt', 'exe')),
             template='{id}.{ext}')
         with self.assertRaises(ValueError):
             spec.find()
@@ -520,8 +520,8 @@ class PathTests(TestCase):
         spec = PathSpec(
             DirSpec(template=str(base)),
             FileSpec(
-                StrPathVar('id', pattern='[A-Z0-9_]+', invalid=('ABC123',)),
-                StrPathVar('ext', pattern='[^\.]+', valid=('txt', 'exe')),
+                StrPathVar('id', pattern=r'[A-Z0-9_]+', invalid=('ABC123',)),
+                StrPathVar('ext', pattern=r'[^\.]+', valid=('txt', 'exe')),
                 template='{id}.{ext}'))
 
         all_paths = spec.find()
