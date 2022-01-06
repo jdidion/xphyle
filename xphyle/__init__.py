@@ -1238,9 +1238,9 @@ def xopen(
         if mode.readable:
             target = check_readable_file(target)
             if validate or guess_format:
-                guess = FORMATS.guess_format_from_file_header(
-                    target
-                ) or FORMATS.guess_compression_format(target)
+                guess = FORMATS.guess_format_from_file_header(target)
+                if guess is None:
+                    guess = FORMATS.guess_compression_format(target)
         else:
             target = check_writable_file(target)
             # If overwrite=False, check that the file doesn't already exist
