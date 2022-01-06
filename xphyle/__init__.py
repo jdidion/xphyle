@@ -336,10 +336,12 @@ class FileWrapper(FileLikeWrapper):
                 name = str(getattr(source_fileobj, "name"))
             self._path = Path(name) if name else None
 
-        if mode is None and hasattr(source, "mode"):
+        if hasattr(source_fileobj, "mode"):
             mode = getattr(source_fileobj, "mode")
-        if mode:
+        elif mode:
             mode = str(mode)
+        else:
+            raise Exception(f"cannot determine mode of file {source}")
 
         super().__init__(
             source_fileobj, compression=compression, close_fileobj=close_fileobj
@@ -359,6 +361,10 @@ class FileWrapper(FileLikeWrapper):
         """The source path.
         """
         return getattr(self, "_path", None)
+    
+    @property
+    def mode(self) -> str:
+        return self._mode
 
 
 class BufferWrapper(FileWrapper):
@@ -1037,7 +1043,7 @@ def xopen(
             file_type = FileType.URL if url_parts else FileType.LOCAL
         elif not url_parts:
             raise ValueError(f"{target} is not a valid URL")
-
+    
     if not mode:
         # set to default
         if not is_buffer:
@@ -1242,7 +1248,10 @@ def xopen(
         if mode.readable:
             target = check_readable_file(target)
             if validate or guess_format:
-                guess = FORMATS.guess_format_from_file_header(target)
+                guess = (
+                    FORMATS.guess_format_from_file_header(target) or 
+                    FORMATS.guess_compression_format(target)
+                )
         else:
             target = check_writable_file(target)
             # If overwrite=False, check that the file doesn't already exist

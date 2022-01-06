@@ -194,7 +194,7 @@ class XphyleTests(TestCase):
         with self.assertRaises(IOError):
             xopen("foobar", "r")
         path = self.root.make_file(suffix=".gz")
-        with xopen(path, "rU") as i:
+        with xopen(path, "rU", context_wrapper=True) as i:
             assert "rt" == i.mode
         with xopen(path, "w", compression=True, context_wrapper=True) as o:
             assert cast(FileLikeWrapper, o).compression == "gzip"

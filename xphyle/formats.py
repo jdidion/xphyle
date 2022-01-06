@@ -957,7 +957,7 @@ class Formats:
 
         Note that ``path`` must be openable and readable. If it is a named pipe
         or other pseudo-file type, the magic bytes will be destructively
-        consumed and thus will open correctly.
+        consumed and thus will not open correctly.
 
         Args:
             path: Path to the file
