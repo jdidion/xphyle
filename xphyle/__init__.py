@@ -115,8 +115,7 @@ class EventListener(Generic[E], metaclass=ABCMeta):
 
 
 class EventManager:
-    """Mixin type for classes that allow registering event listners.
-    """
+    """Mixin type for classes that allow registering event listners."""
 
     def __init__(self) -> None:
         self._listeners: Dict[EventType, List[EventListener]] = defaultdict(lambda: [])
@@ -358,10 +357,9 @@ class FileWrapper(FileLikeWrapper):
 
     @property
     def path(self) -> PurePath:
-        """The source path.
-        """
+        """The source path."""
         return getattr(self, "_path", None)
-    
+
     @property
     def mode(self) -> str:
         return self._mode
@@ -389,8 +387,7 @@ class BufferWrapper(FileWrapper):
         self.buffer = buffer
 
     def getvalue(self) -> AnyChar:
-        """Returns the contents of the buffer.
-        """
+        """Returns the contents of the buffer."""
         if hasattr(self, "_value"):
             return getattr(self, "_value")
         else:
@@ -520,8 +517,7 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
         return self._std[name][1] is not None
 
     def writable(self) -> bool:
-        """Returns True if this Popen has stdin, otherwise False.
-        """
+        """Returns True if this Popen has stdin, otherwise False."""
         return self.get_writer() is not None
 
     def write(self, data: AnyChar) -> int:
@@ -537,14 +533,12 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
         return self.get_writer().write(data)
 
     def get_writer(self) -> FileLike:
-        """Returns the stream for writing to stdin.
-        """
+        """Returns the stream for writing to stdin."""
         stdin = self._std["stdin"]
         return stdin[1] or stdin[0]
 
     def readable(self) -> bool:
-        """Returns True if this Popen has stdout and/or stderr, otherwise False.
-        """
+        """Returns True if this Popen has stdout and/or stderr, otherwise False."""
         return self.get_reader() is not None
 
     def read(self, size: int = -1, which: str = None) -> bytes:
@@ -577,8 +571,7 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
         return std[1] or std[0]
 
     def get_readers(self):
-        """Returns (stdout, stderr) tuple.
-        """
+        """Returns (stdout, stderr) tuple."""
         return tuple(self.get_reader(std) for std in ("stdout", "stderr"))
 
     # ISSUE: No idea why mypy says the type of `inp` is incompatible with
@@ -600,14 +593,12 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
         return self.stdout, self.stderr
 
     def flush(self) -> None:
-        """Flushes stdin if there is one.
-        """
+        """Flushes stdin if there is one."""
         if self.writable():
             self.get_writer().flush()
 
     def __next__(self) -> AnyChar:
-        """Returns the next line from the iterator.
-        """
+        """Returns the next line from the iterator."""
         return next(iter(self))
 
     def __iter__(self) -> Iterator[AnyChar]:
@@ -643,8 +634,7 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
 
     @property
     def closed(self):
-        """Whether the Process has been closed.
-        """
+        """Whether the Process has been closed."""
         return self._std is None
 
     def close(self) -> None:
@@ -1043,7 +1033,7 @@ def xopen(
             file_type = FileType.URL if url_parts else FileType.LOCAL
         elif not url_parts:
             raise ValueError(f"{target} is not a valid URL")
-    
+
     if not mode:
         # set to default
         if not is_buffer:
@@ -1248,10 +1238,9 @@ def xopen(
         if mode.readable:
             target = check_readable_file(target)
             if validate or guess_format:
-                guess = (
-                    FORMATS.guess_format_from_file_header(target) or 
-                    FORMATS.guess_compression_format(target)
-                )
+                guess = FORMATS.guess_format_from_file_header(
+                    target
+                ) or FORMATS.guess_compression_format(target)
         else:
             target = check_writable_file(target)
             # If overwrite=False, check that the file doesn't already exist

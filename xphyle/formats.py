@@ -48,8 +48,7 @@ from xphyle.types import (
 
 
 class ThreadsVar:
-    """Maintain ``threads`` variable.
-    """
+    """Maintain ``threads`` variable."""
 
     def __init__(self, default_value: int = 1) -> None:
         self.threads = default_value
@@ -172,18 +171,15 @@ class SystemReader(SystemIO):
         return "rb"
 
     def readable(self) -> bool:
-        """Implementing file interface; returns True.
-        """
+        """Implementing file interface; returns True."""
         return True
 
     def flush(self) -> None:
-        """Implementing file interface; no-op.
-        """
+        """Implementing file interface; no-op."""
         pass
 
     def close(self) -> None:
-        """Close the reader; terminates the underlying process.
-        """
+        """Close the reader; terminates the underlying process."""
         self._closed = True
         retcode = self.process.poll()
         if retcode is None:
@@ -262,23 +258,19 @@ class SystemWriter(SystemIO):
         return "wb"
 
     def writable(self) -> bool:
-        """Implementing file interface; returns True.
-        """
+        """Implementing file interface; returns True."""
         return True
 
     def write(self, arg) -> int:
-        """Write to stdin of the underlying process.
-        """
+        """Write to stdin of the underlying process."""
         return self.process.stdin.write(arg)
 
     def flush(self) -> None:
-        """Flush stdin of the underlying process.
-        """
+        """Flush stdin of the underlying process."""
         self.process.stdin.flush()
 
     def close(self) -> None:
-        """Close the writer; terminates the underlying process.
-        """
+        """Close the writer; terminates the underlying process."""
         self._closed = True
         self.process.stdin.close()
         retcode = self.process.wait()
@@ -299,27 +291,23 @@ class CompressionFormat(FileFormat):
     @property
     @abstractmethod
     def name(self) -> str:
-        """The canonical format name.
-        """
+        """The canonical format name."""
         pass
 
     @property
     @abstractmethod
     def exts(self) -> Tuple[str, ...]:
-        """The commonly used file extensions.
-        """
+        """The commonly used file extensions."""
         pass
 
     @property
     def allowed_exts(self) -> Tuple[str, ...]:
-        """Extensions that are allowed to be used. Defaults to `self.exts`.
-        """
+        """Extensions that are allowed to be used. Defaults to `self.exts`."""
         return self.exts
 
     @property
     def system_commands(self) -> Tuple[str, ...]:
-        """The names of the system-level commands, in order of preference.
-        """
+        """The names of the system-level commands, in order of preference."""
         return (self.name,)
 
     @property
@@ -331,34 +319,29 @@ class CompressionFormat(FileFormat):
 
     @property
     def compresslevel_range(self) -> Optional[Tuple[int, int]]:  # pragma: no-cover
-        """The range of valid compression levels: (lowest, highest).
-        """
+        """The range of valid compression levels: (lowest, highest)."""
         return None
 
     @property
     @abstractmethod
     def compress_path(self) -> PurePath:
-        """The path of the compression program.
-        """
+        """The path of the compression program."""
         pass
 
     @property
     @abstractmethod
     def decompress_path(self) -> PurePath:
-        """The path of the decompression program.
-        """
+        """The path of the decompression program."""
         pass
 
     @property
     def compress_name(self) -> str:
-        """The name of the compression program.
-        """
+        """The name of the compression program."""
         return self.compress_path.name
 
     @property
     def decompress_name(self) -> str:
-        """The name of the decompression program.
-        """
+        """The name of the decompression program."""
         return self.decompress_path.name
 
     @property
@@ -372,14 +355,12 @@ class CompressionFormat(FileFormat):
     @property
     @abstractmethod
     def mime_types(self) -> Tuple[str, ...]:
-        """The MIME types.
-        """
+        """The MIME types."""
         pass
 
     @property
     def aliases(self) -> Tuple:
-        """All of the aliases by which this format is known.
-        """
+        """All of the aliases by which this format is known."""
         aliases = set(self.exts)
         # if isinstance(fmt.system_commands, dict):
         #     aliases = aliases | set(fmt.system_commands.values())
@@ -390,8 +371,7 @@ class CompressionFormat(FileFormat):
 
     @property
     def default_ext(self) -> str:
-        """The default file extension for this format.
-        """
+        """The default file extension for this format."""
         return self.exts[0]
 
     def _get_compresslevel(self, level: int = None) -> int:
@@ -844,8 +824,7 @@ class CompressionFormat(FileFormat):
 
 
 class Formats:
-    """Manages a set of compression formats.
-    """
+    """Manages a set of compression formats."""
 
     def __init__(self):
         self.compression_formats = {}
@@ -884,8 +863,7 @@ class Formats:
             self.mime_types[mime] = fmt.name
 
     def list_compression_formats(self) -> Tuple:
-        """Returns a list of all registered compression formats.
-        """
+        """Returns a list of all registered compression formats."""
         return tuple(self.compression_formats.keys())
 
     def list_extensions(self, with_sep: bool = False) -> Iterable[str]:
@@ -927,8 +905,7 @@ class Formats:
         raise ValueError("Unsupported compression format: {}".format(name))
 
     def get_compression_format_name(self, alias: str):
-        """Returns the cannonical name for the given alias.
-        """
+        """Returns the cannonical name for the given alias."""
         if alias in self.compression_formats:
             return alias
         return self.compression_format_aliases.get(alias, None)
@@ -1047,15 +1024,13 @@ class SingleExeCompressionFormat(
 
     @property
     def executable_path(self) -> PurePath:
-        """The path of the system executable.
-        """
+        """The path of the system executable."""
         self._resolve_executable()
         return self._executable_path
 
     @property
     def executable_name(self) -> str:
-        """The name of the system executable.
-        """
+        """The name of the system executable."""
         self._resolve_executable()
         return self._executable_name
 
@@ -1227,8 +1202,7 @@ class DualExeCompressionFormat(
 
 @compression_format
 class Gzip(SingleExeCompressionFormat):
-    """Implementation of CompressionFormat for gzip files.
-    """
+    """Implementation of CompressionFormat for gzip files."""
 
     @property
     def name(self) -> str:
@@ -1489,10 +1463,11 @@ class Zstd(SingleExeCompressionFormat):
     @property
     def magic_bytes(self) -> Optional[Tuple[Tuple[int, ...], ...]]:
         return (
-            (0xFD, 0x2F, 0xB5, 0x1E),  # v0.1
-            (0xFD, 0x2F, 0xB5, 0x22),  # v0.2
-            (0xFD, 0x2F, 0xB5, 0x23),  # v0.3
-            (0xFD, 0x2F, 0xB5, 0x24),  # v0.4
+            (0x28, 0xB5, 0x2F, 0xFD),
+            (0x22, 0xB5, 0x2F, 0xFD),  # v0.2
+            (0x23, 0xB5, 0x2F, 0xFD),  # v0.3
+            (0x24, 0xB5, 0x2F, 0xFD),  # v0.4
+            (0x1E, 0xB5, 0x2F, 0xFD),  # v0.1
         )
 
     @property
@@ -1560,8 +1535,7 @@ class Zstd(SingleExeCompressionFormat):
 
 @compression_format
 class BZip2(SingleExeCompressionFormat):
-    """Implementation of CompressionFormat for bzip2 files.
-    """
+    """Implementation of CompressionFormat for bzip2 files."""
 
     @property
     def name(self) -> str:
@@ -1635,8 +1609,7 @@ class BZip2(SingleExeCompressionFormat):
 
 @compression_format
 class Lzma(SingleExeCompressionFormat):
-    """Implementation of CompressionFormat for lzma (.xz) files.
-    """
+    """Implementation of CompressionFormat for lzma (.xz) files."""
 
     @property
     def name(self) -> str:
@@ -1750,11 +1723,11 @@ class Brotli(SingleExeCompressionFormat):
 
     @property
     def exts(self) -> Tuple[str, ...]:
-        return "br",
+        return ("br",)
 
     @property
     def system_commands(self) -> Tuple[str, ...]:
-        return "brotli",
+        return ("brotli",)
 
     @property
     def compresslevel_range(self) -> Tuple[int, int]:
@@ -1774,11 +1747,7 @@ class Brotli(SingleExeCompressionFormat):
     @property
     def mime_types(self) -> Tuple[str, ...]:
         # none of these are official, but they are used in the wild
-        return (
-            "application/brotli",
-            "application/x-brotli",
-            "application/x-br"
-        )
+        return ("application/brotli", "application/x-brotli", "application/x-br")
 
     def get_command(
         self,
