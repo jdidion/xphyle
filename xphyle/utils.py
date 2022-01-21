@@ -5,7 +5,8 @@ managing files. All of these functions are 'safe', meaning that if you pass
 handled gracefully.
 """
 from abc import ABCMeta, abstractmethod
-from collections import OrderedDict, Sized
+from collections import OrderedDict
+from collections.abc import Sized
 import copy
 import csv
 from itertools import cycle
@@ -560,8 +561,7 @@ def uncompressed_size(
 
 
 class CompressOnClose(EventListener[FileWrapper]):
-    """Compress a file after it is closed.
-    """
+    """Compress a file after it is closed."""
 
     compressed_path = None
 
@@ -570,16 +570,14 @@ class CompressOnClose(EventListener[FileWrapper]):
 
 
 class MoveOnClose(EventListener[FileWrapper]):
-    """Move a file after it is closed.
-    """
+    """Move a file after it is closed."""
 
     def execute(self, wrapper: FileWrapper, dest: PurePath = None, **kwargs) -> None:
         shutil.move(wrapper.path, str(dest))
 
 
 class RemoveOnClose(EventListener[FileWrapper]):
-    """Remove a file after it is closed.
-    """
+    """Remove a file after it is closed."""
 
     def execute(self, wrapper: FileWrapper, **kwargs) -> None:
         os.remove(wrapper.path)
@@ -760,24 +758,20 @@ class FileManager(Sized):
 
     @property
     def keys(self) -> Sequence[Any]:
-        """Returns a list of all keys in the order they were added.
-        """
+        """Returns a list of all keys in the order they were added."""
         return tuple(self._files.keys())
 
     @property
     def paths(self) -> Sequence[PurePath]:
-        """Returns a list of all paths in the order they were added.
-        """
+        """Returns a list of all paths in the order they were added."""
         return list(self._paths[key] for key in self.keys)
 
     def iter_files(self) -> Generator[Tuple[Any, FileLike], None, None]:
-        """Iterates over all (key, file) pairs in the order they were added.
-        """
+        """Iterates over all (key, file) pairs in the order they were added."""
         yield from ((key, self.get(key)) for key in list(self.keys))
 
     def close(self) -> None:
-        """Close all files being tracked.
-        """
+        """Close all files being tracked."""
         if not hasattr(self, "_files"):
             return
         for fileobj in self._files.values():
@@ -815,38 +809,33 @@ class FileInput(FileManager, Generic[CharMode], Iterator[CharMode]):
 
     @property
     def filekey(self) -> Any:
-        """The key of the file currently being read.
-        """
+        """The key of the file currently being read."""
         if self.fileno < 0:
             return None
         return list(self.keys)[self.fileno]
 
     @property
     def filename(self) -> Optional[PurePath]:
-        """The name of the file currently being read.
-        """
+        """The name of the file currently being read."""
         if self.fileno < 0:
             return None
         return self.get_path(self.fileno)
 
     @property
     def lineno(self) -> int:
-        """The total number of lines that have been read so far from all files.
-        """
+        """The total number of lines that have been read so far from all files."""
         return self._startlineno + self.filelineno
 
     @property
     def finished(self) -> bool:
-        """Whether all data has been read from all files.
-        """
+        """Whether all data has been read from all files."""
         return self.fileno >= len(self)
 
     @deprecated_str_to_path(1, "path_or_file")
     def add(
         self, path_or_file: PathOrFile, key: Optional[Any] = None, **kwargs
     ) -> None:
-        """Overrides FileManager.add() to prevent file-specific open args.
-        """
+        """Overrides FileManager.add() to prevent file-specific open args."""
         # If we've already finished reading all the files,
         # put us back in a pending state
         if self.finished:
@@ -1084,8 +1073,7 @@ class FileOutput(FileManager, Generic[CharMode], metaclass=ABCMeta):
 
 
 class TeeFileOutput(Generic[CharMode], FileOutput[CharMode]):
-    """Write output to mutliple files simultaneously.
-    """
+    """Write output to mutliple files simultaneously."""
 
     def _writeline(self, line: CharMode = None) -> int:
         char_count = None

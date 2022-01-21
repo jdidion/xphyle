@@ -50,14 +50,14 @@ class UtilsTests(TestCase):
         assert 3 == write_lines(['foo'], path, linesep=None)
         assert list(read_lines(path)) == ['foo']
         path = self.root.make_file()
-        self.assertEquals(
+        self.assertEqual(
             9 + (2*linesep_len),
             write_lines(('foo', 'bar', 'baz'), path, linesep=None))
         self.assertEqual(
             list(read_lines(path)),
             ['foo', 'bar', 'baz'])
         path = self.root.make_file()
-        self.assertEquals(
+        self.assertEqual(
             11, write_lines(('foo', 'bar', 'baz'), path, linesep='|'))
         assert list(read_lines(path)) == ['foo|bar|baz']
         path = self.root.make_file(permissions='r')
