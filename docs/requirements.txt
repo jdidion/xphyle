@@ -1,2 +1,2 @@
-sphinx==4.4.0
+sphinx==5.2.3
 pokrok==0.2.0
