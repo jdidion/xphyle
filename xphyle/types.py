@@ -49,14 +49,12 @@ class ModeAccess(Enum):
 
     @property
     def readable(self):
-        """Whether this is readable mode.
-        """
+        """Whether this is readable mode."""
         return any(char in self.value for char in ("r", "+"))
 
     @property
     def writable(self):
-        """Whether this is writable mode.
-        """
+        """Whether this is writable mode."""
         return any(char in self.value for char in ("w", "+", "a", "x"))
 
     @property
@@ -117,15 +115,26 @@ class FileMode(object):
     ) -> None:
         if mode:
             access_val = None
-            for a in ModeAccess:
-                if a.value in mode:
-                    access_val = a
-                    break
+            access_char = None
+            update = False
             coding_val = None
-            for e in ModeCoding:
-                if e.value in mode:
-                    coding_val = e
-                    break
+            for c in mode:
+                if c in "rwax" and access_char is None:
+                    access_char = c
+                elif c == "+":
+                    update = True
+                elif c in "bt" and coding_val is None:
+                    coding_val = ModeCoding(c)
+                elif c == "U" and coding_val is None:
+                    coding_val = ModeCoding.TEXT
+                else:
+                    raise ValueError(f"Invalid characters in mode string: {mode}")
+
+            if access_char is not None:
+                if update:
+                    access_val = ModeAccess(access_char + "+")
+                else:
+                    access_val = ModeAccess(access_char)
         else:
             if isinstance(access, str):
                 access_val = ModeAccess(access)
@@ -149,31 +158,26 @@ class FileMode(object):
 
     @property
     def readable(self):
-        """Whether this is readable mode.
-        """
+        """Whether this is readable mode."""
         return self.access.readable
 
     @property
     def writable(self):
-        """Whether this is writable mode.
-        """
+        """Whether this is writable mode."""
         return self.access.writable
 
     @property
     def readwritable(self):
-        """Whether this is read+write mode.
-        """
+        """Whether this is read+write mode."""
         return self.access.readwritable
 
     @property
     def binary(self):
-        """Whether this is binary mode.
-        """
+        """Whether this is binary mode."""
         return self.coding == ModeCoding.BINARY
 
     def as_binary(self):
-        """Converts this mode to binary
-        """
+        """Converts this mode to binary"""
         if self.coding == ModeCoding.BINARY:
             return self
         else:
@@ -181,13 +185,11 @@ class FileMode(object):
 
     @property
     def text(self):
-        """Whether this is text mode.
-        """
+        """Whether this is text mode."""
         return self.coding == ModeCoding.TEXT
 
     def as_text(self):
-        """Converts this mode to text
-        """
+        """Converts this mode to text"""
         if self.coding == ModeCoding.TEXT:
             return self
         else:
@@ -248,14 +250,12 @@ class Permission(Enum):
 
     @property
     def stat_flag(self):
-        """Returns the :module:`stat` flag.
-        """
+        """Returns the :module:`stat` flag."""
         return STAT_ALIASES[self.value]
 
     @property
     def os_flag(self):
-        """Returns the :module:`os` flag.
-        """
+        """Returns the :module:`os` flag."""
         return OS_ALIASES[self.value]
 
 
@@ -483,8 +483,7 @@ class FileLikeBase(FileLikeInterface):
 
 
 class PathType(Enum):
-    """Enumeration of supported path types (file, directory, FIFO).
-    """
+    """Enumeration of supported path types (file, directory, FIFO)."""
 
     FILE = "f"
     """Path represents a file."""

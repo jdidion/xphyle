@@ -321,6 +321,18 @@ class XphyleTests(TestCase):
                 assert "f" == i.peek(1)
                 assert "foo\n" == next(i)
 
+    def test_seek(self):
+        path = self.root.make_file(contents="foo")
+        with open_(path, "rb") as i:
+            i.seek(1)
+            assert b"o" == i.peek(1)
+
+    def test_truncate(self):
+        path = self.root.make_file(contents="foo")
+        with open_(path, "r+") as i:
+            i.truncate(1)
+            assert i.read() == "f"
+
     def test_event_listeners(self):
         class MockEventListener(EventListener):
             def __init__(self):
