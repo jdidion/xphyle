@@ -301,7 +301,6 @@ class FileLikeWrapper(EventManager, FileLikeBase):
         return self._fileobj.fileno()
 
     def truncate(self, size: int = None) -> int:  # pragma: no-cover
-        print(type(self._fileobj))
         return self._fileobj.truncate(size)
 
 
