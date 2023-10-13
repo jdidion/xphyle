@@ -36,7 +36,7 @@ release: clean tag install test
 	python setup.py sdist bdist_wheel
 	# release
 	#python setup.py upload -r pypi
-	twine upload dist/*
+	twine upload -u "__token__" -p "$(pypi_token)" dist/*
 	# push new tag after successful build
 	git push origin --tags
 	# create release in GitHub
