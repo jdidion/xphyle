@@ -34,6 +34,8 @@ tag:
 release: clean tag install test
 	echo "Releasing version $(version)"
 	python setup.py sdist bdist_wheel
+	# pypi doesn't accept eggs
+	rm dist/*.egg
 	# release
 	#python setup.py upload -r pypi
 	twine upload -u "__token__" -p "$(pypi_token)" dist/*
