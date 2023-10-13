@@ -289,7 +289,7 @@ class FileLikeWrapper(EventManager, FileLikeBase):
         return self._fileobj.seekable()
 
     def seek(self, offset, whence: int = 0) -> int:  # pragma: no-cover
-        return self._fileobj.seek(offset, whence=whence)
+        return self._fileobj.seek(offset, whence)
 
     def tell(self) -> int:  # pragma: no-cover
         return self._fileobj.tell()
@@ -301,7 +301,8 @@ class FileLikeWrapper(EventManager, FileLikeBase):
         return self._fileobj.fileno()
 
     def truncate(self, size: int = None) -> int:  # pragma: no-cover
-        return self._fileobj.truncate(size=size)
+        print(type(self._fileobj))
+        return self._fileobj.truncate(size)
 
 
 class FileWrapper(FileLikeWrapper):
@@ -743,6 +744,7 @@ class Process(Popen, EventManager, FileLikeBase, Iterable):
 
 
 # Methods
+
 
 # noinspection PyShadowingNames
 def configure(
