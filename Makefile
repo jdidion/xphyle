@@ -44,7 +44,7 @@ release: clean tag install test
 	# create release in GitHub
 	curl -v -i -X POST \
 		-H "Content-Type:application/json" \
-		-H "Authorization: token $(token)" \
+		-H "Authorization: token $(github_token)" \
 		https://api.github.com/repos/$(repo)/releases \
 		-d '{ \
 		  "tag_name":"$(version)", \
