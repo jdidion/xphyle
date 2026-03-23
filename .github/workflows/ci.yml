@@ -21,6 +21,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install "pokrok @ git+https://github.com/jdidion/pokrok.git@maintenance/modernize-packaging"
           pip install -e ".[test]"
       - name: Run tests
         run: |
