@@ -11,3 +11,6 @@ docs/_build/
 .pytest_cache/
 .eggs/
 .DS_Store
+
+# oh-my-claudecode scratch
+.omc/
