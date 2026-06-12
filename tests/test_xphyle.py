@@ -1,6 +1,7 @@
 from unittest import TestCase, skipIf
 from . import *
 import gzip
+import os
 from io import BytesIO, IOBase
 from xphyle import *
 from xphyle.paths import TempDir, STDIN, STDOUT, STDERR, EXECUTABLE_CACHE
@@ -194,8 +195,15 @@ class XphyleTests(TestCase):
         with self.assertRaises(IOError):
             xopen("foobar", "r")
         path = self.root.make_file(suffix=".gz")
+        # Write a real gzip stream so the read path decompresses actual data
+        # rather than an empty file (see issue #112: system decompressors exit
+        # non-zero on empty input, which made this test fail nondeterministically
+        # depending on a process-exit race).
+        with gzip.open(path, "wt") as o:
+            o.write("bar")
         with xopen(path, "rU", context_wrapper=True) as i:
             assert "rt" == i.mode
+            assert i.read() == "bar"
         with xopen(path, "w", compression=True, context_wrapper=True) as o:
             assert cast(FileLikeWrapper, o).compression == "gzip"
             o.write("foo")
@@ -210,6 +218,19 @@ class XphyleTests(TestCase):
         with self.assertRaises(ValueError):
             with xopen(existing_file, "wt", overwrite=False):
                 pass
+
+    def test_xopen_empty_compressed_file(self):
+        # Regression test for issue #112: reading an empty (zero-byte)
+        # compressed file via the system-level decompressor must not raise.
+        # System tools such as gzip/pigz exit non-zero on empty input, which
+        # previously surfaced as a nondeterministic EOFError depending on a
+        # process-exit race (failing far more often on single-CPU machines).
+        path = self.root.make_file(suffix=".gz")
+        assert os.path.getsize(path) == 0
+        # Force the system-level read path and consume the whole stream so the
+        # subprocess exit code is deterministically checked.
+        with xopen(path, "rb", use_system=True, context_wrapper=True) as i:
+            assert i.read() == b""
 
     def test_xopen_fileobj(self):
         path = self.root.make_file(suffix=".gz")

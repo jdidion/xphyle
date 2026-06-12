@@ -1,5 +1,9 @@
 # Changes
 
+## Unreleased
+
+* Fix #112 - Reading an empty compressed file via a system-level decompressor (gzip/pigz) no longer raises a spurious `EOFError`. System decompressors exit non-zero on empty input, which surfaced as a nondeterministic failure depending on a process-exit race (more frequent on single-CPU machines).
+
 ## v4.4.1 (2020.12.06)
 
 * Fix #41 - Windows does not support SIGPIPE
