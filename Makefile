@@ -1,23 +1,23 @@
 module = xphyle
-#pytestops = "--full-trace"
-#pytestops = "-v -s"
 repo = jdidion/$(module)
-desc = Release $(version)
 tests = tests
-desc = ''
-# Use this option to show full stack trace for errors
-#pytestopts = "--full-trace"
 
 all: install test
 
 install:
-	python setup.py install
+	uv sync --all-extras
 
 test:
-	pytest -m "not perf" -vv --cov --cov-report term-missing $(pytestopts) $(tests)
+	uv run pytest -m "not perf" -vv --cov --cov-report term-missing $(pytestopts) $(tests)
 
 perftest:
-	pytest -m "perf" $(tests)
+	uv run pytest -m "perf" $(tests)
+
+lint:
+	uv run ruff check $(module)
+
+build:
+	uv build
 
 clean:
 	rm -Rf __pycache__
@@ -28,39 +28,12 @@ clean:
 	rm -Rf .pytest_cache
 	rm -Rf .coverage
 
-tag:
-	git tag $(version)
-
-release: clean tag install test
-	echo "Releasing version $(version)"
-	python setup.py sdist bdist_wheel
-	# pypi doesn't accept eggs
-	rm dist/*.egg
-	# release
-	#python setup.py upload -r pypi
-	twine upload -u "__token__" -p "$(pypi_token)" dist/*
-	# push new tag after successful build
-	git push origin --tags
-	# create release in GitHub
-	curl -v -i -X POST \
-		-H "Content-Type:application/json" \
-		-H "Authorization: token $(github_token)" \
-		https://api.github.com/repos/$(repo)/releases \
-		-d '{ \
-		  "tag_name":"$(version)", \
-		  "target_commitish": "master", \
-		  "name": "$(version)", \
-		  "body": "$(desc)", \
-		  "draft": false, \
-		  "prerelease": false \
-		}'
+# Versioning is git-tag driven via setuptools-scm. To release:
+#   1. git tag vX.Y.0 && git push origin vX.Y.0
+#   2. CI builds and publishes to PyPI (or run `make publish` locally with UV_PUBLISH_TOKEN set).
+publish: clean build
+	uv publish
 
 docs:
-	make -C docs api
-	make -C docs html
-
-readme:
-	pandoc --from=markdown --to=rst --output=README.rst README.md
-
-lint:
-	pylint $(module)
+	$(MAKE) -C docs api
+	$(MAKE) -C docs html

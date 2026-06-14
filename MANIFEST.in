@@ -1,8 +1,0 @@
-include README.md
-include LICENSE
-include tests/test*.py
-include docs/*.rst
-include docs/conf.py
-include docs/Makefile
-include docs/logo.png
-include docs/api/*.rst

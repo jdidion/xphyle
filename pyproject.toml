@@ -25,6 +25,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 
 [project.optional-dependencies]
@@ -34,6 +35,9 @@ test = ["pytest", "pytest-cov"]
 
 [project.urls]
 Homepage = "https://github.com/jdidion/xphyle"
+
+[dependency-groups]
+dev = ["pytest", "pytest-cov", "ruff"]
 
 [tool.setuptools]
 packages = ["xphyle"]
@@ -48,7 +52,6 @@ markers = [
 [tool.coverage.run]
 omit = [
     "tests/*",
-    "setup.py",
     "*site-packages/*",
 ]
 
