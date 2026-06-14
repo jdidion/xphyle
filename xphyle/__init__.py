@@ -31,7 +31,7 @@ from typing import (
     cast,
 )
 
-import pkg_resources
+from importlib.metadata import version, PackageNotFoundError
 
 from xphyle.formats import FORMATS, THREADS, CompressionFormat
 from xphyle.paths import (
@@ -65,8 +65,8 @@ from xphyle.urls import parse_url, open_url, get_url_file_name
 
 
 try:
-    __version__ = pkg_resources.get_distribution(__name__).version
-except pkg_resources.DistributionNotFound:
+    __version__ = version(__name__)
+except PackageNotFoundError:
     __version__ = "Unknown"
 
 
