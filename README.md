@@ -1,14 +1,14 @@
 # xphyle: extraordinarily simple file handling
 
-[![PyPI](https://img.shields.io/pypi/v/xphyle.svg?branch=master)](https://pypi.python.org/pypi/xphyle)
-[![Travis CI](https://img.shields.io/travis/jdidion/xphyle/master.svg)](https://travis-ci.org/jdidion/xphyle)
-[![Coverage Status](https://img.shields.io/coveralls/jdidion/xphyle/master.svg)](https://coveralls.io/github/jdidion/xphyle?branch=master)
+[![PyPI](https://img.shields.io/pypi/v/xphyle.svg)](https://pypi.python.org/pypi/xphyle)
+[![CI](https://github.com/jdidion/xphyle/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jdidion/xphyle/actions/workflows/ci.yml)
+[![Coverage Status](https://img.shields.io/coveralls/jdidion/xphyle/main.svg)](https://coveralls.io/github/jdidion/xphyle?branch=main)
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/b2c0baa52b604e39a09ed108ac2f53ee)](https://www.codacy.com/app/jdidion/xphyle?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=jdidion/xphyle&amp;utm_campaign=Badge_Grade)
 [![Documentation Status](https://readthedocs.org/projects/xphyle/badge/?version=latest)](http://xphyle.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/71260678.svg)](https://zenodo.org/badge/latestdoi/71260678)
 [![JOSS](http://joss.theoj.org/papers/10.21105/joss.00255/status.svg)](http://joss.theoj.org/papers/10.21105/joss.00255)
 
-<img src="https://github.com/jdidion/xphyle/blob/master/docs/logo.png?raw=true"
+<img src="https://github.com/jdidion/xphyle/blob/main/docs/logo.png?raw=true"
      alt="logo" width="200" height="200">
 
 xphyle is a small python library that makes it easy to open compressed

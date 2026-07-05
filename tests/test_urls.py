@@ -3,7 +3,7 @@ from xphyle.urls import *
 from xphyle.paths import *
 
 
-good_url = 'https://github.com/jdidion/xphyle/blob/master/tests/foo.gz?raw=True'
+good_url = 'https://github.com/jdidion/xphyle/blob/main/tests/foo.gz?raw=True'
 bad_url = 'foo'
 
 
@@ -12,7 +12,7 @@ class TestURLs(TestCase):
         self.assertEqual(
             tuple(parse_url(good_url)),
             ('https', 'github.com',
-             '/jdidion/xphyle/blob/master/tests/foo.gz',
+             '/jdidion/xphyle/blob/main/tests/foo.gz',
              '', 'raw=True', ''))
         self.assertIsNone(parse_url(bad_url))
 
