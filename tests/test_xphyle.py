@@ -290,7 +290,7 @@ class XphyleTests(TestCase):
         badurl = "http://google.com/__badurl__"
         with self.assertRaises(ValueError):
             xopen(badurl)
-        url = "https://github.com/jdidion/xphyle/blob/master/tests/foo.gz?raw=True"
+        url = "https://github.com/jdidion/xphyle/blob/main/tests/foo.gz?raw=True"
         with self.assertRaises(ValueError):
             xopen(url, "w")
         with open_(url, "rt") as i:

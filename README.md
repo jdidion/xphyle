@@ -8,7 +8,7 @@
 [![DOI](https://zenodo.org/badge/71260678.svg)](https://zenodo.org/badge/latestdoi/71260678)
 [![JOSS](http://joss.theoj.org/papers/10.21105/joss.00255/status.svg)](http://joss.theoj.org/papers/10.21105/joss.00255)
 
-<img src="https://github.com/jdidion/xphyle/blob/master/docs/logo.png?raw=true"
+<img src="https://github.com/jdidion/xphyle/blob/main/docs/logo.png?raw=true"
      alt="logo" width="200" height="200">
 
 xphyle is a small python library that makes it easy to open compressed
