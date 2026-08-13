@@ -195,13 +195,27 @@ class SystemReader(SystemIO):
     def _raise_if_error(self) -> None:
         """Raise EOFError if process is not running anymore and the
         exit code is nonzero.
+
+        An empty source file is a special case: system decompressors such as
+        ``gzip``/``pigz`` exit non-zero on empty input ("unexpected end of
+        file"), whereas the Python implementations treat an empty file as a
+        valid, empty stream. To keep the system- and library-level read paths
+        consistent, a non-zero exit code is ignored when the source file is
+        empty.
         """
         retcode = self.process.poll()
-        if retcode is not None and retcode != 0:  # pragma: no-cover
+        if retcode is not None and retcode != 0 and not self._source_is_empty():
             raise EOFError(
                 f"{self.executable_name} process returned non-zero exit code "
                 f"{retcode}. Is the input file truncated or corrupt?"
             )
+
+    def _source_is_empty(self) -> bool:
+        """Return True if the source file exists and is zero bytes."""
+        try:
+            return os.path.getsize(self._name) == 0
+        except OSError:  # pragma: no-cover
+            return False
 
     def read(self, *args) -> bytes:
         """Read bytes from the stream. Arguments are passed through to the
